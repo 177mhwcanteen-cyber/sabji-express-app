@@ -240,6 +240,18 @@ rep(".toast{position:fixed;", """/* v22 रूट, ग्राहक, बिल
 .audcard{border:2px solid #7c3aed;background:linear-gradient(135deg,rgba(124,58,237,.08),transparent)}
 .toast{position:fixed;""")
 
+# v23: खरीद — बिक्री जैसा आसान (टाइल → मात्रा/भाव → कागज़ी खरीद बिल → छूट → सेव)
+rep(".toast{position:fixed;", """/* v23 खरीद */
+.supcard{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(124,58,237,.10),var(--surface));border:1.5px solid rgba(124,58,237,.35);border-radius:18px;padding:12px 14px;box-shadow:var(--shadow)}
+.supcard .mid{flex:1;display:grid;min-width:0}.supcard b{font-size:18px}.supcard .mid span{font-size:13px;color:var(--muted)}
+.supav{width:42px;height:42px;border-radius:12px;background:#ede9fe;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.supopt{display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 12px;text-align:left}
+.supopt .mid{flex:1;display:grid}.supopt .mid span{font-size:12.5px;color:var(--muted)}
+.nsbox summary{font-weight:800;color:var(--leaf);padding:6px 0;cursor:pointer}
+.big-in{font-size:22px!important;font-weight:800;text-align:center}
+.pbarbtn{background:#6d28d9;color:#fff}
+.toast{position:fixed;""")
+
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")

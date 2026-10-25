@@ -152,30 +152,38 @@ async def main():
         assert xb and [l for l in xb[0]["lines"] if l["id"] == "xyz"][0]["note"] == "थैली" and xb[0]["total"] == 130, xb
         print("xyz + new item bill", xb[0]["no"], xb[0]["total"])
         await pg.evaluate("closeSheet()")
-        # ---- खरीद (मंडी) ----
+        # ---- खरीद (मंडी) — बिक्री जैसा ----
         await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
         await pg.fill("#nsName", "पवन सब्ज़ी भंडार"); await pg.fill("#nsPhone", "98290 11111"); await pg.click("[data-nsadd]"); await pg.wait_for_timeout(200)
-        await pg.click('#p-kharid [data-padd="tamatar"]'); await pg.wait_for_timeout(100)
-        await pg.fill('#p-kharid [data-pi="0"] [data-pl="qty"]', "28"); await pg.fill('#p-kharid [data-pi="0"] [data-pl="rate"]', "10")
-        await pg.fill("#pq", "प्याज"); await pg.wait_for_timeout(100); await pg.press("#pq", "Enter"); await pg.wait_for_timeout(150)
-        await pg.fill('#p-kharid [data-pi="1"] [data-pl="qty"]', "92"); await pg.fill('#p-kharid [data-pi="1"] [data-pl="rate"]', "52")
-        await pg.click('[data-ppay="udhar"]'); await pg.fill("#pPaid", "1000"); await pg.press("#pPaid", "Tab")
-        await pg.wait_for_timeout(200)
+        assert await pg.is_visible(".supcard"), "supplier card"
+        await pg.click('#pgrid [data-pitem="tamatar"]'); await pg.wait_for_selector("#piQ")
+        await pg.fill("#piQ", "28"); await pg.fill("#piR", "10"); await pg.click("[data-pisave]"); await pg.wait_for_timeout(200)
+        await pg.fill("#pq", "प्याज 92"); await pg.press("#pq", "Enter"); await pg.wait_for_selector("#piQ")
+        assert await pg.input_value("#piQ") == "92"
+        await pg.fill("#piR", ""); await pg.fill("#piA", "4784"); await pg.wait_for_timeout(100)
+        assert await pg.input_value("#piR") == "52", await pg.input_value("#piR")
+        await pg.click("[data-pisave]"); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f"{SHOTS}/8-kharid.png", full_page=True)
+        await pg.click("[data-pbill]"); await pg.wait_for_selector("#pNet")
+        await pg.fill("#pNet", "5000"); await pg.press("#pNet", "Tab"); await pg.wait_for_timeout(200)
+        assert await pg.input_value("#pDisc") == "64", await pg.input_value("#pDisc")
+        await pg.click('[data-ppay="udhar"]'); await pg.wait_for_timeout(150); await pg.fill("#pPaid", "1000"); await pg.press("#pPaid", "Tab"); await pg.wait_for_timeout(200)
         async with pg.expect_file_chooser() as fc:
             await pg.click("[data-pphoto]")
-        await (await fc.value).set_files(os.path.join(WWW, "img", "tamatar.jpg")); await pg.wait_for_timeout(600)
+        await (await fc.value).set_files(os.path.join(WWW, "img", "tamatar.jpg")); await pg.wait_for_timeout(800)
+        await pg.screenshot(path=f"{SHOTS}/8b-kharid-bill.png", full_page=True)
         await pg.click("[data-psave]"); await pg.wait_for_timeout(3500)
         pur = await pg.evaluate("Object.values(window.__MOCK__.purchases||{})")
-        assert len(pur) == 1 and pur[0]["total"] == 5064 and pur[0]["due"] == 4064 and pur[0]["supName"] == "पवन सब्ज़ी भंडार", pur
-        print("purchase", pur[0]["total"], "due", pur[0]["due"], "photos", pur[0].get("photos"), "pending", pur[0].get("photoPending"), "uploads", UPLOADS)
+        assert len(pur) == 1 and pur[0]["gross"] == 5064 and pur[0]["disc"] == 64 and pur[0]["total"] == 5000 and pur[0]["due"] == 4000 and pur[0]["supName"] == "पवन सब्ज़ी भंडार", pur
+        print("purchase", pur[0]["gross"], "disc", pur[0]["disc"], "net", pur[0]["total"], "due", pur[0]["due"], "photos", pur[0].get("photos"), "pending", pur[0].get("photoPending"), "uploads", UPLOADS)
         assert UPLOADS and pur[0]["photos"] and pur[0]["photoPending"] == 0, "photo upload failed"
         assert await pg.evaluate("SF.pendingPhotos()") == 0, "photo not deleted from phone"
+        assert await pg.is_visible(".supcard"), "supplier should stay filled for next purchase"
         await pg.screenshot(path=f"{SHOTS}/9-kharid-saved.png", full_page=True)
         # संस्था को प्याज — आज के खरीद भाव ₹52 पर
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(200)
         inst_rate = await pg.evaluate("(()=>{S.mode='inst';const r=priceOf(item('pyaj'));S.mode='walk';return r})()")
-        assert inst_rate == 52, inst_rate
+        assert inst_rate == 51.34, inst_rate
         # लेबल: सब्ज़ी की टोकरी — टमाटर (नाम + भाव + बारकोड) → स्कैन → वज़न पूछे
         await pg.click('[data-tab="label"]'); await pg.wait_for_timeout(200)
         await pg.click('[data-ltype="sabzi"]'); await pg.wait_for_timeout(150)

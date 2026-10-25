@@ -83,11 +83,16 @@ SF.flushPhotos=async function(){
 
 /* =============== 🛒 खरीद स्क्रीन =============== */
 let P=null;
-function blankP(){return {supId:"",lines:[],pay:"vikram",paid:"",note:"",photos:0,q:""}}
+/* पिछली बार इसी फोन से जिस दुकान से खरीदा — वही पहले से भरी मिले */
+function lastSupId(){const mine=S.purchHist.concat(S.purch).filter(p=>!p.cancelled&&(!S.uid||p.by===S.uid)).sort((a,b)=>b.ts-a.ts)[0];const id=mine?mine.supId:(LS.get("se_lastsup")||"");return S.suppliers.find(s=>s.id===id)?id:""}
+function blankP(){return {supId:lastSupId(),supAuto:true,lines:[],pay:"vikram",paid:"",net:"",note:"",photos:0,q:"",sq:""}}
 function loadDraft(){try{P=JSON.parse(LS.get("se_pdraft")||"null")}catch(e){P=null}if(!P)P=blankP();if(!P.lines)P.lines=[]}
 const saveDraft=()=>LS.set("se_pdraft",JSON.stringify({...P,photos:0}));
 let draftPhotos=[];
-const pTotal=()=>r2(P.lines.reduce((a,l)=>a+r2(num(l.qty)*num(l.rate)),0));
+const lAmt=l=>r2(num(l.qty)*num(l.rate));
+const pTotal=()=>r2(P.lines.reduce((a,l)=>a+lAmt(l),0)); // बिल का जोड़
+const pNet=()=>{const g=pTotal();const n=String(P.net??"").trim();return n===""?g:Math.max(0,Math.min(g,r2(num(n))))}; // असल में देने हैं
+const pDisc=()=>r2(pTotal()-pNet());
 const pNo=(p,idx)=>{const [y,m,d]=(p?p.date:today()).split("-");return `ख-${d}/${m}-${String(idx).padStart(2,"0")}`};
 function supDue(id){const due=S.purchHist.concat(S.purch).filter((p,i,a)=>!p.cancelled&&p.supId===id&&a.findIndex(x=>x.id===p.id)===i).reduce((a,p)=>a+num(p.due),0);const paid=S.supPay.filter(x=>x.supId===id).reduce((a,x)=>a+num(x.amt),0);return r2(due-paid)}
 function rateBadge(id,rate){
@@ -97,72 +102,150 @@ function rateBadge(id,rate){
   const pct=Math.round(d/l.rate*100);
   return d>0?`<span class="pill red">🔺 पिछली बार ${rs(l.rate)}${when} → ${rs(rate)} (+${pct}%)</span>`:`<span class="pill blue">🔻 पिछली बार ${rs(l.rate)}${when} → ${rs(rate)} (${pct}%)</span>`;
 }
+const uOf=it=>it?(UNITS[it.unit]||it.unit):"नग";
+function pPick(){const qq=(P.q||"").trim().toLowerCase().replace(/\s*\d+([.,]\d+)?\s*(kg|किलो)?$/i,"").trim();
+  return S.items.filter(i=>i.active!==false&&!i.virtual&&(!qq||(i.name+" "+(i.alias||"")+" "+i.id+" "+(window.SN?SN.en(i):"")).toLowerCase().includes(qq)))}
+function pGridHTML(){
+  return pPick().map(it=>{const lr=lastRate(it.id);const inC=P.lines.filter(l=>l.id===it.id).reduce((a,l)=>a+num(l.qty),0);
+    return `<button class="card" data-pitem="${esc(it.id)}">${tileHTML(it)}${inC?`<span class="badge">${fq(inC,it.unit)}</span>`:""}<span class="nm">${esc(it.name)}${window.SN&&SN.en(it)?`<small class="en">${esc(SN.en(it))}</small>`:""}</span><span class="pr">${lr?`पिछली <b>${rs(lr.rate)}</b>/${uOf(it)}`:"पहली खरीद"}</span></button>`}).join("")
+  +`<button class="card addnew" data-pitem=""><span class="tile"><span class="em">📦</span></span><span class="nm">दूसरा सामान<small class="en">पॉलीथीन, रस्सी…</small></span><span class="pr">लिस्ट में नहीं</span></button>`;
+}
+function supPickHTML(){
+  const q=(P.sq||"").trim().toLowerCase(),qd=q.replace(/\D/g,"");
+  const L=S.suppliers.filter(s=>!q||String(s.name||"").toLowerCase().includes(q)||(qd.length>=3&&String(s.phone||"").includes(qd))).slice(0,q?20:8);
+  return `${L.map(s=>{const due=supDue(s.id);return `<button class="supopt" data-psup="${esc(s.id)}"><span class="supav">🏪</span><span class="mid"><b>${esc(s.name)}</b><span>${s.phone?"📞 "+esc(s.phone):"नंबर नहीं"}${due>0?` · बाकी ${rs(due)}`:""}</span></span><span>›</span></button>`}).join("")||'<p class="note" style="margin:4px 0">कोई दुकान नहीं मिली — नीचे नई जोड़ें</p>'}`;
+}
 SF.renderKharid=function(force){
   if(!P)loadDraft();
+  if(P.supAuto&&!P.supId&&!P.lines.length){const id=lastSupId();if(id)P.supId=id}
   const el=$("#p-kharid");if(!el)return;
-  if(!force&&el.contains(document.activeElement)&&document.activeElement.matches("input[data-pl],input#pq,input#pPaid,input#pNote"))return; // टाइप करते समय दोबारा न बनाओ
+  if(!force&&el.contains(document.activeElement)&&document.activeElement.matches("input#pq,input#psq,input#nsName,input#nsPhone"))return;
   const sup=S.suppliers.find(s=>s.id===P.supId),tot=pTotal();
   const list=livePurch(),nextNo=pNo(null,S.purch.length+1);
-  const qq=(P.q||"").trim().toLowerCase();
-  const pick=S.items.filter(i=>i.active!==false&&(!qq||(i.name+" "+(i.alias||"")+" "+i.id).toLowerCase().includes(qq))).slice(0,qq?24:60);
-  const paidV=P.pay==="udhar"?num(P.paid):tot;
+  const lastP=sup?S.purchHist.concat(S.purch).filter(p=>!p.cancelled&&p.supId===sup.id).sort((a,b)=>b.ts-a.ts)[0]:null;
   el.innerHTML=`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">🛒 मंडी खरीद</h2><span class="pill blue" style="font-size:14px">नया: ${nextNo}</span></div>
-  <div class="card2">
-    <h3>1. दुकान / आढ़तिया</h3>
-    ${sup?`<div class="supsel"><b>🏪 ${esc(sup.name)}</b><span class="note">${esc(sup.phone||"")}${supDue(sup.id)>0?` · पहले का बाकी ${rs(supDue(sup.id))}`:""}</span><button class="lnk" data-psup="">बदलें</button></div>`
-    :`<div class="seg" style="margin:0">${S.suppliers.slice(0,12).map(s=>`<button class="chip" data-psup="${esc(s.id)}">🏪 ${esc(s.name)}</button>`).join("")}</div>
-      <div class="row2" style="margin:0"><input class="inp" id="nsName" placeholder="नई दुकान का नाम" aria-label="नई दुकान का नाम"><input class="inp" id="nsPhone" inputmode="tel" placeholder="मोबाइल (ज़रूरी नहीं)" aria-label="दुकान का मोबाइल"></div>
-      <button class="big ghost" data-nsadd>+ नई दुकान जोड़ें</button>`}
-  </div>
-  <div class="card2">
-    <h3>2. क्या-क्या लिया</h3>
-    ${P.lines.length?`<div class="plines">${P.lines.map((l,i)=>{const it=item(l.id);const amt=r2(num(l.qty)*num(l.rate));const u=it?(UNITS[it.unit]||it.unit):"";
-      return `<div class="pline" data-pi="${i}">${it?tileHTML(it):'<span class="tile"><span class="em">📦</span></span>'}<div style="min-width:0">
-        <div class="stkmeta"><b style="color:var(--ink);font-size:16px">${esc(it?it.name:l.name)}</b><button class="lnk" data-prm="${i}" style="color:var(--chili)">हटाएँ</button></div>
-        ${it?"":`<input class="inp" data-pl="name" value="${esc(l.name||"")}" placeholder="क्या लिया (जैसे पॉलीथीन)" aria-label="सामान का नाम" style="margin-bottom:6px">`}
-        <div class="pf"><label class="fld">${it&&it.unit!=="kg"?"गिनती ("+u+")":"किलो"}<input class="inp" data-pl="qty" inputmode="decimal" value="${l.qty??""}" placeholder="0"></label>
-        <label class="fld">भाव ₹/${it?u:"नग"}<input class="inp" data-pl="rate" inputmode="decimal" value="${l.rate??""}" placeholder="${it&&lastRate(it.id)?lastRate(it.id).rate:"0"}"></label>
-        <div class="fld"><span>रकम</span><b class="pamt">${rs(amt)}</b></div></div>
-        ${it?`<div class="pbadge">${rateBadge(it.id,num(l.rate))}</div>`:""}
-      </div></div>`}).join("")}</div>`:'<p class="note" style="margin:0">नीचे से सब्ज़ी चुनें।</p>'}
-    <input class="inp" id="pq" type="search" placeholder="🔍 सब्ज़ी खोजें" value="${esc(P.q||"")}" autocomplete="off" aria-label="सब्ज़ी खोजें">
-    <div class="ppick">${pick.map(it=>`<button data-padd="${esc(it.id)}" aria-label="${esc(it.name)}">${tileHTML(it)}<span>${esc(it.name)}</span></button>`).join("")}
-      <button data-padd="" aria-label="दूसरा सामान"><span class="tile"><span class="em">📦</span></span><span>दूसरा सामान</span></button></div>
-  </div>
-  <div class="card2">
-    <h3>3. भुगतान</h3>
-    <div class="amtline" style="margin:0"><span>कुल रकम (ऐप ने जोड़ी)</span><b>${rs(tot)}</b></div>
-    <div class="paym" style="margin:0">${Object.entries(PAY).map(([k,v])=>`<button data-ppay="${k}" aria-pressed="${P.pay===k}">${v}</button>`).join("")}</div>
-    ${P.pay==="udhar"?`<label class="fld">अभी कितना दिया ₹ (कुछ नहीं दिया तो 0)<input class="inp" id="pPaid" inputmode="decimal" value="${esc(P.paid??"")}" placeholder="0"></label><p class="note" style="margin:0">दुकान का बाकी: <b id="pDue" style="color:var(--chili)">${rs(r2(tot-Math.min(paidV,tot)))}</b></p>`:""}
-    <input class="inp" id="pNote" placeholder="कुछ लिखना हो (ज़रूरी नहीं)" value="${esc(P.note||"")}" aria-label="नोट">
-  </div>
-  <div class="card2">
-    <h3>4. बिल की फोटो</h3>
-    <p class="note" style="margin:0">फोटो छोटी होकर फोन में रुकेगी और नेट मिलते ही Google Drive में चली जाएगी, फिर फोन से अपने-आप मिट जाएगी।</p>
-    <button class="big ghost" data-pphoto>📷 बिल की फोटो लें ${draftPhotos.length?"("+draftPhotos.length+" ली गईं)":""}</button>
-  </div>
-  <button class="big" data-psave ${tot>0?"":"disabled"}>✓ खरीद सेव करें · ${rs(tot)}</button>
-  <p class="note" style="text-align:center;margin:6px 0 16px">सेव करते ही माल आज के स्टॉक में जुड़ जाएगा।</p>
-  ${list.length?`<h3 style="margin:8px 0 6px">आज की खरीद · ${list.length} बिल · ${rs(r2(list.reduce((a,p)=>a+num(p.total),0)))}</h3>
-  <div class="list">${list.map((p,i)=>`<button class="li" data-pview="${esc(p.id)}"><div class="mid"><b>${pNo(p,i+1)} · ${esc(p.supName||"दुकान")}</b><span>${ftime(p.ts)} · ${esc(p.byName||"")} · ${PAY[p.pay]||""}${num(p.due)>0?" · बाकी "+rs(p.due):""} · ${(p.photos||[]).length?"📷 "+(p.photos||[]).length:num(p.photoPending)>0?"📷 भेजनी बाकी":"फोटो नहीं"}</span></div><div class="rt">${rs(p.total)}<small>${(p.lines||[]).length} सामान</small></div></button>`).join("")}</div>`:""}
-  ${S.isOwner?supSummaryHTML():""}`;
+  ${sup?`<div class="supcard"><span class="supav">🏪</span><div class="mid"><b>${esc(sup.name)}</b><span>${sup.phone?"📞 "+esc(sup.phone):"नंबर नहीं"} · ${supDue(sup.id)>0?`<b style="color:var(--chili)">पहले का बाकी ${rs(supDue(sup.id))}</b>`:"हिसाब साफ़"}${lastP?" · आखिरी खरीद "+fdate(lastP.date).slice(0,5):""}</span></div><button class="chip" data-psupch>बदलें</button></div>`
+  :`<div class="card2"><h3>🏪 किस दुकान / आढ़तिया से खरीदा?</h3>
+    <input class="inp" id="psq" type="search" placeholder="🔍 दुकान का नाम या मोबाइल नंबर" value="${esc(P.sq||"")}" autocomplete="off" aria-label="दुकान खोजें">
+    <div class="list" id="psl" style="margin:6px 0">${supPickHTML()}</div>
+    <details class="nsbox" ${S.suppliers.length?"":"open"}><summary>➕ नई दुकान जोड़ें</summary>
+      <div class="row2" style="margin:6px 0 0"><input class="inp" id="nsName" placeholder="दुकान का नाम" aria-label="नई दुकान का नाम" value="${esc(/\d/.test(P.sq||"")?"":(P.sq||""))}"><input class="inp" id="nsPhone" inputmode="tel" placeholder="मोबाइल नंबर" aria-label="दुकान का मोबाइल" value="${esc(/\d{3,}/.test(P.sq||"")?String(P.sq).replace(/\D/g,""):"")}"></div>
+      <button class="big ghost" data-nsadd style="margin-top:6px">+ दुकान जोड़ें</button></details></div>`}
+  <input class="inp" id="pq" type="search" placeholder="🔍 सब्ज़ी खोजें — जैसे टमाटर 25" value="${esc(P.q||"")}" autocomplete="off" aria-label="सब्ज़ी खोजें" style="margin:10px 0">
+  <div class="grid" id="pgrid">${pGridHTML()}</div>
+  ${list.length?`<h3 style="margin:16px 0 6px">आज की खरीद · ${list.length} बिल · ${rs(r2(list.reduce((a,p)=>a+num(p.total),0)))}</h3>
+  <div class="list">${list.map((p,i)=>`<button class="li" data-pview="${esc(p.id)}"><div class="mid"><b>${pNo(p,i+1)} · ${esc(p.supName||"दुकान")}</b><span>${ftime(p.ts)} · ${esc(p.byName||"")} · ${PAY[p.pay]||""}${num(p.disc)>0?" · छूट "+rs(p.disc):""}${num(p.due)>0?" · बाकी "+rs(p.due):""} · ${(p.photos||[]).length?"📷 "+(p.photos||[]).length:num(p.photoPending)>0?"📷 भेजनी बाकी":"फोटो नहीं"}</span></div><div class="rt">${rs(p.total)}<small>${(p.lines||[]).length} सामान</small></div></button>`).join("")}</div>`:""}
+  ${S.isOwner?supSummaryHTML():""}
+  <div style="height:${P.lines.length?96:16}px"></div>
+  ${P.lines.length?`<div class="cartbar px"><button class="cartbtn pbarbtn" data-pbill><span class="c">${P.lines.length} सामान<br>${sup?esc(sup.name):"दुकान चुनें"}</span><span class="t">${rs(tot)}</span><span class="go">खरीद बिल ›</span></button></div>`:""}`;
 };
 function supSummaryHTML(){
   const rows=S.suppliers.map(s=>({s,due:supDue(s.id)})).filter(x=>Math.abs(x.due)>=1);
   if(!rows.length)return "";
   return `<h3 style="margin:14px 0 6px">दुकानों का बाकी (हमें देना है)</h3><div class="list">${rows.map(x=>`<div class="li"><div class="mid"><b>🏪 ${esc(x.s.name)}</b><span>${esc(x.s.phone||"")}</span></div><div class="rt" style="color:var(--chili)">${rs(x.due)}<small><button class="lnk" data-spay="${esc(x.s.id)}">भुगतान दर्ज करें</button></small></div></div>`).join("")}</div>`;
 }
-function addLine(id){const it=id?item(id):null;const ex=it&&P.lines.find(l=>l.id===it.id);if(ex){toast(it.name+" पहले से जुड़ा है — मात्रा बदलें");return}
-  P.lines.push({id:id||"",name:it?it.name:"",qty:"",rate:""});P.q="";saveDraft();SF.renderKharid(1);
-  setTimeout(()=>{const r=document.querySelectorAll('#p-kharid .pline');const last=r[r.length-1];const f=last&&last.querySelector(id?'[data-pl="qty"]':'[data-pl="name"]');if(f)f.focus()},30)}
+/* सामान चुनते ही छोटा फॉर्म — कितना, किस भाव (या कुल रकम) */
+function pItemSheet(id,idx,qty0){
+  const ln=idx!=null?P.lines[idx]:null;if(ln)id=ln.id;
+  const it=id?item(id):null,lr=it?lastRate(it.id):null,u=uOf(it),kg=!it||it.unit==="kg";
+  const q0=ln?ln.qty:(qty0||""),r0=ln?ln.rate:(lr?lr.rate:"");
+  const chips=kg&&it?[5,10,20,25,50,100]:[1,2,5,10,20,50];
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="खरीद का सामान"><div class="grab"></div>
+  <div class="sh-head"><div style="display:flex;gap:10px;align-items:center">${it?tileHTML(it):'<span class="tile"><span class="em">📦</span></span>'}<div><h3 style="margin:0">${it?esc(it.name):"दूसरा सामान"}${it&&window.SN&&SN.en(it)?` <small class="note">(${esc(SN.en(it))})</small>`:""}</h3><span class="note">${lr?`पिछली खरीद ${rs(lr.rate)}/${u}${lr.date?" · "+fdate(lr.date).slice(0,5):""}`:"पहली बार खरीद रहे हैं"}</span></div></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  ${it?"":`<label class="fld">क्या लिया<input class="inp" id="piN" value="${esc(ln?ln.name:"")}" placeholder="जैसे पॉलीथीन, रस्सी, भाड़ा"></label>`}
+  <label class="fld">कितना लिया (${kg&&it?"किलो":u})<input class="inp big-in" id="piQ" inputmode="decimal" value="${q0}" placeholder="0"></label>
+  <div class="lsws" style="margin:6px 0 10px">${chips.map(c=>`<button class="chip" data-piq="${c}">${c}${kg&&it?" kg":""}</button>`).join("")}</div>
+  <div class="row2" style="margin:0"><label class="fld">भाव ₹/${kg&&it?"किलो":u}<input class="inp big-in" id="piR" inputmode="decimal" value="${r0}" placeholder="₹"></label>
+  <label class="fld">या कुल रकम ₹<input class="inp big-in" id="piA" inputmode="decimal" value="${q0&&r0?r2(num(q0)*num(r0)):""}" placeholder="₹"></label></div>
+  <div id="piB" class="pbadge" style="margin:8px 0">${it?rateBadge(it.id,num(r0)):""}</div>
+  <button class="big" data-pisave>✓ ${ln?"बदलें":"खरीद में जोड़ें"} · <span id="piT">${rs(r2(num(q0)*num(r0)))}</span></button>
+  ${ln?`<button class="big ghost" data-pidel style="margin-top:8px;color:var(--chili)">✕ यह सामान हटाएँ</button>`:""}</div></div>`;
+  const Q=$("#piQ"),Rt=$("#piR"),A=$("#piA");
+  const upd=src=>{const q=num(Q.value),r=num(Rt.value);
+    if(src==="a"){if(q>0&&num(A.value)>0)Rt.value=r2(num(A.value)/q)}else if(src!=="init")A.value=q>0&&r>0?r2(q*r):"";
+    const rr=num(Rt.value);$("#piT").textContent=rs(r2(q*rr));if(it)$("#piB").innerHTML=rateBadge(it.id,rr)};
+  $("#sheet").oninput=e=>{if(e.target===A)upd("a");else if(e.target===Q){if(num(A.value)>0&&!num(Rt.value))upd("a");else upd("q")}else if(e.target===Rt)upd("r")};
+  $("#sheet").onclick=e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    const c=e.target.closest("[data-piq]");if(c){Q.value=c.dataset.piq;upd("q");return}
+    if(e.target.closest("[data-pidel]")){P.lines.splice(idx,1);saveDraft();closeSheet();SF.renderKharid(1);if(P.lines.length)pBillSheet();return}
+    if(!e.target.closest("[data-pisave]"))return;
+    const q=r2(num(Q.value)*1000)/1000,r=r2(num(Rt.value)),nm=it?it.name:String(($("#piN")||{}).value||"").trim();
+    if(!it&&!nm){toast("क्या लिया — यह लिखें");return}if(!(q>0)){toast("कितना लिया — यह लिखें");Q.focus();return}if(!(r>0)){toast("भाव या कुल रकम लिखें");Rt.focus();return}
+    const line={id:it?it.id:"",name:nm,unit:it?it.unit:"pc",qty:q,rate:r};
+    if(ln)P.lines[idx]=line;else{const ex=it&&P.lines.findIndex(l=>l.id===it.id);if(it&&ex>-1){P.lines[ex]={...line,qty:r2((num(P.lines[ex].qty)+q)*1000)/1000}}else P.lines.push(line)}
+    P.q="";P.net="";saveDraft();closeSheet();SF.renderKharid(1);beep(true);toast("✓ "+nm+" "+fq(q,line.unit)+" × "+rs(r)+" = "+rs(r2(q*r)));
+    if(ln)pBillSheet();
+  };
+  $("#sheet").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();const s=$("[data-pisave]");if(s)s.click()}};
+  setTimeout(()=>{const f=it?(q0?Rt:Q):$("#piN");if(f){f.focus();f.select&&f.select()}},120);
+}
+/* बिक्री जैसा कागज़ी खरीद बिल — छूट, भुगतान, फोटो, सेव */
+function pBillSheet(){
+  const sup=S.suppliers.find(s=>s.id===P.supId),g=pTotal(),net=pNet(),disc=pDisc(),no=pNo(null,S.purch.length+1);
+  const paidNow=P.pay==="udhar"?Math.min(num(P.paid),net):net;
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="खरीद बिल"><div class="grab"></div>
+  <div class="sh-head"><div><h3>🧾 खरीद बिल</h3><span class="note">पंक्ति पर दबाकर मात्रा/भाव बदलें</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="pp-slot"><div class="pp-printer"></div><div class="paper pp-anim">
+    <div class="pp-head"><div class="pp-logo">🛒</div><b>खरीद बिल</b><small>सब्ज़ी एक्सप्रेस · जालीपा कैंट, बाड़मेर</small></div>
+    <div class="pp-rule"></div>
+    <div class="pp-tag ud" style="border-color:#7c3aed;color:#6d28d9">🏪 ${sup?esc(sup.name):"⚠ दुकान नहीं चुनी"}${sup&&sup.phone?" · "+esc(sup.phone):""}</div>
+    <div class="pp-meta"><span>खरीद नं <b>${no}</b></span><span>${fdate(today())} · ${ftime(Date.now())}</span></div>
+    <div class="pp-meta"><span>खरीदार: <b>${esc(biller())}</b></span><span>${P.lines.length} सामान</span></div>
+    <div class="pp-dash"></div>
+    <table class="pp-t"><thead><tr><th>क्र.</th><th>सामान</th><th class="r">मात्रा</th><th class="r">भाव</th><th class="r">रकम</th><th></th></tr></thead><tbody>
+    ${P.lines.map((l,i)=>{const it=l.id?item(l.id):null;const lr=it?lastRate(it.id):null;const up=lr&&num(l.rate)>lr.rate*1.03;
+      return `<tr data-pedit="${i}"><td>${i+1}</td><td>${esc(l.name||(it&&it.name)||"")}${up?` <span class="pp-chg">🔺 पहले ₹${lr.rate}</span>`:""}</td><td class="r">${fq(l.qty,l.unit||(it&&it.unit)||"pc").replace(" कि.ग्रा"," kg")}</td><td class="r">₹${l.rate}</td><td class="r"><b>₹${lAmt(l)}</b></td><td><button class="pp-x" data-pdel="${i}" aria-label="हटाएँ">✕</button></td></tr>`}).join("")}
+    </tbody></table>
+    <div class="pp-dash"></div>
+    <div class="pp-row"><span>बिल का जोड़</span><span>₹${g}</span></div>
+    ${disc>0?`<div class="pp-row" style="color:#1f8a4c;font-weight:700"><span>छूट (कम दिए)</span><span>−₹${disc}</span></div>`:""}
+    <div class="pp-total"><span>देने हैं</span><b>₹${net}</b></div>
+    ${P.pay==="udhar"?`<div class="pp-row"><span>अभी दिए</span><span>₹${r2(paidNow)}</span></div><div class="pp-row" style="color:var(--chili);font-weight:800"><span>दुकान का बाकी</span><span>₹${r2(net-paidNow)}</span></div>`:""}
+    ${sup&&supDue(sup.id)>0?`<div class="pp-row note"><span>इस दुकान का पहले का बाकी</span><span>₹${supDue(sup.id)}</span></div>`:""}
+  </div></div>
+  <div class="card2" style="margin-top:6px"><h3>🏷️ छूट — दुकान ने कम लिए?</h3>
+    <div class="row2" style="margin:0"><label class="fld">असल में देने हैं ₹<input class="inp big-in" id="pNet" inputmode="decimal" value="${esc(P.net??"")}" placeholder="${g}"></label>
+    <label class="fld">या छूट ₹<input class="inp big-in" id="pDisc" inputmode="decimal" value="${disc||""}" placeholder="0"></label></div>
+    <p class="note" style="margin:4px 0 0">जैसे बिल ₹1620 का बना पर ₹1500 लिए — "देने हैं" में 1500 लिखें, छूट ₹120 अपने-आप।</p></div>
+  <div class="card2"><h3>💳 भुगतान किसने किया?</h3>
+    <div class="paym" style="margin:0">${Object.entries(PAY).map(([k,v])=>`<button data-ppay="${k}" aria-pressed="${P.pay===k}">${v}</button>`).join("")}</div>
+    ${P.pay==="udhar"?`<label class="fld">अभी कितना दिया ₹ (कुछ नहीं दिया तो 0)<input class="inp" id="pPaid" inputmode="decimal" value="${esc(P.paid??"")}" placeholder="0"></label>`:""}
+    <input class="inp" id="pNote" placeholder="कुछ लिखना हो (ज़रूरी नहीं)" value="${esc(P.note||"")}" aria-label="नोट" style="margin-top:8px"></div>
+  <div class="card2"><h3>📷 दुकान के बिल की फोटो</h3><p class="note" style="margin:0">नेट मिलते ही Google Drive में चली जाएगी, फिर फोन से अपने-आप मिटेगी।</p>
+    <button class="big ghost" data-pphoto>📷 फोटो लें ${draftPhotos.length?"("+draftPhotos.length+" ली गईं ✓)":""}</button></div>
+  ${sup?"":`<p class="warn">⚠ पहले ऊपर "दुकान" चुनें — बिल बंद करके दुकान चुनें</p>`}
+  <button class="big" data-psave ${net>0&&sup?"":"disabled"}>✓ खरीद सेव करें · ${rs(net)}</button>
+  <p class="note" style="text-align:center;margin:6px 0 0">सेव करते ही माल आज के स्टॉक में जुड़ जाएगा · खरीद नं अपने-आप</p>
+  </div></div>`;
+  const sh=$("#sheet");
+  sh.oninput=e=>{const t=e.target;
+    if(t.id==="pNet"){P.net=t.value;saveDraft();const d=$("#pDisc");if(d)d.value=pDisc()||"";return}
+    if(t.id==="pDisc"){const d=Math.max(0,num(t.value));P.net=d>0?String(r2(pTotal()-d)):"";saveDraft();const n=$("#pNet");if(n)n.value=P.net;return}
+    if(t.id==="pPaid"){P.paid=t.value;saveDraft();return}
+    if(t.id==="pNote"){P.note=t.value;saveDraft();return}};
+  sh.onchange=e=>{if(e.target.id==="pNet"||e.target.id==="pDisc"||e.target.id==="pPaid"){const y=sh.querySelector(".sheet").scrollTop;pBillSheet();const s2=sh.querySelector(".sheet");if(s2){s2.scrollTop=y;s2.querySelector(".pp-anim")&&s2.querySelector(".pp-anim").classList.remove("pp-anim")}}};
+  sh.onclick=e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    const del=e.target.closest("[data-pdel]");if(del){P.lines.splice(+del.dataset.pdel,1);P.net="";saveDraft();SF.renderKharid(1);if(P.lines.length)pBillSheet();else closeSheet();return}
+    const ed=e.target.closest("[data-pedit]");if(ed){pItemSheet(null,+ed.dataset.pedit);return}
+    const pp=e.target.closest("[data-ppay]");if(pp){P.pay=pp.dataset.ppay;if(P.pay==="udhar"&&P.paid==="")P.paid="0";saveDraft();const y=sh.querySelector(".sheet").scrollTop;pBillSheet();const s2=sh.querySelector(".sheet");if(s2)s2.scrollTop=y;return}
+    if(e.target.closest("[data-pphoto]")){pickPhoto(b=>{draftPhotos.push(b);toast("📷 फोटो ली गई ("+Math.round(b.size/1024)+" KB)");pBillSheet()});return}
+    if(e.target.closest("[data-psave]")){savePurchase();return}
+  };
+}
+SF.pBillSheet=pBillSheet;
 async function savePurchase(){
-  const tot=pTotal();if(!(tot>0)){toast("पहले सामान, किलो और भाव लिखें");return}
+  const gross=pTotal();if(!(gross>0)){toast("पहले सामान, मात्रा और भाव लिखें");return}
   const bad=P.lines.find(l=>!(num(l.qty)>0)||!(num(l.rate)>0)||(!l.id&&!String(l.name||"").trim()));if(bad){toast("हर लाइन में मात्रा और भाव दोनों लिखें");return}
   const sup=S.suppliers.find(s=>s.id===P.supId);if(!sup){toast("पहले दुकान/आढ़तिया चुनें");return}
   if(S.saving)return;S.saving=true;
-  const ts=Date.now(),id="p"+uid(),paid=P.pay==="udhar"?Math.min(num(P.paid),tot):tot;
-  const lines=P.lines.map(l=>{const it=item(l.id);const lr=it?lastRate(it.id):null;return {id:l.id||"",name:it?it.name:String(l.name).trim(),unit:it?it.unit:"pc",qty:r2(num(l.qty)*1000)/1000,rate:r2(num(l.rate)),amt:r2(num(l.qty)*num(l.rate)),prev:lr?lr.rate:0}});
-  const doc={date:today(),ts,by:S.uid||"",byName:biller(),supId:sup.id,supName:sup.name,supPhone:sup.phone||"",lines,total:tot,pay:P.pay,paid:r2(paid),due:r2(tot-paid),note:String(P.note||"").trim(),photos:[],photoPending:draftPhotos.length,cancelled:false};
+  const net=pNet(),disc=r2(gross-net),f=gross>0?net/gross:1;
+  const ts=Date.now(),id="p"+uid(),paid=P.pay==="udhar"?Math.min(num(P.paid),net):net;
+  // छूट हर सामान में बराबर हिस्से से — ताकि स्टॉक की लागत असली रहे
+  const lines=P.lines.map(l=>{const it=l.id?item(l.id):null;const lr=it?lastRate(it.id):null;const amt=lAmt(l);
+    return {id:l.id||"",name:it?it.name:String(l.name).trim(),unit:it?it.unit:(l.unit||"pc"),qty:r2(num(l.qty)*1000)/1000,rate:r2(num(l.rate)),amt:disc>0?r2(amt*f):amt,billAmt:amt,prev:lr?lr.rate:0}});
+  const doc={date:today(),ts,by:S.uid||"",byName:biller(),supId:sup.id,supName:sup.name,supPhone:sup.phone||"",lines,gross,disc,total:net,pay:P.pay,paid:r2(paid),due:r2(net-paid),note:String(P.note||"").trim(),photos:[],photoPending:draftPhotos.length,cancelled:false};
   try{
     if(S.demo){S.purch.push({id,...doc});}
     else{
@@ -170,20 +253,23 @@ async function savePurchase(){
       S.db.collection("purchases").doc(id).set(doc).catch(e=>toast("खरीद सर्वर पर नहीं गई: "+(e.code||"")));
       S.db.collection("suppliers").doc(sup.id).update({lastTs:ts}).catch(()=>{});
     }
-    S.purchHist.push({id,...doc});
+    S.purchHist.push({id,...doc});LS.set("se_lastsup",sup.id);
     const n=pNo(doc,S.purch.filter(p=>p.date===doc.date).length+(S.purch.find(p=>p.id===id)?0:1));
-    P=blankP();draftPhotos=[];saveDraft();S.saving=false;SF.renderKharid(1);beep(true);
-    toast("✓ खरीद "+n+" सेव · "+rs(tot)+" · माल स्टॉक में जुड़ा");
+    P=blankP();P.supId=sup.id;draftPhotos=[];saveDraft();S.saving=false;closeSheet();SF.renderKharid(1);beep(true);
+    toast("✓ खरीद "+n+" सेव · "+rs(net)+(disc>0?" (छूट "+rs(disc)+")":"")+" · माल स्टॉक में जुड़ा");
     setTimeout(SF.flushPhotos,1500);
   }catch(e){S.saving=false;toast("सेव नहीं हुई: "+(e.message||e.code||""))}
 }
 function viewPurchase(p){
-  const idx=S.purch.findIndex(x=>x.id===p.id)+1;
+  const idx=S.purch.findIndex(x=>x.id===p.id)+1;const g=num(p.gross)||num(p.total);
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="खरीद"><div class="grab"></div>
   <div class="sh-head"><div><h3>खरीद ${pNo(p,idx||1)}</h3><span class="note">${esc(p.supName)} · ${fdate(p.date)} ${ftime(p.ts)} · ${esc(p.byName||"")}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
-  <div class="receipt"><table>${(p.lines||[]).map(l=>`<tr><td>${esc(l.name)} <span class="note">${fq(l.qty,l.unit)} × ${rs(l.rate)}</span>${l.prev&&l.rate>l.prev*1.03?` <span class="pill red">🔺 पहले ${rs(l.prev)}</span>`:l.prev&&l.rate<l.prev*0.97?` <span class="pill blue">🔻 पहले ${rs(l.prev)}</span>`:""}</td><td class="r">${rs(l.amt)}</td></tr>`).join("")}
-  <tr class="tot"><td>कुल</td><td class="r">${rs(p.total)}</td></tr></table>
-  <div class="meta"><span class="pill ${p.pay==="udhar"?"red":"green"}">${PAY[p.pay]||""}${p.pay==="udhar"?" · दिया "+rs(p.paid)+" · बाकी "+rs(p.due):""}</span></div>${p.note?`<p class="note">📝 ${esc(p.note)}</p>`:""}</div>
+  <div class="paper"><div class="pp-head"><div class="pp-logo">🛒</div><b>खरीद बिल</b><small>${esc(p.supName)}${p.supPhone?" · "+esc(p.supPhone):""}</small></div><div class="pp-rule"></div>
+  <table class="pp-t"><thead><tr><th>क्र.</th><th>सामान</th><th class="r">मात्रा</th><th class="r">भाव</th><th class="r">रकम</th></tr></thead><tbody>
+  ${(p.lines||[]).map((l,i)=>`<tr><td>${i+1}</td><td>${esc(l.name)}${l.prev&&l.rate>l.prev*1.03?` <span class="pp-chg">🔺 पहले ₹${l.prev}</span>`:""}</td><td class="r">${fq(l.qty,l.unit).replace(" कि.ग्रा"," kg")}</td><td class="r">₹${l.rate}</td><td class="r"><b>₹${num(l.billAmt)||l.amt}</b></td></tr>`).join("")}</tbody></table>
+  <div class="pp-dash"></div><div class="pp-row"><span>बिल का जोड़</span><span>₹${g}</span></div>${num(p.disc)>0?`<div class="pp-row" style="color:#1f8a4c;font-weight:700"><span>छूट</span><span>−₹${p.disc}</span></div>`:""}
+  <div class="pp-total"><span>दिए / देने</span><b>₹${p.total}</b></div>
+  <div class="pp-stamp${p.pay==="udhar"&&num(p.due)>0?" red":""}">${PAY[p.pay]||""}${p.pay==="udhar"?" · दिया ₹"+p.paid+" · बाकी ₹"+p.due:""}</div>${p.note?`<p class="note">📝 ${esc(p.note)}</p>`:""}</div>
   <h4 style="margin:10px 0 6px">बिल की फोटो</h4>
   ${(p.photos||[]).length?(p.photos||[]).map((f,i)=>`<a class="big ghost" style="margin-bottom:6px" target="_blank" rel="noopener" href="${esc(f.url)}">📷 फोटो ${i+1} देखें (Google Drive)</a>`).join(""):`<p class="note">${num(p.photoPending)>0?"📷 फोटो अभी उस फोन से Drive पर जानी बाकी है":"इस खरीद की फोटो नहीं ली गई"}</p>`}
   ${p.by===S.uid&&!p.cancelled&&!S.demo?`<button class="big ghost" data-paddphoto style="margin-top:8px">📷 और फोटो जोड़ें</button>`:""}
@@ -209,35 +295,24 @@ function supPaySheet(sid){
       if(S.demo)S.supPay.push({id:uid(),...d});else S.db.collection("supPay").doc("s"+uid()).set(d).catch(()=>toast("सेव नहीं हुआ"));
       S.supPay.push({id:"tmp",...d});closeSheet();toast(s.name+" को "+rs(amt)+" दर्ज");SF.renderKharid(1)}};
 }
-function updDue(){const d=$("#pDue");if(d){const tot=pTotal();d.textContent=rs(r2(tot-Math.min(num(P.paid),tot)))}}
 SF.bindKharid=function(){
   const el=$("#p-kharid");
   el.addEventListener("input",e=>{const t=e.target;
-    if(t.id==="pq"){P.q=t.value;const pos=t.selectionStart;SF.renderKharid._q=true;const v=t.value;
-      // सिर्फ़ चुनने वाली सूची बदलो, कीबोर्ड बना रहे
-      const qq=v.trim().toLowerCase();const box=el.querySelector(".ppick");if(box){const pick=S.items.filter(i=>i.active!==false&&(!qq||(i.name+" "+(i.alias||"")+" "+i.id).toLowerCase().includes(qq))).slice(0,qq?24:60);
-        box.innerHTML=pick.map(it=>`<button data-padd="${esc(it.id)}" aria-label="${esc(it.name)}">${tileHTML(it)}<span>${esc(it.name)}</span></button>`).join("")+`<button data-padd="" aria-label="दूसरा सामान"><span class="tile"><span class="em">📦</span></span><span>दूसरा सामान</span></button>`}return}
-    if(t.dataset.pl){const i=+t.closest("[data-pi]").dataset.pi;const l=P.lines[i];if(!l)return;l[t.dataset.pl]=t.value;saveDraft();
-      const row=t.closest(".pline");const amt=r2(num(l.qty)*num(l.rate));const a=row.querySelector(".pamt");if(a)a.textContent=rs(amt);
-      const bdg=row.querySelector(".pbadge");if(bdg&&l.id)bdg.innerHTML=rateBadge(l.id,num(l.rate));
-      const tot=pTotal();const sv=el.querySelector("[data-psave]");if(sv){sv.disabled=!(tot>0);sv.textContent="✓ खरीद सेव करें · "+rs(tot)}
-      const al=el.querySelector(".amtline b");if(al)al.textContent=rs(tot);updDue();return}
-    if(t.id==="pPaid"){P.paid=t.value;saveDraft();updDue();return}
-    if(t.id==="pNote"){P.note=t.value;saveDraft();return}
+    if(t.id==="pq"){P.q=t.value;const g=$("#pgrid");if(g)g.innerHTML=pGridHTML();return}
+    if(t.id==="psq"){P.sq=t.value;const l=$("#psl");if(l)l.innerHTML=supPickHTML();return}
   });
-  el.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pq"){e.preventDefault();const b=el.querySelector(".ppick [data-padd]");if(b&&b.dataset.padd)addLine(b.dataset.padd)}});
+  el.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pq"){e.preventDefault();const L=pPick();const m=String(P.q||"").match(/(\d+(?:[.,]\d+)?)\s*(kg|किलो)?\s*$/i);if(L.length)pItemSheet(L[0].id,null,m?num(m[1]):"")}});
   el.addEventListener("click",async e=>{
-    const a=e.target.closest("[data-padd]");if(a){addLine(a.dataset.padd);return}
-    const rm=e.target.closest("[data-prm]");if(rm){P.lines.splice(+rm.dataset.prm,1);saveDraft();SF.renderKharid(1);return}
-    const sp=e.target.closest("[data-psup]");if(sp){P.supId=sp.dataset.psup;saveDraft();SF.renderKharid(1);return}
+    const a=e.target.closest("[data-pitem]");if(a){const m=String(P.q||"").match(/(\d+(?:[.,]\d+)?)\s*(kg|किलो)?\s*$/i);pItemSheet(a.dataset.pitem||null,null,m?num(m[1]):"");return}
+    if(e.target.closest("[data-psupch]")){P.supId="";P.supAuto=false;P.sq="";saveDraft();SF.renderKharid(1);setTimeout(()=>{const s=$("#psq");if(s)s.focus()},50);return}
+    const sp=e.target.closest("[data-psup]");if(sp){P.supId=sp.dataset.psup;P.sq="";saveDraft();SF.renderKharid(1);return}
     if(e.target.closest("[data-nsadd]")){const name=$("#nsName").value.trim(),phone=$("#nsPhone").value.replace(/\D/g,"").slice(-10);
       if(!name){toast("दुकान का नाम लिखें");return}
+      if(phone){const ex=S.suppliers.find(x=>String(x.phone||"")===phone);if(ex){P.supId=ex.id;saveDraft();SF.renderKharid(1);toast("यह नंबर पहले से "+ex.name+" का है — वही चुनी");return}}
       const id="s"+uid(),d={name,phone,ts:Date.now(),lastTs:Date.now(),by:S.uid||"",byName:biller()};
       if(!S.demo)S.db.collection("suppliers").doc(id).set(d).catch(()=>toast("दुकान सेव नहीं हुई"));
-      if(!S.suppliers.find(x=>x.id===id))S.suppliers.unshift({id,...d});P.supId=id;saveDraft();SF.renderKharid(1);toast("🏪 "+name+" जुड़ गई");return}
-    const pp=e.target.closest("[data-ppay]");if(pp){P.pay=pp.dataset.ppay;if(P.pay==="udhar"&&P.paid==="")P.paid="0";saveDraft();SF.renderKharid(1);return}
-    if(e.target.closest("[data-pphoto]")){pickPhoto(b=>{draftPhotos.push(b);SF.renderKharid(1);toast("📷 फोटो ली गई ("+Math.round(b.size/1024)+" KB)")});return}
-    if(e.target.closest("[data-psave]")){savePurchase();return}
+      if(!S.suppliers.find(x=>x.id===id))S.suppliers.unshift({id,...d});P.supId=id;P.sq="";saveDraft();SF.renderKharid(1);toast("🏪 "+name+" जुड़ गई");return}
+    if(e.target.closest("[data-pbill]")){pBillSheet();return}
     const v=e.target.closest("[data-pview]");if(v){const p=S.purch.find(x=>x.id===v.dataset.pview);if(p)viewPurchase(p);return}
     const pay=e.target.closest("[data-spay]");if(pay){supPaySheet(pay.dataset.spay);return}
   });
@@ -390,6 +465,7 @@ ${T(rows.map(r=>[r.it.name,U(r.it),r.prev,r.buyQ,r.rate,r.saleQ,r.instQ,r.waste,
 ${TH(["नं","समय","दुकान","किसने","सामान","मात्रा","भाव ₹","पिछला भाव ₹","फर्क %","रकम ₹","भुगतान","फोटो"])}
 ${T(livePurch().flatMap((p,i)=>(p.lines||[]).map(l=>{const pr=lastRate(l.id,p.ts);const diff=pr&&pr.rate>0?r2((num(l.rate)-pr.rate)/pr.rate*100):"";
   return [pNo(p,i+1),ftime(p.ts),p.supName||"",p.byName||"",l.name,num(l.qty),num(l.rate),pr?pr.rate:"",diff,r2(num(l.qty)*num(l.rate)),PAY[p.pay]||p.pay||"",(p.photos&&p.photos.length)||p.photoPending?"हाँ":"⚠ नहीं"]})))}
+${livePurch().filter(p=>num(p.disc)>0).length?"\nछूट मिली: "+livePurch().filter(p=>num(p.disc)>0).map(p=>(p.supName||"")+" बिल ₹"+p.gross+" → दिए ₹"+p.total+" (छूट ₹"+p.disc+")").join("; "):""}
 ${S.purch.filter(p=>p.cancelled).length?"\nरद्द खरीद: "+S.purch.filter(p=>p.cancelled).map(p=>(p.supName||"")+" ₹"+p.total).join(", "):""}
 
 ## 5. खर्च
