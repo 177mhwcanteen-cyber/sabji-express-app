@@ -180,6 +180,9 @@ rep('/* ---------- biller name ---------- */', EXTRA + '\n/* ---------- biller n
 rep('<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Mukta:wght@400;500;700&display=swap">',
     '<link rel="stylesheet" href="fonts/fonts.css">')
 
+# v20: बिल सेटल होने से पहले शेयर — भुगतान खाली हो तो भी संदेश बने
+rep("function receiptText(b){\n", "function receiptText(b){\n  b={...b,pay:b.pay||{}};\n")
+
 exec(open(__import__("os").path.join(__import__("os").path.dirname(__file__),"port_v15.py"),encoding="utf8").read())
 
 # टीम के लिए "स्टाफ" शब्द नहीं

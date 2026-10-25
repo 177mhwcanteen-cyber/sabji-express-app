@@ -780,6 +780,7 @@ async function saveBill(){
   S.saving=false;closeCurTab();refreshAfterCart();showReceipt(bill,true,offline);netbar();beat();
 }
 function receiptText(b){
+  b={...b,pay:b.pay||{}};
   const L="━━━━━━━━━━━━━━━";
   let t=`🥬 *सब्ज़ी एक्सप्रेस*\n_ताज़ी सब्ज़ी, आपके दरवाज़े पर_\nजालीपा कैंट, बाड़मेर\n${L}\n🧾 बिल नं: ${b.no}\n📅 ${fdate(b.date)} · ${ftime(b.ts)}\n👤 ${b.partyName}${b.custPhone?" ("+b.custPhone+")":""}\n${L}\n`;
   b.lines.forEach((l,i)=>t+=l.free?`${i+1}. ${l.name} ${fq(l.qty,l.unit)} — 🎁 मुफ्त\n`:`${i+1}. ${l.name}\n    ${fq(l.qty,l.unit)} × ₹${l.rate} = *₹${l.amt}*\n`);
