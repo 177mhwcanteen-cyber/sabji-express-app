@@ -388,6 +388,20 @@ main{padding-block:10px 120px}
 .nsbox summary{font-weight:800;color:var(--leaf);padding:6px 0;cursor:pointer}
 .big-in{font-size:22px!important;font-weight:800;text-align:center}
 .pbarbtn{background:#6d28d9;color:#fff}
+/* v24 */
+.qstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px}
+.qstrip button{display:grid;justify-items:center;gap:2px;border:0;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:10px 4px;font-size:22px;color:var(--ink)}
+.qstrip button span{font-size:12.5px;font-weight:800}
+.card .mg{display:block;font-size:11px;font-weight:800;padding:0 9px 7px;color:#15803d}.card .mg.mid{color:#b45309}.card .mg.bad{color:var(--chili)}
+.grid .card .mg{padding:0 7px 6px}
+.ratechip{border-color:#7c3aed!important;color:#6d28d9}.ratechip.on{background:#7c3aed!important;color:#fff!important}
+.shoprow{display:grid;grid-template-columns:1.4fr 1fr;gap:8px}
+.spcard{border:2px solid #0f766e;background:linear-gradient(135deg,rgba(15,118,110,.10),var(--surface));border-radius:18px;padding:12px 14px;margin:0 0 12px;box-shadow:var(--shadow)}
+.sp-h{display:flex;justify-content:space-between;align-items:center;gap:8px}.sp-h b{font-size:17px}
+.sp-need{display:grid;gap:2px;font-size:13px;margin:4px 0 8px}
+.sp-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sp-btns .big{padding:10px 6px;font-size:14.5px}
+.spinfo{background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:8px 10px;font-size:13px;margin:8px 0}
+.sp-prev{display:flex;gap:10px;align-items:flex-start}.sp-prev input{margin-top:5px;width:20px;height:20px}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -618,18 +632,20 @@ function renderBill(){
   ["#modes","#custbox","#cats"].forEach(x=>$(x).hidden=searching);if(S.demo)$("#demo").hidden=searching||!S.demo;
   const tip=$("#qtip");tip.hidden=!searching;S.qq=bl.qq;
   if(searching){tip.className="qtip"+(bl.list.length===1||bl.qq?" go":"");tip.textContent=bl.list.length?(bl.qq?`टैप करें → ${bl.qq} ${bl.list.length===1&&bl.list[0].unit!=="kg"?"पीस":"कि.ग्रा"} सीधा बिल में`:`${bl.list.length} मिलीं · टैप करके मात्रा चुनें`)+(bl.list.length===1?" · या ✓/Enter दबाएँ":""):""}
-  $("#cats").innerHTML=CATS.map(([k,v])=>`<button class="chip" aria-pressed="${S.cat===k}" data-cat="${k}">${v}</button>`).join("")+`<button class="chip" aria-pressed="${S.sortTop}" data-sorttop>⭐ टॉप सेलिंग ऊपर</button><button class="chip" data-view>${S.view==="list"?"▦ फोटो":"☰ लिस्ट"}</button>`;
+  $("#cats").innerHTML=(window.SR?SR.rateChipHTML():"")+CATS.map(([k,v])=>`<button class="chip" aria-pressed="${S.cat===k}" data-cat="${k}">${v}</button>`).join("")+`<button class="chip" aria-pressed="${S.sortTop}" data-sorttop>⭐ टॉप सेलिंग ऊपर</button><button class="chip" data-view>${S.view==="list"?"▦ फोटो":"☰ लिस्ट"}</button>`;
   $("#grid").classList.toggle("rows",S.view==="list");
   const q=bl.q,list=bl.list;
   if(!S.items.length){$("#grid").innerHTML=`<div class="empty" style="grid-column:1/-1"><b>सब्ज़ियों की लिस्ट अभी खाली है</b>मालिक "रेट व सेटिंग" में जाकर सब्ज़ी और उनके रेट डालें, फिर यहाँ फोटो वाले कार्ड दिखेंगे।</div>`;return}
   if(!list.length){$("#grid").innerHTML=`<div class="empty" style="grid-column:1/-1"><b>"${esc(q)}" नहीं मिली</b>दूसरा नाम लिखकर देखें।</div>`+(window.SR?SR.addCardHTML(q):"");return}
-  $("#grid").innerHTML=list.map(it=>{
+  const LL=window.SF&&SF.liveLeftMap?SF.liveLeftMap():null;$("#grid").innerHTML=list.map(it=>{
     const p=priceOf(it);const inCart=S.cart.filter(l=>l.id===it.id).reduce((a,l)=>a+l.qty,0);
-    const left=stockLeft(it.id);
-    return `<button class="card ${p>0?"":"off"}" data-item="${esc(it.id)}">${tileHTML(it)}${left!=null?`<span class="stk ${left<=0.5?"low":""}">${left<=0?"खत्म":"बचा "+fq(left,it.unit)}</span>`:""}${inCart?`<span class="badge">${fq(inCart,it.unit)}</span>`:""}<span class="nm">${esc(it.name)}${SN.en(it)?`<small class="en">${esc(SN.en(it))}</small>`:""}</span><span class="pr">${p>0?`<b>${rs(p)}</b>/${UNITS[it.unit]||it.unit}`:"रेट बाकी"}</span></button>`;
+    let left=stockLeft(it.id);if(left==null&&LL&&LL[it.id]!=null)left=LL[it.id];
+    return `<button class="card ${p>0?"":"off"}" data-item="${esc(it.id)}">${tileHTML(it)}${left!=null?`<span class="stk ${left<=0.5?"low":""}">${left<=0?"खत्म":"बचा "+fq(left,it.unit)}</span>`:""}${inCart?`<span class="badge">${fq(inCart,it.unit)}</span>`:""}<span class="nm">${esc(it.name)}${SN.en(it)?`<small class="en">${esc(SN.en(it))}</small>`:""}</span><span class="pr">${p>0?`<b>${rs(p)}</b>/${UNITS[it.unit]||it.unit}`:"रेट बाकी"}</span>${S.isOwner&&window.SR?SR.marginHTML(it,p):""}</button>`;
   }).join("")+(window.SR?SR.addCardHTML():"");
 }
 $("#p-bill").addEventListener("click",e=>{
+  if(e.target.closest("[data-ratemode]")){S.rateMode=!S.rateMode;renderBill();if(S.rateMode)toast("✏️ अब जिस सामान का भाव बदलना है, उसे दबाएँ");return}
+  const rmi=S.rateMode&&e.target.closest("[data-item]");if(rmi&&window.SR){SR.rateSheet(item(rmi.dataset.item));return}
   const ni=e.target.closest("[data-newitem]");if(ni&&window.SR){SR.newItemSheet(ni.dataset.newitem);return}
   const m=e.target.closest("[data-mode]");if(m){setMode(m.dataset.mode);return}
   const c=e.target.closest("[data-cat]");if(c){S.cat=c.dataset.cat;renderBill();return}
@@ -1215,7 +1231,7 @@ function diffPill(diff){if(diff==null)return '<span class="pill blue">अभी 
 function renderDay(){
   const d=S.billsDate,c=cashCalc(d),rows=stockRows();
   const _k=window.SF?SF.dayKpi():{buy:0,short:0};const buyTot=_k.buy,shortTot=_k.short;
-  const quick=["डीज़ल","मंडी भाड़ा","हम्माली","पॉलीथीन","चाय-नाश्ता"];
+  const quick=["गाड़ी किराया","पेट्रोल / डीज़ल","गाड़ी रिपेयर","मंडी भाड़ा","हम्माली","पॉलीथीन / थैली","चाय-नाश्ता"];
   $("#p-day").innerHTML=`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">दिन का हिसाब</h2><input class="inp" type="date" id="dayDate" value="${d}" aria-label="तारीख"></div>
   <div class="kpis"><div class="kpi"><span>आज की खरीद (मंडी)</span><b>${rs(buyTot)}</b></div><div class="kpi red"><span>खर्चा</span><b>${rs(c.khAll)}</b></div>
   <div class="kpi ${shortTot>0?"red":""}"><span>माल में कमी (बिक्री रेट)</span><b>${rs(shortTot)}</b></div><div class="kpi"><span>गल्ला</span><b style="font-size:16px;padding-top:6px">${diffPill(c.diff)}</b></div></div>
@@ -1245,7 +1261,7 @@ function renderDay(){
 let kMode="cash";
 async function saveStock(){
   if(S.demo)return;
-  try{await S.db.doc("days/"+S.billsDate+"/meta/stock").set({items:S.stock.items||{},ts:Date.now(),by:S.uid||"",byName:biller()})}catch(e){toast("माल का हिसाब सेव नहीं हुआ")}
+  try{await S.db.doc("days/"+S.billsDate+"/meta/stock").set({items:S.stock.items||{},wlog:S.stock.wlog||[],nightBy:S.stock.nightBy||"",nightTs:S.stock.nightTs||0,ts:Date.now(),by:S.uid||"",byName:biller()})}catch(e){toast("माल का हिसाब सेव नहीं हुआ")}
 }
 $("#p-day").addEventListener("change",async e=>{
   const t=e.target;
@@ -1545,5 +1561,6 @@ boot();
 </script>
 <script src="se-features.js"></script>
 <script src="se-route.js"></script>
+<script src="se-pay.js"></script>
 
 </body></html>

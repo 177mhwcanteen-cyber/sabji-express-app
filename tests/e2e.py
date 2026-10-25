@@ -130,6 +130,17 @@ async def main():
         await pg.wait_for_timeout(300)
         await pg.locator("#rc").screenshot(path=f"{SHOTS}/6-thermal-receipt.png")
         await pg.evaluate("document.getElementById('rc').remove();closeSheet()")
+        # ---- ✏️ भाव बदलना (कर्मचारी) ----
+        await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(200)
+        await pg.click("[data-ratemode]"); await pg.wait_for_timeout(200)
+        await pg.click('#grid [data-item="lauki"]'); await pg.wait_for_selector("#rnIn")
+        await pg.fill("#rnIn", "35"); await pg.press("#rnIn", "Enter"); await pg.wait_for_timeout(400)
+        lk = await pg.evaluate("window.__MOCK__.items.lauki")
+        assert lk["sale"] == 35 and lk["rateByName"] == "कमल भाई" and lk["ratePrev"] == 30, lk
+        assert any(v["name"] == "लौकी" and v["new"] == 35 for v in (await pg.evaluate("Object.values(window.__MOCK__.priceLog||{})")))
+        await pg.click("[data-ratemode]"); await pg.wait_for_timeout(200)
+        assert not await pg.query_selector("#grid .mg"), "staff must not see margin"
+        print("staff rate change ok")
         # ---- 🅧 XYZ + ➕ नया सामान ----
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(300)
         await pg.click('#grid [data-item="xyz"]'); await pg.wait_for_selector("#xyAmt")
@@ -154,15 +165,14 @@ async def main():
         await pg.evaluate("closeSheet()")
         # ---- खरीद (मंडी) — बिक्री जैसा ----
         await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
-        await pg.fill("#nsName", "पवन सब्ज़ी भंडार"); await pg.fill("#nsPhone", "98290 11111"); await pg.click("[data-nsadd]"); await pg.wait_for_timeout(200)
-        assert await pg.is_visible(".supcard"), "supplier card"
+        assert await pg.input_value("#pShop") == "", "shop must not auto-fill"
+        await pg.fill("#pShop", "पवन सब्ज़ी भंडार"); await pg.fill("#pPh", "98290 11111")
         await pg.click('#pgrid [data-pitem="tamatar"]'); await pg.wait_for_selector("#piQ")
-        await pg.fill("#piQ", "28"); await pg.fill("#piR", "10"); await pg.click("[data-pisave]"); await pg.wait_for_timeout(200)
-        await pg.fill("#pq", "प्याज 92"); await pg.press("#pq", "Enter"); await pg.wait_for_selector("#piQ")
+        await pg.fill("#piQ", "28"); await pg.press("#piQ", "Enter"); await pg.keyboard.type("10"); await pg.keyboard.press("Enter"); await pg.wait_for_timeout(300)
+        assert await pg.evaluate("document.activeElement.id") == "pq", "focus should go to search"
+        await pg.keyboard.type("प्याज 92"); await pg.keyboard.press("Enter"); await pg.wait_for_selector("#piQ")
         assert await pg.input_value("#piQ") == "92"
-        await pg.fill("#piR", ""); await pg.fill("#piA", "4784"); await pg.wait_for_timeout(100)
-        assert await pg.input_value("#piR") == "52", await pg.input_value("#piR")
-        await pg.click("[data-pisave]"); await pg.wait_for_timeout(200)
+        await pg.fill("#piR", "52"); await pg.press("#piR", "Enter"); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f"{SHOTS}/8-kharid.png", full_page=True)
         await pg.click("[data-pbill]"); await pg.wait_for_selector("#pNet")
         await pg.fill("#pNet", "5000"); await pg.press("#pNet", "Tab"); await pg.wait_for_timeout(200)
@@ -178,7 +188,16 @@ async def main():
         print("purchase", pur[0]["gross"], "disc", pur[0]["disc"], "net", pur[0]["total"], "due", pur[0]["due"], "photos", pur[0].get("photos"), "pending", pur[0].get("photoPending"), "uploads", UPLOADS)
         assert UPLOADS and pur[0]["photos"] and pur[0]["photoPending"] == 0, "photo upload failed"
         assert await pg.evaluate("SF.pendingPhotos()") == 0, "photo not deleted from phone"
-        assert await pg.is_visible(".supcard"), "supplier should stay filled for next purchase"
+        assert await pg.input_value("#pShop") == "", "shop should be empty for next purchase"
+        # ⚡ खराबी + खर्चा (कर्मचारी)
+        await pg.click("[data-qwaste]"); await pg.wait_for_selector("#wpick")
+        await pg.click('#wpick [data-wit="tamatar"]'); await pg.wait_for_selector("#wQ"); await pg.fill("#wQ", "0.5"); await pg.click('[data-wr="सड़ गई"]'); await pg.click("[data-wsave]"); await pg.wait_for_timeout(400)
+        await pg.click("[data-qkharch]"); await pg.wait_for_selector("#qkA"); await pg.click('[data-khq="गाड़ी किराया"]'); await pg.fill("#qkA", "250"); await pg.click("[data-qksave]"); await pg.wait_for_timeout(400)
+        st = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/meta')).map(([k,v])=>v.stock).filter(Boolean)[0]")
+        assert st and st["wlog"][0]["reason"] == "सड़ गई" and st["items"]["tamatar"]["waste"] == 0.5, st
+        kh = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/kharch')).flatMap(([k,v])=>Object.values(v))")
+        assert any(k["what"] == "गाड़ी किराया" and k["amt"] == 250 for k in kh), kh
+        print("waste + kharch ok")
         await pg.screenshot(path=f"{SHOTS}/9-kharid-saved.png", full_page=True)
         # संस्था को प्याज — आज के खरीद भाव ₹52 पर
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(200)
@@ -202,7 +221,13 @@ async def main():
         await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300)
         await pg.click("[data-night]"); await pg.wait_for_timeout(200)
         await pg.fill('[data-nclose="pyaj"]', "88"); await pg.fill('[data-nclose="tamatar"]', "26")
-        await pg.click("[data-nsave]"); await pg.wait_for_timeout(500)
+        assert "होना चाहिए" not in await pg.inner_text("#sheet"), "staff must not see expected stock"
+        await pg.click("[data-nsave]"); await pg.wait_for_timeout(900)
+        assert await pg.query_selector('[data-nclose="pyaj"]'), "recheck sheet expected for pyaj"
+        await pg.fill('[data-nclose="pyaj"]', "88"); await pg.click("[data-nsave]"); await pg.wait_for_timeout(500)
+        st = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/meta')).map(([k,v])=>v.stock).filter(Boolean)[0]")
+        assert st["items"]["pyaj"]["recount"] and st["items"]["pyaj"]["close1"] == 88 and st["nightBy"] == "कमल भाई", st["items"]["pyaj"]
+        print("blind night count + recheck ok")
         await pg.screenshot(path=f"{SHOTS}/11-day.png", full_page=True)
         # बिल रद्द करने की अर्ज़ी (कर्मचारी)
         await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
@@ -236,6 +261,37 @@ async def main():
         await pg.screenshot(path=f"{SHOTS}/12-owner-day.png", full_page=True)
         txt = await pg.inner_text("#p-day")
         assert "असली मुनाफ़ा" in txt, txt[:300]
+        # 📈 मालिक: टाइल पर मुनाफ़ा
+        await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(400)
+        mg = await pg.eval_on_selector_all("#grid .mg", "e=>e.map(x=>x.innerText)")
+        assert mg and any("%" in x for x in mg), mg
+        print("owner margin sample", mg[:3])
+        # 🔐 UPI मिलान: मालिक की खरीद (विक्रम जी ने दिया) → AI फाइल → जवाब चिपकाएँ
+        await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(400)
+        await pg.fill("#pShop", "राजू"); await pg.click('#pgrid [data-pitem="aloo"]'); await pg.wait_for_selector("#piQ")
+        await pg.fill("#piQ", "10"); await pg.fill("#piR", "15"); await pg.press("#piR", "Enter"); await pg.wait_for_timeout(200)
+        await pg.click("[data-pbill]"); await pg.wait_for_selector("[data-psave]"); await pg.click("[data-psave]"); await pg.wait_for_timeout(800)
+        await pg.evaluate("SP.st.loaded=0"); await pg.wait_for_timeout(200)
+        html = await pg.evaluate("(async()=>{await new Promise(r=>setTimeout(r,300));return SP.aiHTML()})()")
+        open(f"{SHOTS}/upi-milan.html", "w", encoding="utf8").write(html)
+        need = await pg.evaluate("SP.need().map(x=>[x.ref,x.amt,x.shop])")
+        assert any(n[1] == 150 and n[2] == "राजू" for n in need), need
+        ref = [n[0] for n in need if n[2] == "राजू"][0]
+        await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
+        assert "स्क्रीनशॉट चाहिए" in await pg.inner_text(".spcard")
+        await pg.click("[data-spaccts]"); await pg.wait_for_selector("#acL"); await pg.fill("#acL", "विक्रम जी पर्सनल"); await pg.fill("#acN", "0499"); await pg.click("[data-acadd]"); await pg.wait_for_timeout(300); await pg.evaluate("closeSheet()")
+        ai = "सार: 1 मिला।\n```json\n" + json.dumps({"sabji_match": 1, "items": [{"ref": ref, "payee": "RAJU RAM", "upi": "raju@ybl", "amt": 150, "time": "2026-10-25 08:10", "utr": "429811112222", "from_bank": "SBI", "from_last4": "0499", "app": "PhonePe", "conf": "high"}], "unmatched": [{"payee": "MOHAN LAL", "amt": 700, "time": "2026-10-25 09:00", "utr": "429899990000", "from_last4": "0499"}]}, ensure_ascii=False) + "\n```"
+        await pg.click("[data-sppaste]"); await pg.wait_for_selector("#spTxt"); await pg.fill("#spTxt", ai); await pg.click("[data-spcheck]"); await pg.wait_for_selector("[data-spsave2]")
+        await pg.screenshot(path=f"{SHOTS}/17-upi-preview.png")
+        await pg.click("[data-spsave2]"); await pg.wait_for_timeout(800)
+        pay = await pg.evaluate("window.__MOCK__.pay"); payees = await pg.evaluate("Object.values(window.__MOCK__.payees||{})")
+        assert any(v.get("utr") == "429811112222" and v["payee"] == "RAJU RAM" for v in pay.values()) and any(v.get("kind") == "unmatched" for v in pay.values()), pay
+        assert payees and payees[0]["name"] == "RAJU RAM" and "राजू" in payees[0]["shops"], payees
+        await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
+        await pg.screenshot(path=f"{SHOTS}/18-owner-kharid.png", full_page=True)
+        assert "बिना खरीद" in await pg.inner_text(".spcard") or "खरीद एंट्री नहीं" in await pg.inner_text(".spcard")
+        print("UPI matching ok", ref)
+        await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(500)
         # 🤖 AI ऑडिट पैक
         assert await pg.is_visible("[data-audcopy]")
         pack = await pg.evaluate("SF.auditPack()")

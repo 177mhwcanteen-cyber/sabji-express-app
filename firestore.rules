@@ -32,11 +32,13 @@ service cloud.firestore {
     match /items/{id} {
       allow read: if active();
       allow create: if isOwner() || (active() && request.resource.data.pending == true && request.resource.data.addedBy == request.auth.uid);
-      allow update, delete: if isOwner();
+      // कर्मचारी सिर्फ़ बिक्री भाव बदल सकते हैं (किसने, कब, पुराना भाव — सब दर्ज)
+      allow update: if isOwner() || (active() && onlyKeys(['sale', 'rateTs', 'rateBy', 'rateByName', 'ratePrev']) && request.resource.data.rateBy == request.auth.uid);
+      allow delete: if isOwner();
     }
     match /settings/{id} { allow read: if active(); allow write: if isOwner(); }
     match /photos/{id}   { allow read: if active(); allow write: if isOwner(); }
-    match /priceLog/{id} { allow read: if isOwner(); allow create: if isOwner(); }
+    match /priceLog/{id} { allow read: if isOwner(); allow create: if isOwner() || (active() && request.resource.data.by == request.auth.uid); }
 
     match /days/{date}/bills/{no} {
       allow read: if active();
@@ -98,6 +100,11 @@ service cloud.firestore {
       allow write: if active() && request.auth.uid == uid;
     }
     match /places/{id} { allow read: if active(); allow write: if isOwner(); }
+
+    // 🔐 मालिक का UPI मिलान, असली दुकानदार, अपने खाते — कर्मचारी पढ़ भी नहीं सकते
+    match /pay/{id}      { allow read, write: if isOwner(); }
+    match /payees/{id}   { allow read, write: if isOwner(); }
+    match /ownerCfg/{id} { allow read, write: if isOwner(); }
 
     // पहरेदार की निजी छाप — सिर्फ़ मालिक
     match /data/users/{uid}/{doc} { allow read, write: if isOwner() && request.auth.uid == uid; }

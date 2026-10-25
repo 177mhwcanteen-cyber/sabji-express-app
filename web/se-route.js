@@ -154,6 +154,7 @@ const XYZ={id:"xyz",name:"XYZ (अन्य पैसा)",en:"Other / Misc",emo
 const seenPending=new Set();let pendInit=false;
 SR.addVirtual=function(){
   if(!S.items.find(i=>i.id==="xyz"))S.items.push({...XYZ});
+  try{rateAlerts()}catch(e){}
   if(S.isOwner){const P=S.items.filter(i=>i.pending&&!i.virtual);
     const fresh=P.filter(i=>!seenPending.has(i.id));P.forEach(i=>seenPending.add(i.id));
     if(fresh.length&&pendInit)toast("🆕 "+(fresh[0].addedByName||"कर्मचारी")+" ने नया सामान जोड़ा: "+fresh.map(i=>i.name).join(", ")+" — रिपोर्ट में देखें");
@@ -471,6 +472,104 @@ function bindRoute(el){
   });
 }
 
+
+/* ======================= ⚡ जल्दी वाले काम: खराबी, खर्चा, भाव, रात का स्टॉक ======================= */
+SR.quickStripHTML=function(){return `<div class="qstrip"><button data-qwaste>🗑️<span>खराबी</span></button><button data-qkharch>💸<span>खर्चा</span></button><button data-qrate>✏️<span>भाव बदलें</span></button><button data-qnight>🌙<span>रात का स्टॉक</span></button></div>`};
+const KH=["गाड़ी किराया","पेट्रोल / डीज़ल","गाड़ी रिपेयर","मंडी भाड़ा","हम्माली","पॉलीथीन / थैली","चाय-नाश्ता","अन्य"];
+SR.kharchSheet=function(){
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="खर्चा"><div class="grab"></div>
+  <div class="sh-head"><div><h3>💸 खर्चा लिखें</h3><span class="note">आज ${fdate(today())} · विक्रम जी के हिसाब में जाएगा</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="lsws" style="margin:0 0 8px">${KH.map(k=>`<button class="chip" data-khq="${esc(k)}">${esc(k)}</button>`).join("")}</div>
+  <label class="fld">किस चीज़ का<input class="inp" id="qkW" placeholder="जैसे गाड़ी किराया"></label>
+  <label class="fld">कितने रुपये<input class="inp big-in" id="qkA" inputmode="decimal" placeholder="₹"></label>
+  <div class="paym" style="margin:8px 0"><button data-qkm="cash" aria-pressed="true">💵 नकद (गल्ले से)</button><button data-qkm="upi" aria-pressed="false">📱 UPI</button></div>
+  <button class="big" data-qksave>✓ खर्चा सेव करें</button></div></div>`;
+  let mode="cash";
+  $("#sheet").onclick=async e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    const q=e.target.closest("[data-khq]");if(q){$("#qkW").value=q.dataset.khq==="अन्य"?"":q.dataset.khq;(q.dataset.khq==="अन्य"?$("#qkW"):$("#qkA")).focus();return}
+    const m=e.target.closest("[data-qkm]");if(m){mode=m.dataset.qkm;document.querySelectorAll("[data-qkm]").forEach(x=>x.setAttribute("aria-pressed",x===m));return}
+    if(!e.target.closest("[data-qksave]"))return;
+    const what=$("#qkW").value.trim(),amt=r2(parseFloat(String($("#qkA").value).replace(",","."))||0);
+    if(!what||!(amt>0)){toast("किस चीज़ का और कितने रुपये — दोनों लिखें");return}
+    const k={what,amt,mode,ts:Date.now(),by:S.uid||"",byName:biller()};
+    try{if(S.demo)S.kharch.push({id:"k"+k.ts,...k});else await S.db.collection("days/"+today()+"/kharch").doc("k"+k.ts.toString(36)).set(k);closeSheet();toast("💸 "+what+" "+rs(amt)+" जुड़ा")}catch(err){toast("खर्चा सेव नहीं हुआ")}
+  };
+  setTimeout(()=>{const x=$("#qkW");if(x)x.focus()},120);
+};
+const WR=["सड़ गई","सूख गई","दब/टूट गई","कम तौल","ग्राहक को लौटाई","अन्य"];
+SR.wasteSheet=function(id){
+  if(S.billsDate!==today()){toast("खराबी आज की तारीख में ही लिखें — दिन का हिसाब में आज चुनें");return}
+  const it=id?item(id):null;
+  if(!it){
+    const L=S.items.filter(i=>i.active!==false&&!i.virtual);
+    $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="खराबी"><div class="grab"></div>
+    <div class="sh-head"><div><h3>🗑️ क्या खराब हुआ?</h3><span class="note">सामान चुनें</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    <input class="inp" id="wq" type="search" placeholder="🔍 खोजें" autocomplete="off" style="margin-bottom:8px">
+    <div class="ppick" id="wpick">${L.map(i=>`<button data-wit="${esc(i.id)}">${tileHTML(i)}<span>${esc(i.name)}</span></button>`).join("")}</div></div></div>`;
+    $("#sheet").oninput=e=>{if(e.target.id!=="wq")return;const q=e.target.value.trim().toLowerCase();document.querySelectorAll("#wpick [data-wit]").forEach(b=>{const x=item(b.dataset.wit);b.hidden=!!q&&!((x.name+" "+(window.SN?SN.en(x):"")+" "+x.id).toLowerCase().includes(q))})};
+    $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}const b=e.target.closest("[data-wit]");if(b)SR.wasteSheet(b.dataset.wit)};
+    return;
+  }
+  const kg=it.unit==="kg",u=UNITS[it.unit]||it.unit;const hd=$("header").getBoundingClientRect(),top=Math.max(8,Math.round(hd.bottom)+6);
+  $("#sheet").innerHTML=`<div class="qscrim" data-close></div><div class="qpop" style="top:${top}px" role="dialog" aria-label="${esc(it.name)} खराबी">
+    <div class="qh">${tileHTML(it)}<div class="qn"><b>🗑️ ${esc(it.name)}</b><span>कितना खराब हुआ?</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    <div class="qrow"><label class="qf"><input id="wQ" inputmode="decimal" autocomplete="off" placeholder="0"><span>${kg?"कि.ग्रा":u}</span></label></div>
+    <div class="lsws">${WR.map((w,i)=>`<button class="chip" data-wr="${esc(w)}" aria-pressed="${i===0}">${esc(w)}</button>`).join("")}</div>
+    <button class="big" data-wsave style="background:var(--chili);color:#fff">✓ खराबी दर्ज करें</button></div>`;
+  let why=WR[0];
+  $("#sheet").onclick=async e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    const w=e.target.closest("[data-wr]");if(w){why=w.dataset.wr;document.querySelectorAll("[data-wr]").forEach(x=>x.setAttribute("aria-pressed",x===w));return}
+    if(!e.target.closest("[data-wsave]"))return;
+    const q=r2(parseFloat(String($("#wQ").value).replace(",","."))*1000||0)/1000;if(!(q>0)){toast("कितना खराब हुआ — लिखें");return}
+    const items=S.stock.items||(S.stock.items={});const o=items[it.id]||(items[it.id]={});o.waste=r2((+o.waste||0)+q);
+    (S.stock.wlog||(S.stock.wlog=[])).push({id:it.id,name:it.name,unit:it.unit,qty:q,reason:why,ts:Date.now(),by:S.uid||"",byName:biller()});
+    await saveStock();closeSheet();toast("🗑️ "+it.name+" "+fq(q,it.unit)+" खराबी दर्ज ("+why+")");try{renderPane()}catch(err){}
+  };
+  setTimeout(()=>{const x=$("#wQ");if(x)x.focus()},60);
+};
+/* ✏️ भाव बदलना — कर्मचारी भी; मालिक को खबर */
+SR.rateChipHTML=function(){return S.rateMode?`<button class="chip ratechip on" data-ratemode>✏️ भाव बदलने का मोड — सामान दबाएँ · बंद ✕</button>`:`<button class="chip ratechip" data-ratemode>✏️ भाव बदलें</button>`};
+SR.rateSheet=function(it){
+  if(!it||it.virtual)return;const old=+it.sale||0,u=UNITS[it.unit]||it.unit;const cost=window.SF?SF.costOf(it):(+it.cost||0);
+  const hd=$("header").getBoundingClientRect(),top=Math.max(8,Math.round(hd.bottom)+6);
+  $("#sheet").innerHTML=`<div class="qscrim" data-close></div><div class="qpop" style="top:${top}px" role="dialog" aria-label="${esc(it.name)} का भाव">
+    <div class="qh">${tileHTML(it)}<div class="qn"><b>✏️ ${esc(it.name)}</b><span>अभी का भाव ${rs(old)}/${u}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    <div class="qrow"><label class="qf"><span>नया ₹</span><input id="rnIn" inputmode="decimal" autocomplete="off" placeholder="${old}"><span>/${u}</span></label></div>
+    ${S.isOwner&&cost>0?`<p class="note" id="rnM" style="margin:0">खरीद ${rs(cost)}/${u}</p>`:""}
+    <button class="big" data-rnsave>✓ नया भाव लगाएँ</button>
+    ${S.isOwner?"":`<p class="note" style="margin:0;text-align:center">यह बदलाव विक्रम जी को दिखेगा</p>`}</div>`;
+  const I=$("#rnIn");
+  $("#sheet").oninput=()=>{const n=num(I.value),m=$("#rnM");if(m&&n>0)m.innerHTML=`खरीद ${rs(cost)} → बिक्री ${rs(n)} · मुनाफ़ा <b style="color:${n>cost?"var(--leaf)":"var(--chili)"}">${Math.round((n-cost)/cost*100)}%</b>`};
+  const save=async()=>{const n=r2(num(I.value));if(!(n>0)){toast("नया भाव लिखें");return}if(n===old){closeSheet();return}
+    try{if(!S.demo){await S.db.collection("items").doc(it.id).update({sale:n,rateTs:Date.now(),rateBy:S.uid||"",rateByName:biller(),ratePrev:old});
+        await S.db.collection("priceLog").doc("r"+Date.now().toString(36)).set({itemId:it.id,name:it.name,field:"sale",old,new:n,ts:Date.now(),by:S.uid||"",byName:biller()})}
+      it.sale=n;closeSheet();refreshAfterCart();toast("✏️ "+it.name+": "+rs(old)+" → "+rs(n))}
+    catch(e){toast("भाव नहीं बदला: "+(e.code||""))}};
+  $("#sheet").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();save()}};
+  $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}if(e.target.closest("[data-rnsave]"))save()};
+  setTimeout(()=>I.focus(),50);
+};
+const num=v=>{const n=parseFloat(String(v??"").replace(",","."));return isFinite(n)?n:0};
+/* 📈 मालिक: टाइल पर खरीद → बिक्री · मुनाफ़ा % */
+SR.marginHTML=function(it,p){
+  if(!S.isOwner||it.virtual||!(p>0))return "";const c=window.SF?SF.costOf(it):(+it.cost||0);if(!(c>0))return `<span class="mg">खरीद भाव नहीं</span>`;
+  const pct=Math.round((p-c)/c*100);return `<span class="mg ${pct<15?"bad":pct<30?"mid":""}">ख ${rs(c)} · ${pct>=0?"+":""}${pct}%</span>`;
+};
+const rateSeen={};let rateInit=false;
+function rateAlerts(){
+  if(!S.isOwner)return;
+  S.items.forEach(i=>{if(!i.rateTs)return;const was=rateSeen[i.id];rateSeen[i.id]=i.rateTs;
+    if(rateInit&&i.rateTs!==was&&i.rateBy&&i.rateBy!==S.uid)toast("✏️ "+(i.rateByName||"कर्मचारी")+" ने "+i.name+" का भाव "+rs(i.ratePrev||0)+" → "+rs(i.sale)+" किया")});
+  rateInit=true;
+}
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-qwaste]")){SR.wasteSheet();return}
+  if(e.target.closest("[data-qkharch]")){SR.kharchSheet();return}
+  if(e.target.closest("[data-qnight]")){if(S.billsDate!==today()){toast("रात का स्टॉक आज का ही — दिन का हिसाब में आज की तारीख चुनें");return}if(window.SF&&SF.nightSheet)SF.nightSheet();return}
+  if(e.target.closest("[data-qrate]")){S.rateMode=true;S.tab="bill";try{showTab()}catch(x){}try{renderBill()}catch(x){}toast("✏️ अब जिस सामान का भाव बदलना है, उसे दबाएँ");return}
+});
 /* SF के साथ जोड़ */
 if(window.SF){const _o=SF.onDb;SF.onDb=function(db){_o(db);try{SR.onDb(db)}catch(e){}}}
 })();

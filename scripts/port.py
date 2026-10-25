@@ -252,6 +252,31 @@ rep(".toast{position:fixed;", """/* v23 खरीद */
 .pbarbtn{background:#6d28d9;color:#fff}
 .toast{position:fixed;""")
 
+# v24: मालिक का UPI मिलान, भाव बदलना, मुनाफ़ा %, गाड़ी में माल, खराबी, खर्चा
+rep('<script src="se-route.js"></script>', '<script src="se-route.js"></script>\n<script src="se-pay.js"></script>')
+rep('set({items:S.stock.items||{},ts:Date.now(),by:S.uid||"",byName:biller()})', 'set({items:S.stock.items||{},wlog:S.stock.wlog||[],nightBy:S.stock.nightBy||"",nightTs:S.stock.nightTs||0,ts:Date.now(),by:S.uid||"",byName:biller()})')
+rep('const quick=["डीज़ल","मंडी भाड़ा","हम्माली","पॉलीथीन","चाय-नाश्ता"];', 'const quick=["गाड़ी किराया","पेट्रोल / डीज़ल","गाड़ी रिपेयर","मंडी भाड़ा","हम्माली","पॉलीथीन / थैली","चाय-नाश्ता"];')
+rep('$("#cats").innerHTML=CATS.map(', '$("#cats").innerHTML=(window.SR?SR.rateChipHTML():"")+CATS.map(')
+rep('  const ni=e.target.closest("[data-newitem]");', '  if(e.target.closest("[data-ratemode]")){S.rateMode=!S.rateMode;renderBill();if(S.rateMode)toast("✏️ अब जिस सामान का भाव बदलना है, उसे दबाएँ");return}\n  const rmi=S.rateMode&&e.target.closest("[data-item]");if(rmi&&window.SR){SR.rateSheet(item(rmi.dataset.item));return}\n  const ni=e.target.closest("[data-newitem]");')
+rep('"रेट बाकी"}</span></button>', '"रेट बाकी"}</span>${S.isOwner&&window.SR?SR.marginHTML(it,p):""}</button>')
+rep('$("#grid").innerHTML=list.map(it=>{', 'const LL=window.SF&&SF.liveLeftMap?SF.liveLeftMap():null;$("#grid").innerHTML=list.map(it=>{')
+rep('const left=stockLeft(it.id);', 'let left=stockLeft(it.id);if(left==null&&LL&&LL[it.id]!=null)left=LL[it.id];')
+rep(".toast{position:fixed;", """/* v24 */
+.qstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px}
+.qstrip button{display:grid;justify-items:center;gap:2px;border:0;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:10px 4px;font-size:22px;color:var(--ink)}
+.qstrip button span{font-size:12.5px;font-weight:800}
+.card .mg{display:block;font-size:11px;font-weight:800;padding:0 9px 7px;color:#15803d}.card .mg.mid{color:#b45309}.card .mg.bad{color:var(--chili)}
+.grid .card .mg{padding:0 7px 6px}
+.ratechip{border-color:#7c3aed!important;color:#6d28d9}.ratechip.on{background:#7c3aed!important;color:#fff!important}
+.shoprow{display:grid;grid-template-columns:1.4fr 1fr;gap:8px}
+.spcard{border:2px solid #0f766e;background:linear-gradient(135deg,rgba(15,118,110,.10),var(--surface));border-radius:18px;padding:12px 14px;margin:0 0 12px;box-shadow:var(--shadow)}
+.sp-h{display:flex;justify-content:space-between;align-items:center;gap:8px}.sp-h b{font-size:17px}
+.sp-need{display:grid;gap:2px;font-size:13px;margin:4px 0 8px}
+.sp-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sp-btns .big{padding:10px 6px;font-size:14.5px}
+.spinfo{background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:8px 10px;font-size:13px;margin:8px 0}
+.sp-prev{display:flex;gap:10px;align-items:flex-start}.sp-prev input{margin-top:5px;width:20px;height:20px}
+.toast{position:fixed;""")
+
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")
