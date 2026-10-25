@@ -222,8 +222,9 @@ rep('$("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")', '$("#p-report
 rep('${S.items.map(it=>`<div class="setitem"', '${S.items.filter(i=>!i.virtual).map(it=>`<div class="setitem"')
 rep('return S.items.filter(i=>!i.track&&(i.active!==false||st[i.id])).map(it=>{', 'return S.items.filter(i=>!i.track&&!i.virtual&&(i.active!==false||st[i.id])).map(it=>{')
 rep(".toast{position:fixed;", """/* v22 रूट, ग्राहक, बिल भेजना, नया सामान */
-.locbar{display:block;width:100%;border:0;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;line-height:1.3;padding:10px 12px;text-align:center;border-radius:12px;margin-bottom:8px;animation:lbp 1.6s ease-in-out infinite}
-@keyframes lbp{50%{background:#dc2626}}@media (prefers-reduced-motion:reduce){.locbar{animation:none}}
+.locbar{display:block;width:100%;border:0;background:#fff4e5;color:#92400e;border:1.5px solid #f59e0b;font-weight:800;font-size:14px;line-height:1.3;padding:9px 12px;text-align:center;border-radius:12px;margin-bottom:8px}
+.morning{display:grid;gap:2px;background:linear-gradient(135deg,#fff7e6,var(--surface));border:1.5px solid #fbbf24;border-radius:16px;padding:10px 14px;margin:0 0 12px;color:var(--ink)}.morning span{font-size:14px}.morning small{color:var(--muted);font-size:12px}
+.nrev{border:2px solid #f59e0b}.nrev.ok{border-color:var(--leaf)}
 #shbox{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center}#shbox[hidden]{display:none}
 .shb-scrim{position:absolute;inset:0;background:rgba(5,15,9,.55)}
 .shb{position:relative;width:100%;max-width:520px;background:var(--surface);color:var(--ink);border-radius:24px 24px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 30px rgba(0,0,0,.25);animation:up .2s ease-out}

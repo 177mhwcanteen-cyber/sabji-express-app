@@ -35,6 +35,9 @@ SF.onDate=function(d){
     S.purch.forEach(p=>{const i=S.purchHist.findIndex(h=>h.id===p.id);if(i>-1)S.purchHist[i]=p;else S.purchHist.push(p)});
     if(S.tab==="kharid")SF.renderKharid();else if(S.tab==="day"&&!$("#p-day").contains(document.activeElement))renderDay();
   },()=>{});
+  if(S.isOwner){SF._rev=null;if(SF._unRev)try{SF._unRev()}catch(e){}SF._unRev=S.db.doc("ownerCfg/rev_"+d).onSnapshot(x=>{SF._rev=x.exists?x.data():null;if(S.tab==="day")renderDay()},()=>{});
+    if(SF._unN)try{SF._unN()}catch(e){}SF._nt=undefined;
+    if(d===today())SF._unN=S.db.doc("days/"+d+"/meta/stock").onSnapshot(x=>{const v=x.exists?x.data():null;const nt=v&&v.nightTs;if(SF._nt!==undefined&&nt&&nt!==SF._nt&&v.by!==S.uid)setTimeout(()=>{const D=nightDiffs(),tot=r2(D.filter(y=>y.r.short>0).reduce((a,y)=>a+y.val,0));toast("🌙 "+(v.nightBy||"कर्मचारी")+" ने रात का स्टॉक लिखा"+(D.length?" · "+D.length+" में फर्क"+(tot>0?" · लगभग "+rs(tot):"")+" — दिन का हिसाब देखें":" · हिसाब मिल गया 👍"))},900);SF._nt=nt||null},()=>{})}
   S.prevStock={};
   S.db.doc("days/"+dayAdd(d,-1)+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day")renderDay()}).catch(()=>{});
 };
@@ -119,6 +122,7 @@ SF.renderKharid=function(force){
   const names=[...new Set(S.suppliers.map(x=>x.name).filter(Boolean))].slice(0,80);
   el.innerHTML=`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">🛒 मंडी खरीद</h2><span class="pill blue" style="font-size:14px">नया: ${nextNo}</span></div>
   ${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
+  ${SF.morningHTML()}
   ${S.isOwner&&window.SP?SP.cardHTML():""}
   <div class="shoprow"><label class="fld">🏪 दुकान का नाम<input class="inp" id="pShop" list="shopList" value="${esc(P.shop)}" placeholder="कुछ भी — जैसे पवन, 12 नं दुकान" autocomplete="off"></label>
     <label class="fld">📞 मोबाइल<input class="inp" id="pPh" inputmode="tel" value="${esc(P.phone)}" placeholder="ज़रूरी नहीं" autocomplete="off"></label></div>
@@ -332,7 +336,7 @@ SF.dayStockHTML=function(){
   const rows=dayRows().filter(r=>r.active);
   const flags=rows.filter(r=>r.flag);
   const P2=dayMoney(rows);
-  return `${S.isOwner?SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html:""}
+  return `${S.isOwner?SF.nightReviewHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html:""}
   ${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>
     <p class="note" style="margin:0">दुकान बंद करते समय बचा माल तौलकर डालें। "होना चाहिए" = कल रात का + आज की खरीद − बिका − संस्था।</p>
@@ -374,34 +378,59 @@ function dayMoney(rows){
   return {html,openVal,buyAll,instVal,closeVal,cogs,sales,profit,expSale,gap};
 }
 SF.dayKpi=()=>{const rows=dayRows().filter(r=>r.active);return {buy:dayMoney(rows).buyAll,short:r2(rows.reduce((a,r)=>a+(r.flag?r.short*(+r.it.sale||0):0),0))}};
-/* 🌙 रात का स्टॉक — कर्मचारी पहले बिना "होना चाहिए" देखे तौलकर लिखे (blind count); फर्क हो तो दोबारा तौलने को कहें */
+/* 🌙 रात का स्टॉक — कर्मचारी एक बार लिखे (बिना "होना चाहिए" देखे); फर्क की जानकारी सिर्फ़ मालिक को, फैसला मालिक का */
 const nTol=r=>r.it.unit==="kg"?Math.max(0.2,r2(r.avail*0.03)):0.99;
-function nightSheet(recheck){
-  const blind=!S.isOwner;
-  let rows=dayRows().filter(r=>r.active&&r.avail>0);
-  if(recheck)rows=rows.filter(r=>recheck.includes(r.it.id));
+function nightSheet(){
+  const own=S.isOwner;
+  const rows=dayRows().filter(r=>r.active&&r.avail>0);
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="रात का स्टॉक"><div class="grab"></div>
-  <div class="sh-head"><div><h3>${recheck?"⚖️ एक बार फिर तौलें":"🌙 रात का स्टॉक · "+fdate(S.billsDate)}</h3><span class="note">${recheck?"इनमें हिसाब से फर्क लगता है — ध्यान से दोबारा तौलकर लिखें":"हर सब्ज़ी तौलकर असली बचा माल लिखें"}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
-  <div class="list" style="margin:0">${rows.map(r=>{const st=(S.stock.items||{})[r.it.id]||{};return `<div class="nrow">${tileHTML(r.it)}<div><b>${esc(r.it.name)}</b><span class="note">${recheck?`पहली बार लिखा: ${fq(num(st.close1??st.close),r.it.unit)}`:blind?(r.it.unit==="kg"?"किलो में":"गिनती में"):`होना चाहिए ${fq(Math.max(0,r.expect),r.it.unit)}`}</span></div>
-    <input class="inp" data-nclose="${esc(r.it.id)}" inputmode="decimal" placeholder="${r.it.unit==="kg"?"किलो":"गिनती"}" value="${recheck?"":(r.close??"")}" aria-label="${esc(r.it.name)} कितना बचा"></div>`}).join("")||'<p class="note">आज कोई माल नहीं।</p>'}</div>
-  <button class="big" data-nsave style="margin-top:12px">✓ ${recheck?"दोबारा तौला — सेव करें":"रात का स्टॉक सेव करें"}</button></div></div>`;
+  <div class="sh-head"><div><h3>🌙 आज का बचा माल · ${fdate(S.billsDate)}</h3><span class="note">${own?"होना चाहिए वाला हिसाब सिर्फ़ आपको दिखता है":"तौलकर लिखें — कल सुबह यही माल आपकी शुरुआत में दिखेगा"}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="list" style="margin:0">${rows.map(r=>`<div class="nrow">${tileHTML(r.it)}<div><b>${esc(r.it.name)}</b><span class="note">${own?`होना चाहिए ${fq(Math.max(0,r.expect),r.it.unit)}`:(r.it.unit==="kg"?"किलो में":"गिनती में")}</span></div>
+    <input class="inp" data-nclose="${esc(r.it.id)}" inputmode="decimal" placeholder="${r.it.unit==="kg"?"किलो":"गिनती"}" value="${r.close??""}" aria-label="${esc(r.it.name)} कितना बचा"></div>`).join("")||'<p class="note">आज कोई माल नहीं।</p>'}</div>
+  <button class="big" data-nsave style="margin-top:12px">✓ सेव करें</button></div></div>`;
   $("#sheet").onclick=async e=>{if(e.target.matches("[data-close]")){closeSheet();return}
     if(e.target.closest("[data-nsave]")){const items=S.stock.items||(S.stock.items={});let n=0;
       document.querySelectorAll("[data-nclose]").forEach(i=>{const v=i.value.trim();if(v==="")return;const o=items[i.dataset.nclose]||(items[i.dataset.nclose]={});
-        if(recheck){if(o.close1==null)o.close1=o.close;o.recount=true;o.recountTs=Date.now()}else{o.close1=null;o.recount=false}
         o.close=num(v);o.closeBy=biller();o.closeTs=Date.now();n++});
       S.stock.nightBy=biller();S.stock.nightTs=Date.now();
       await saveStock();closeSheet();renderDay();
-      if(!recheck&&blind){const diff=dayRows().filter(r=>r.active&&r.close!=null&&Math.abs(r.close-r.expect)>nTol(r)).map(r=>r.it.id);
-        if(diff.length){toast("⚖️ "+diff.length+" सब्ज़ियों में फर्क लगता है — एक बार फिर तौलें");setTimeout(()=>nightSheet(diff),400);return}}
-      toast("🌙 "+n+" सब्ज़ियों का रात का स्टॉक सेव")}};
+      toast(own?"🌙 "+n+" सब्ज़ियों का रात का स्टॉक सेव":"🙏 धन्यवाद! कल सुबह यही माल आपकी शुरुआत में दिखेगा")}};
   $("#sheet").onkeydown=e=>{if(e.key==="Enter"&&e.target.dataset.nclose){e.preventDefault();const all=[...document.querySelectorAll("[data-nclose]")];const i=all.indexOf(e.target);if(all[i+1])all[i+1].focus();else e.target.blur()}};
   const f=document.querySelector("[data-nclose]");if(f)f.focus();
 }
+/* 🌅 सुबह: कल रात कर्मचारी ने जो लिखा, वही आज की शुरुआत */
+SF.morningHTML=function(){
+  if(S.billsDate!==today())return "";const ps=S.prevStock||{};
+  const L=Object.entries(ps).filter(([id,o])=>o&&o.close!=null&&o.close!==""&&num(o.close)>0).map(([id,o])=>{const it=item(id);return it?`${esc(it.name)} ${fq(num(o.close),it.unit)}`:""}).filter(Boolean);
+  if(!L.length)return "";
+  return `<div class="morning"><b>🌅 कल रात आपने लिखा था</b><span>${L.join(" · ")}</span><small>आज की खरीद इसमें जुड़ती जाएगी</small></div>`;
+};
+/* 🌙 मालिक: रात का मिलान — फर्क, रकम, कॉल/WhatsApp, फैसला */
+function nightDiffs(){return dayRows().filter(r=>r.active&&r.close!=null&&r.short!=null&&Math.abs(r.short)>nTol(r)).map(r=>({r,val:r2(r.short*num(r.it.sale))}))}
+SF.nightReviewHTML=function(){
+  if(!S.isOwner||!S.stock||!S.stock.nightTs)return "";
+  const D=nightDiffs(),who=S.stock.nightBy||"",st=(S.staffDocs||[]).find(x=>x.name===who||x.id===S.stock.by)||{};const ph=String(st.phone||"").replace(/\D/g,"").slice(-10);
+  const rev=SF._rev&&SF._rev.date===S.billsDate?SF._rev:null;
+  const short=D.filter(x=>x.r.short>0),tot=r2(short.reduce((a,x)=>a+x.val,0));
+  if(!D.length)return `<div class="card2 nrev ok"><h3>🌙 रात का मिलान</h3><p style="margin:0">✓ ${esc(who)} का लिखा हिसाब एकदम मिल गया 👍 <span class="note">${ftime(S.stock.nightTs)}</span></p>
+    ${ph?`<a class="big ghost" style="margin-top:8px;text-align:center;text-decoration:none" target="_blank" rel="noopener" href="${waLink(who+", आज का हिसाब एकदम सही मिला 👍 बहुत बढ़िया। धन्यवाद 🙏",ph)}">🟢 शाबाशी भेजें</a>`:""}</div>`;
+  const msg=`${who}, आज के हिसाब में ${short.map(x=>`${x.r.it.name} लगभग ${fq(x.r.short,x.r.it.unit)}`).join(", ")} कम लग रहा है। कोई सब्ज़ी खराब हुई, किसी संस्था/ग्राहक को दी, या तौल में फर्क रहा क्या? बता दीजिए तो हिसाब में लिख दूँ 🙏`;
+  return `<div class="card2 nrev"><h3>🌙 रात का मिलान — आपका फैसला</h3>
+  <p class="note" style="margin:0 0 6px">${esc(who)} ने ${ftime(S.stock.nightTs)} पर लिखा · ${D.length} ${D.length>1?"सब्ज़ियों":"सब्ज़ी"} में फर्क${tot>0?` · कमी लगभग <b style="color:var(--chili)">${rs(tot)}</b>`:""} · यह सिर्फ़ आपको दिखता है</p>
+  <div class="list" style="margin:0">${D.map(({r,val})=>`<div class="li"><div class="mid"><b>${esc(r.it.name)}</b><span>होना चाहिए ${fq(Math.max(0,r.expect),r.it.unit)} · लिखा ${fq(r.close,r.it.unit)}</span></div><div class="rt" style="color:${r.short>0?"var(--chili)":"var(--leaf)"}">${r.short>0?"कम "+fq(r.short,r.it.unit):"ज़्यादा "+fq(-r.short,r.it.unit)}<small>${rs(Math.abs(val))}</small></div></div>`).join("")}</div>
+  ${rev?`<p class="pill green" style="margin:8px 0 0;display:inline-block">✓ आपने देख लिया · ${ftime(rev.ts)}${rev.note?" · "+esc(rev.note):""}</p>`:""}
+  <div class="sp-btns" style="margin-top:8px">${ph?`<a class="big ghost" style="text-align:center;text-decoration:none" href="tel:+91${ph}">📞 कॉल करें</a><a class="big ghost" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="${waLink(msg,ph)}">🟢 प्यार से पूछें</a>`:`<span class="note">कर्मचारी का नंबर सेटिंग में नहीं मिला</span><span></span>`}
+  <button class="big" data-nrevok>✓ ठीक है, समझ गया</button><button class="big ghost" data-nrevnote>📝 नोट लिखें</button></div></div>`;
+};
+SF.saveReview=async function(note){
+  const d={date:S.billsDate,ts:Date.now(),note:note||"",diffs:nightDiffs().map(x=>({id:x.r.it.id,name:x.r.it.name,short:x.r.short,val:x.val}))};
+  try{if(!S.demo)await S.db.doc("ownerCfg/rev_"+S.billsDate).set(d);SF._rev=d;renderDay();toast("✓ दर्ज हुआ")}catch(e){toast("सेव नहीं हुआ")}
+};
 SF.nightSheet=nightSheet;
 /* दिन में: गाड़ी में अभी कितना माल होना चाहिए (टाइल पर) */
 SF.liveLeftMap=function(){if(S.billsDate!==today())return null;const m={};dayRows().forEach(r=>{if(r.avail>0)m[r.it.id]=Math.max(0,r2(r.expect*1000)/1000)});return m};
 SF.bindDay=function(){$("#p-day").addEventListener("click",e=>{if(e.target.closest("[data-night]"))nightSheet();
+  if(e.target.closest("[data-nrevok]"))SF.saveReview("");if(e.target.closest("[data-nrevnote]")){const n=prompt("क्या पता चला? (जैसे 2 किलो खराब हुआ था)");if(n!=null)SF.saveReview(n.trim())}
   if(e.target.closest("[data-audcopy]"))SF.auditCopy();if(e.target.closest("[data-audfile]"))SF.auditFile()})};
 /* =============== 🤖 AI ऑडिट पैक — "कोई टोपी न पहना सके" =============== */
 SF.xyzWarnHTML=function(){
@@ -486,7 +515,7 @@ ${S.kharch&&S.kharch.length?TH(["क्या","₹","कैसे","किस�
 ${(()=>{const W=(S.stock&&S.stock.wlog)||[];return W.length?TH(["समय","सामान","मात्रा","वजह","किसने"])+"\n"+T(W.map(w=>[ftime(w.ts),w.name,fq(w.qty,w.unit),w.reason||"",w.byName||""])):"कोई खराबी नहीं लिखी"})()}
 
 ## 5c. रात की गिनती
-${(()=>{const I=(S.stock&&S.stock.items)||{};const R=rows.filter(r=>I[r.it.id]&&I[r.it.id].recount);return (S.stock&&S.stock.nightBy?"गिनती: "+S.stock.nightBy+" · "+ftime(S.stock.nightTs)+"\n":"⚠ रात की गिनती नहीं हुई\n")+(R.length?"दोबारा तौलने पर: "+R.map(r=>r.it.name+" पहली "+I[r.it.id].close1+" → दोबारा "+I[r.it.id].close).join("; "):"")})()}
+${(()=>{const I=(S.stock&&S.stock.items)||{};const R=rows.filter(r=>I[r.it.id]&&I[r.it.id].recount);return (S.stock&&S.stock.nightBy?"गिनती: "+S.stock.nightBy+" · "+ftime(S.stock.nightTs)+"\n":"⚠ रात की गिनती नहीं हुई\n")+(R.length?"दोबारा तौलने पर: "+R.map(r=>r.it.name+" पहली "+I[r.it.id].close1+" → दोबारा "+I[r.it.id].close).join("; ")+"\n":"")+(SF._rev&&SF._rev.date===d?"मालिक ने मिलान देखा: "+ftime(SF._rev.ts)+(SF._rev.note?" · नोट: "+SF._rev.note:""):"मालिक ने अभी मिलान नहीं देखा")})()}
 
 ## 5d. भाव बदलाव (बिक्री भाव)
 ${(S.priceLog||[]).filter(l=>dOf(l.ts)===d).map(l=>"- "+ftime(l.ts)+" · "+l.name+" ₹"+l.old+" → ₹"+l.new+" · "+(l.byName||"")).join("\n")||"कोई भाव नहीं बदला"}

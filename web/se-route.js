@@ -75,10 +75,10 @@ SR.banner=function(){
   if(S.isOwner||S.demo)return;let el=document.getElementById("locbar");
   if(!el){el=document.createElement("button");el.id="locbar";el.className="locbar";el.type="button";const nb=document.getElementById("netbar");if(nb)nb.insertAdjacentElement("afterend",el);else document.body.prepend(el);el.onclick=SR.fixLoc}
   const s=SR.st;let t="";
-  if(s.native&&s.unsupported)t="📍 गाड़ी की लोकेशन के लिए नई APK डालें (वही पुराना लिंक)";
-  else if(s.perm===false)t="📍 लोकेशन की अनुमति नहीं है — यहाँ दबाकर 'अनुमति दें' चुनें";
-  else if(s.gps===false)t="📍 फोन की लोकेशन (GPS) बंद है — यहाँ दबाकर चालू करें";
-  else if(s.native&&s.running===false&&s.perm)t="📍 लोकेशन रुकी हुई है — यहाँ दबाकर चालू करें";
+  if(s.native&&s.unsupported)t="📍 ऐप की नई APK डालें (वही पुराना लिंक)";
+  else if(s.perm===false)t="📍 ऐप को लोकेशन की अनुमति दें — यहाँ दबाएँ";
+  else if(s.gps===false)t="📍 फोन की लोकेशन (GPS) चालू करें — यहाँ दबाएँ";
+  else if(s.native&&s.running===false&&s.perm)t="📍 लोकेशन चालू करें — यहाँ दबाएँ";
   el.hidden=!t;el.textContent=t;
 };
 SR.fixLoc=async function(){
@@ -167,7 +167,7 @@ SR.xyzSheet=function(amt,idx){
   <div class="sh-head"><div><h3>🅧 XYZ — अन्य पैसा</h3><span class="note">जो चीज़ लिस्ट में नहीं, उसके पैसे · ₹1 = 1 इकाई</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
   <label class="fld">कितने रुपये?<input class="inp" id="xyAmt" inputmode="decimal" value="${ln?ln.qty:(amt||"")}" placeholder="₹" style="font-size:24px;font-weight:800"></label>
   <label class="fld">किस चीज़ के पैसे? (ज़रूरी)<input class="inp" id="xyNote" value="${esc(ln?ln.note||"":"")}" placeholder="जैसे थैली, शकरकंद, पुराना हिसाब"></label>
-  <p class="warn" style="margin:8px 0">⚠ XYZ वाला हर बिल विक्रम जी की रिपोर्ट और ऑडिट में अलग से दिखेगा। जो सामान बार-बार बिके, उसे "+ नया सामान" से जोड़ें।</p>
+  <p class="note" style="margin:8px 0">जो सामान बार-बार बिके, उसे "+ नया सामान" से जोड़ लें — बिल बनाना और आसान होगा।</p>
   <button class="big" data-xysave>✓ बिल में जोड़ें</button></div></div>`;
   $("#sheet").onclick=e=>{
     if(e.target.matches("[data-close]")){closeSheet();return}
@@ -185,7 +185,7 @@ SR.xyzSheet=function(amt,idx){
 SR.addCardHTML=function(q){return `<button class="card addnew" data-newitem="${esc(q||"")}"><span class="tile"><span class="em">➕</span></span><span class="nm">नया सामान जोड़ें<small class="en">Add new item</small></span><span class="pr">लिस्ट में नहीं है?</span></button>`};
 SR.newItemSheet=function(q){
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="नया सामान"><div class="grab"></div>
-  <div class="sh-head"><div><h3>➕ नया सामान जोड़ें</h3><span class="note">${S.isOwner?"यह सबके फोन में तुरंत आ जाएगा":"विक्रम जी को इसकी खबर अपने-आप जाएगी"}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="sh-head"><div><h3>➕ नया सामान जोड़ें</h3><span class="note">${S.isOwner?"यह सबके फोन में तुरंत आ जाएगा":"यह सबके फोन में तुरंत आ जाएगा"}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
   <label class="fld">नाम (हिंदी में)<input class="inp" id="niName" value="${esc(q||"")}" placeholder="जैसे शकरकंद"></label>
   <label class="fld">अंग्रेज़ी नाम (अगर पता हो)<input class="inp" id="niEn" placeholder="जैसे Sweet Potato"></label>
   <div class="row2"><label class="fld">किस हिसाब से बिकेगा<select class="inp" id="niUnit"><option value="kg">किलो</option><option value="pc">पीस / पैकेट</option></select></label>
@@ -204,7 +204,7 @@ SR.saveNewItem=async function(){
     addedBy:S.uid||"",addedByName:biller(),addedTs:Date.now(),pending:!S.isOwner,ts:Date.now()};
   try{if(!S.demo&&S.db)await S.db.collection("items").doc(id).set(it)}catch(e){toast("सेव नहीं हुआ: "+(e.code||e.message||""));return}
   if(!S.items.find(x=>x.id===id))S.items.push({id,...it});
-  closeSheet();toast("✓ "+name+" जुड़ गया"+(S.isOwner?"":" — विक्रम जी को खबर गई"));
+  closeSheet();toast("✓ "+name+" जुड़ गया");
   const x=item(id);if(x)openQty(x);
 };
 SR.pendingItemsHTML=function(){
@@ -478,7 +478,7 @@ SR.quickStripHTML=function(){return `<div class="qstrip"><button data-qwaste>�
 const KH=["गाड़ी किराया","पेट्रोल / डीज़ल","गाड़ी रिपेयर","मंडी भाड़ा","हम्माली","पॉलीथीन / थैली","चाय-नाश्ता","अन्य"];
 SR.kharchSheet=function(){
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="खर्चा"><div class="grab"></div>
-  <div class="sh-head"><div><h3>💸 खर्चा लिखें</h3><span class="note">आज ${fdate(today())} · विक्रम जी के हिसाब में जाएगा</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="sh-head"><div><h3>💸 खर्चा लिखें</h3><span class="note">आज ${fdate(today())} · दिन के हिसाब में जुड़ जाएगा</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
   <div class="lsws" style="margin:0 0 8px">${KH.map(k=>`<button class="chip" data-khq="${esc(k)}">${esc(k)}</button>`).join("")}</div>
   <label class="fld">किस चीज़ का<input class="inp" id="qkW" placeholder="जैसे गाड़ी किराया"></label>
   <label class="fld">कितने रुपये<input class="inp big-in" id="qkA" inputmode="decimal" placeholder="₹"></label>
@@ -539,7 +539,7 @@ SR.rateSheet=function(it){
     <div class="qrow"><label class="qf"><span>नया ₹</span><input id="rnIn" inputmode="decimal" autocomplete="off" placeholder="${old}"><span>/${u}</span></label></div>
     ${S.isOwner&&cost>0?`<p class="note" id="rnM" style="margin:0">खरीद ${rs(cost)}/${u}</p>`:""}
     <button class="big" data-rnsave>✓ नया भाव लगाएँ</button>
-    ${S.isOwner?"":`<p class="note" style="margin:0;text-align:center">यह बदलाव विक्रम जी को दिखेगा</p>`}</div>`;
+    ${S.isOwner?"":`<p class="note" style="margin:0;text-align:center">नया भाव सबके फोन में तुरंत लग जाएगा</p>`}</div>`;
   const I=$("#rnIn");
   $("#sheet").oninput=()=>{const n=num(I.value),m=$("#rnM");if(m&&n>0)m.innerHTML=`खरीद ${rs(cost)} → बिक्री ${rs(n)} · मुनाफ़ा <b style="color:${n>cost?"var(--leaf)":"var(--chili)"}">${Math.round((n-cost)/cost*100)}%</b>`};
   const save=async()=>{const n=r2(num(I.value));if(!(n>0)){toast("नया भाव लिखें");return}if(n===old){closeSheet();return}

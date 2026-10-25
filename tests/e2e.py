@@ -222,12 +222,12 @@ async def main():
         await pg.click("[data-night]"); await pg.wait_for_timeout(200)
         await pg.fill('[data-nclose="pyaj"]', "88"); await pg.fill('[data-nclose="tamatar"]', "26")
         assert "होना चाहिए" not in await pg.inner_text("#sheet"), "staff must not see expected stock"
-        await pg.click("[data-nsave]"); await pg.wait_for_timeout(900)
-        assert await pg.query_selector('[data-nclose="pyaj"]'), "recheck sheet expected for pyaj"
-        await pg.fill('[data-nclose="pyaj"]', "88"); await pg.click("[data-nsave]"); await pg.wait_for_timeout(500)
+        await pg.click("[data-nsave]"); await pg.wait_for_timeout(700)
+        assert not await pg.query_selector("[data-nclose]"), "no recheck for staff"
+        assert "धन्यवाद" in await pg.evaluate("(document.querySelector('.toast')||{}).innerText||''")
         st = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/meta')).map(([k,v])=>v.stock).filter(Boolean)[0]")
-        assert st["items"]["pyaj"]["recount"] and st["items"]["pyaj"]["close1"] == 88 and st["nightBy"] == "कमल भाई", st["items"]["pyaj"]
-        print("blind night count + recheck ok")
+        assert st["items"]["pyaj"]["close"] == 88 and st["nightBy"] == "कमल भाई", st["items"]["pyaj"]
+        print("night count (no recheck) ok")
         await pg.screenshot(path=f"{SHOTS}/11-day.png", full_page=True)
         # बिल रद्द करने की अर्ज़ी (कर्मचारी)
         await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
@@ -261,6 +261,13 @@ async def main():
         await pg.screenshot(path=f"{SHOTS}/12-owner-day.png", full_page=True)
         txt = await pg.inner_text("#p-day")
         assert "असली मुनाफ़ा" in txt, txt[:300]
+        assert "रात का मिलान" in txt and "प्याज" in txt, txt[:600]
+        await pg.click("[data-nrevok]"); await pg.wait_for_timeout(500)
+        assert await pg.evaluate("Object.keys(window.__MOCK__.ownerCfg||{}).some(k=>k.startsWith('rev_'))"), "review not saved"
+        await pg.locator(".nrev").screenshot(path=f"{SHOTS}/19-night-review.png")
+        mh = await pg.evaluate("(()=>{const o=S.prevStock;S.prevStock={pyaj:{close:88},tamatar:{close:26}};const h=SF.morningHTML();S.prevStock=o;return h})()")
+        assert "कल रात आपने लिखा था" in mh and "प्याज 88" in mh, mh
+        print("owner night review ok")
         # 📈 मालिक: टाइल पर मुनाफ़ा
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(400)
         mg = await pg.eval_on_selector_all("#grid .mg", "e=>e.map(x=>x.innerText)")
