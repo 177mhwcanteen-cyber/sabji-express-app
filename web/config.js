@@ -12,5 +12,7 @@ window.SE_CONFIG = {
   },
   ownerEmail: "sabziexpress3600@gmail.com",
   ownerName: "विक्रम जी",
+  // Google Apps Script वेब-ऐप का URL (…/exec) — खरीद के बिल की फोटो Drive में भेजने के लिए
+  photoUrl: "",
   updateUrl: "https://177mhwcanteen-cyber.github.io/sabji-express-app/"
 };

@@ -266,6 +266,7 @@ function canvasToEscPos(cv){
   let n=0;parts.forEach(p=>n+=p.length);const all=new Uint8Array(n);let o=0;parts.forEach(p=>{all.set(p,o);o+=p.length});
   let s="";for(let i=0;i<all.length;i+=0x8000)s+=String.fromCharCode.apply(null,all.subarray(i,i+0x8000));return btoa(s);
 }
+SE.escpos=canvasToEscPos;
 SE.printReceipt=async function(b,o){
   const cv=SE.receiptCanvas(b,o);
   if(SE.isNative){

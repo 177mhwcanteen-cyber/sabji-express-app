@@ -299,6 +299,18 @@ main{padding-block:10px 120px}
 .camframe{position:absolute;left:50%;top:42%;width:min(70vw,360px);height:160px;transform:translate(-50%,-50%);border:3px solid #7CFC9A;border-radius:16px;box-shadow:0 0 0 2000px rgba(0,0,0,.35)}
 .camov p{margin:0;font-weight:700;text-align:center}.camov .big{width:min(340px,100%);background:#fff}
 .verline{font-size:12px;color:var(--muted);text-align:center;margin:14px 0 4px}
+/* v15 खरीद, लेबल */
+.supsel{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.supsel b{font-size:17px}.supsel .lnk{margin-left:auto}.supsel .tile{width:40px;height:40px}
+.plines{display:grid;gap:8px}.pline{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:8px;border:1.5px solid var(--line);border-radius:14px}
+.pf{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end}.pf .inp{padding:8px;font-size:17px}.pamt{font-size:18px;padding:8px 0;display:block}
+.pbadge{margin-top:4px;min-height:4px}
+.ppick{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px}.ppick button{border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:5px 4px;display:grid;justify-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--ink)}
+.ppick .tile{width:46px;height:46px}
+.dgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:4px 0 6px}.dgrid span{background:var(--bg);border-radius:8px;padding:3px 5px;font-size:11px;color:var(--muted)}.dgrid b{display:block;color:var(--ink);font-size:13px}
+.nrow{display:grid;grid-template-columns:44px 1fr 110px;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}.nrow .note{display:block}.nrow .inp{font-size:20px;font-weight:800;text-align:center}
+.lsws{display:flex;flex-wrap:wrap;gap:6px 12px}.lsw{display:flex;align-items:center;gap:5px}
+.lprev{background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0/16px 16px;border-radius:12px;padding:10px;display:flex;justify-content:center}.lprev canvas{max-width:100%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.2);border-radius:4px}
+.chip[aria-pressed="true"]{background:var(--leaf);color:var(--leaf-ink);border-color:var(--leaf)}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -367,7 +379,7 @@ a.big[aria-disabled="true"]{opacity:.45}
 <main class="px" id="main">
   <div class="netbar" id="netbar" hidden></div>
   <section id="p-bill">
-    <div id="demo" class="demo" hidden>डेमो मोड: यहाँ बने बिल सेव नहीं होंगे। असली ऐप claude.ai पर साइन-इन करके खोलें।</div>
+    <div id="demo" class="demo" hidden>डेमो मोड: यहाँ बने बिल सेव नहीं होंगे। Firebase जुड़ते ही असली ऐप चलेगा।</div>
     <div class="modes" id="modes"></div>
     <div id="custbox"></div>
     <div class="cats" id="cats"></div>
@@ -379,6 +391,8 @@ a.big[aria-disabled="true"]{opacity:.45}
   <section id="p-report" hidden></section>
   <section id="p-day" hidden></section>
   <section id="p-set" hidden></section>
+  <section id="p-kharid" hidden></section>
+  <section id="p-label" hidden></section>
 </main>
 
 <div class="cartbar px" id="cartbar" hidden>
@@ -420,7 +434,7 @@ function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2200)}
 function insts(){return (S.settings.insts&&S.settings.insts.length)?S.settings.insts:["मारवाड़ रसोई (होटल)","177 MH कैंटीन","रामविनायक डोसा पॉइंट","15 भैरव कैंटीन (जसाई)"]}
 function item(id){return S.items.find(i=>i.id===id)}
-function priceOf(it){return S.mode==="inst"?(+it.cost||0):(+it.sale||0)}
+function priceOf(it){return S.mode==="inst"?(window.SF?SF.costOf(it):(+it.cost||0)):(+it.sale||0)}
 function tileHTML(it,cls=""){
   const h=it.hue??120;
   const em=`<span class="em" aria-hidden="true">${esc(it.emoji||"🥬")}</span>`;
@@ -471,7 +485,7 @@ $("#btabs").onclick=e=>{
 };
 
 /* ---------- tabs ---------- */
-function tabsList(){const t=[["bill","बिलिंग"],["udhar","उधार खाता"],["bills","आज के बिल"],["day","दिन का हिसाब"]];if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()?" 🔴"+guardOpen():"")],["set","रेट व सेटिंग"]);return t}
+function tabsList(){const t=[["bill","बिलिंग"],["kharid","खरीद"],["udhar","उधार खाता"],["bills","आज के बिल"],["day","दिन का हिसाब"]];t.push(["label","लेबल"]);if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()?" 🔴"+guardOpen():"")],["set","रेट व सेटिंग"]);return t}
 function renderTabs(){
   $("#tabs").innerHTML=tabsList().map(([k,v])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}">${v}</button>`).join("");
   $("#who").textContent="👤 "+(biller()||"नाम डालें");
@@ -479,7 +493,7 @@ function renderTabs(){
 $("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(!b)return;S.tab=b.dataset.tab;showTab()};
 function showTab(){
   renderTabs();
-  ["bill","udhar","bills","day","report","set"].forEach(k=>$("#p-"+k).hidden=S.tab!==k);
+  ["bill","udhar","bills","day","report","set","kharid","label"].forEach(k=>$("#p-"+k).hidden=S.tab!==k);$("#sbar").hidden=S.tab==="kharid"||S.tab==="label";
   if(S.tab!=="day")S.scanIn=false;
   renderPane(true);renderCart();renderBillTabs();window.scrollTo(0,0);
 }
@@ -489,6 +503,8 @@ function renderPane(force){
   else if(S.tab==="bills")renderBills();
   else if(S.tab==="day"){const p=$("#p-day");if(force||!p.contains(document.activeElement))renderDay()}
   else if(S.tab==="report")renderReport();
+  else if(S.tab==="kharid"){if(window.SF)SF.renderKharid()}
+  else if(S.tab==="label"){if(window.SF)SF.renderLabel()}
   else if(S.tab==="set"){const p=$("#p-set");if(force||!p.contains(document.activeElement))renderSettings()}
 }
 
@@ -554,7 +570,7 @@ function repeatLast(){
   const src=S.mode==="walk"?S.customers.find(x=>x.id===S.cust.phone):S.parties.find(x=>x.id===S.partyId);
   if(!src||!src.lastCart)return;let n=0;
   src.lastCart.forEach(lc=>{const it=item(lc.id);if(!it||it.active===false)return;const p=priceOf(it);if(!(p>0))return;
-    S.cart.push({key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:lc.qty,rate:p,board:p,cost:+it.cost||0,changed:false,amt:r2(lc.qty*p)});n++});
+    S.cart.push({key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:lc.qty,rate:p,board:p,cost:(window.SF?SF.costOf(it):(+it.cost||0)),changed:false,amt:r2(lc.qty*p)});n++});
   refreshAfterCart();toast(n+" चीज़ें आज के रेट पर जुड़ीं");
 }
 function holdCurrent(){newTab()}
@@ -576,7 +592,7 @@ function quickAdd(it,q){
   const p=priceOf(it);if(!(p>0))return;
   const ex=S.cart.find(l=>l.id===it.id&&!l.changed&&!l.free);
   if(ex){ex.qty=Math.round((ex.qty+q)*1000)/1000;ex.amt=r2(ex.qty*ex.rate)}
-  else S.cart.push({key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:q,rate:p,board:p,cost:+it.cost||0,changed:false,free:false,amt:r2(q*p)});
+  else S.cart.push({key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:q,rate:p,board:p,cost:(window.SF?SF.costOf(it):(+it.cost||0)),changed:false,free:false,amt:r2(q*p)});
   clearSearch();refreshAfterCart();beep(true);toast("✓ "+it.name+" "+fq(q,it.unit)+" · "+rs(r2(q*p)));
 }
 function setMode(m){
@@ -603,7 +619,7 @@ function openQty(it,lineIdx){
   const sh=$("#sheet"),qi=$("#qIn"),ai=$("#aIn"),btn=sh.querySelector("[data-add]");
   const upd=()=>{const amt=r2(st.qty*rate);btn.disabled=!(st.qty>0);btn.textContent=st.qty>0?`${ln?"बदलें":"जोड़ें"} · ${fq(st.qty,it.unit)} = ${rs(amt)}`:(kg?"किलो या रुपये लिखें":"गिनती लिखें")};
   const add=()=>{if(!(st.qty>0))return;const q=Math.round(st.qty*1000)/1000;
-    const line={key:ln?ln.key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:q,rate:r2(rate),board:r2(board),cost:+it.cost||0,changed:r2(rate)!==r2(board),free:false,amt:r2(q*rate)};
+    const line={key:ln?ln.key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:q,rate:r2(rate),board:r2(board),cost:(window.SF?SF.costOf(it):(+it.cost||0)),changed:r2(rate)!==r2(board),free:false,amt:r2(q*rate)};
     if(ln)S.cart[lineIdx]=line;else{const ex=S.cart.findIndex(l=>l.id===it.id&&!l.changed&&!l.free);if(ex>-1){S.cart[ex].qty=Math.round((S.cart[ex].qty+q)*1000)/1000;S.cart[ex].amt=r2(S.cart[ex].qty*S.cart[ex].rate)}else S.cart.push(line)}
     closeSheet();clearSearch();refreshAfterCart();beep(true);toast("✓ "+it.name+" "+fq(q,it.unit)+" · "+rs(line.amt));
     if(lineIdx!=null&&S.chk&&S.cart.length)drawCheckout();};
@@ -867,11 +883,14 @@ async function adjStock(pairs,why){
 function trackedPairs(lines,sign){return lines.filter(l=>item(l.id)?.track).map(l=>[l.id,sign*l.qty])}
 async function handleScan(code){
   code=String(code||"").trim();if(!code)return;
+  const vw=window.SF&&!S.scanIn?SF.parseVW(code):null;
+  if(vw){if(vw.bad){beep(false);toast("लेबल की सब्ज़ी (कोड "+vw.plu+") लिस्ट में नहीं");return}
+    if(S.tab!=="bill"){S.tab="bill";showTab()}if(!(priceOf(vw.it)>0)){toast(vw.it.name+" का रेट नहीं डाला गया");return}quickAdd(vw.it,vw.qty);return}
   const it=findByCode(code);beep(!!it);
   if(!it){unknownCode(code);return}
   if(S.scanIn){
     await adjStock([[it.id,1]],"माल आया");
-    if(!S.demo){try{await S.db.collection("inward").doc("w"+Date.now().toString(36)+Math.random().toString(36).slice(2,4)).set({itemId:it.id,name:it.name,qty:1,cost:+it.cost||0,code,date:today(),ts:Date.now(),by:S.uid||"",byName:biller()})}catch(e){}}
+    if(!S.demo){try{await S.db.collection("inward").doc("w"+Date.now().toString(36)+Math.random().toString(36).slice(2,4)).set({itemId:it.id,name:it.name,qty:1,cost:(window.SF?SF.costOf(it):(+it.cost||0)),code,date:today(),ts:Date.now(),by:S.uid||"",byName:biller()})}catch(e){}}
     toast("📦 "+it.name+" +1 · अब स्टॉक "+fq(S.pstock[it.id].qty,it.unit));if(S.tab==="day")renderDay();return}
   if(S.tab!=="bill"){S.tab="bill";showTab()}
   if(it.active===false){toast(it.name+" अभी बंद है");return}
@@ -879,7 +898,7 @@ async function handleScan(code){
   if(it.unit!=="pc"){openQty(it);return}
   const ex=S.cart.find(l=>l.id===it.id&&!l.changed&&!l.free);
   if(ex){ex.qty=r2(ex.qty+1);ex.amt=r2(ex.qty*ex.rate)}
-  else S.cart.push({key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:1,rate:p,board:p,cost:+it.cost||0,changed:false,free:false,amt:p});
+  else S.cart.push({key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:1,rate:p,board:p,cost:(window.SF?SF.costOf(it):(+it.cost||0)),changed:false,free:false,amt:p});
   clearSearch();refreshAfterCart();
   const inCart=S.cart.filter(l=>l.id===it.id).reduce((a,l)=>a+l.qty,0),left=it.track?r2((+(S.pstock[it.id]?.qty)||0)-inCart):null;
   toast("✓ "+it.name+" · "+rs(p)+(inCart>1?" · कुल "+inCart:"")+(left!=null&&left<0?" · ⚠ स्टॉक में इतना नहीं दिखता":""));
@@ -1094,7 +1113,7 @@ function cashCalc(d){
   const sale=liveBills().filter(b=>b.mode!=="inst");
   const cashSale=r2(sale.reduce((a,b)=>a+(b.pay.cash||0),0));
   const jamaCash=r2(S.ledger.filter(l=>l.date===d&&l.type==="jama"&&l.mode!=="upi").reduce((a,l)=>a+l.amt,0));
-  const khCash=r2(S.kharch.filter(k=>k.mode!=="upi").reduce((a,k)=>a+(+k.amt||0),0));
+  const khCash=r2(S.kharch.filter(k=>k.mode!=="upi").reduce((a,k)=>a+(+k.amt||0),0)+(window.SF?SF.gallaPaid():0));
   const khAll=r2(S.kharch.reduce((a,k)=>a+(+k.amt||0),0));
   const cl=S.close||{};const float=cl.float!=null&&cl.float!==""?+cl.float:(+S.settings.float||0);
   const expected=r2(float+cashSale+jamaCash-khCash);
@@ -1104,7 +1123,7 @@ function cashCalc(d){
 function diffPill(diff){if(diff==null)return '<span class="pill blue">अभी गिना नहीं</span>';if(Math.abs(diff)<=5)return '<span class="pill green">✓ पूरा मिला</span>';return diff<0?`<span class="pill red">${rs(-diff)} कम है</span>`:`<span class="pill blue">${rs(diff)} ज़्यादा है</span>`}
 function renderDay(){
   const d=S.billsDate,c=cashCalc(d),rows=stockRows();
-  const buyTot=r2(rows.reduce((a,r)=>a+r.amt,0)),shortTot=r2(rows.reduce((a,r)=>a+r.shortVal,0)),flags=rows.filter(r=>r.flag);
+  const _k=window.SF?SF.dayKpi():{buy:0,short:0};const buyTot=_k.buy,shortTot=_k.short;
   const quick=["डीज़ल","मंडी भाड़ा","हम्माली","पॉलीथीन","चाय-नाश्ता"];
   $("#p-day").innerHTML=`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">दिन का हिसाब</h2><input class="inp" type="date" id="dayDate" value="${d}" aria-label="तारीख"></div>
   <div class="kpis"><div class="kpi"><span>आज की खरीद (मंडी)</span><b>${rs(buyTot)}</b></div><div class="kpi red"><span>खर्चा</span><b>${rs(c.khAll)}</b></div>
@@ -1114,7 +1133,7 @@ function renderDay(){
     <div class="stkmeta"><span>सुबह खुला पैसा</span><b>${rs(c.float)}</b></div>
     <div class="stkmeta"><span>+ नकद बिक्री</span><b>${rs(c.cashSale)}</b></div>
     <div class="stkmeta"><span>+ उधारी वसूली (नकद)</span><b>${rs(c.jamaCash)}</b></div>
-    <div class="stkmeta"><span>− नकद खर्चा</span><b>${rs(c.khCash)}</b></div>
+    <div class="stkmeta"><span>− नकद खर्चा + गल्ले से खरीद</span><b>${rs(c.khCash)}</b></div>
     <div class="amtline" style="margin:0"><span>गल्ले में होना चाहिए</span><b>${rs(c.expected)}</b></div>
     <div class="row2" style="margin:0"><label class="fld">सुबह खुला पैसा ₹<input class="inp" id="dFloat" inputmode="decimal" value="${c.float||""}"></label><label class="fld">अभी गिनकर कितना है? ₹<input class="inp" id="dCount" inputmode="decimal" value="${c.counted??""}"></label></div>
     <button class="big" data-saveclose>गल्ला मिलान सेव करें</button>
@@ -1130,18 +1149,7 @@ function renderDay(){
   </div>
 
   ${pstockHTML()}
-  <h3 style="margin:0 0 4px">माल: सुबह कितना आया, रात को कितना बचा</h3>
-  <p class="note" style="margin:0 0 8px">सुबह मंडी से आया माल और उसकी कुल रकम डालें। रात को बचा माल तौलकर डालें। ऐप खुद हिसाब लगाएगा कि बिका कितना और कमी कितनी है।</p>
-  ${flags.length?`<div class="warn">⚠ ${flags.length} सब्ज़ियों में माल कम निकला: ${flags.map(r=>esc(r.it.name)+" "+fq(r.short,r.it.unit)).join(", ")}</div>`:""}
-  <div class="list">${rows.map(r=>{const it=r.it,u=UNITS[it.unit]||it.unit,id=esc(it.id);return `<div class="stkrow" data-sid="${id}">${tileHTML(it)}<div style="min-width:0">
-    <div class="stkmeta"><b style="color:var(--ink);font-size:16px">${esc(it.name)}</b><span>${u} में · बिका ${fq(r.sold,it.unit)}${r.buyRate?` · खरीद ${rs(r.buyRate)}/${u}`:""}</span></div>
-    <div class="stkf"><label class="fld">सुबह आया<input class="inp" id="so-${id}" data-sk="open" inputmode="decimal" value="${r.open||""}"></label>
-    <label class="fld">खरीद ₹<input class="inp" id="sa-${id}" data-sk="amt" inputmode="decimal" value="${r.amt||""}"></label>
-    <label class="fld">खराब<input class="inp" id="sw-${id}" data-sk="waste" inputmode="decimal" value="${r.waste||""}"></label>
-    <label class="fld">रात बचा<input class="inp ${r.flag?"bad":""}" id="sc-${id}" data-sk="close" inputmode="decimal" value="${r.close??""}"></label></div>
-    ${r.short!=null?`<div class="stkmeta" style="margin-top:4px">${r.flag?`<span class="pill red">कमी ${fq(r.short,it.unit)} · ${rs(r.shortVal)}</span>`:r.extra?`<span class="pill blue">${fq(-r.short,it.unit)} ज़्यादा बचा</span>`:'<span class="pill green">✓ हिसाब मिला</span>'}</div>`:""}
-    ${S.isOwner&&r.buyRate&&Math.abs(r.buyRate-(+it.cost||0))>=1?`<button class="lnk" data-applycost="${id}" style="margin-top:4px">आज का खरीद रेट ${rs(r.buyRate)} लागू करें (अभी ${rs(+it.cost||0)})</button>`:""}
-  </div></div>`}).join("")||'<div class="empty">सब्ज़ियों की लिस्ट खाली है</div>'}</div>`;
+  ${window.SF?SF.dayStockHTML():""}`;
 }
 let kMode="cash";
 async function saveStock(){
@@ -1280,6 +1288,7 @@ function renderSettings(){
   <div class="card2"><h3>🖨️ ब्लूटूथ प्रिंटर</h3>
     <p class="note" style="margin:0">${SE.isNative?(SE.printer.addr?"चुना हुआ: <b>"+esc(SE.printer.name)+"</b> · "+(SE.printer.width>400?"80mm":"58mm"):"पहले फोन की Bluetooth सेटिंग में प्रिंटर को pair करें, फिर यहाँ चुनें।"):"प्रिंटर Android ऐप में चुना जाता है। वेब में बिल फोन के प्रिंट से छपेगा।"}</p>
     ${SE.isNative?'<div class="row2" style="margin:0"><button class="big ghost" data-prnpick="58">58mm प्रिंटर चुनें</button><button class="big ghost" data-prnpick="80">80mm प्रिंटर चुनें</button></div><div id="prnList"></div><button class="big ghost" data-prntest>टेस्ट प्रिंट</button>':""}</div>
+  ${window.SF?SF.labelSettingsHTML():""}
   <div class="card2"><h3>📦 पुराने ऐप का डेटा</h3><p class="note" style="margin:0">पुराने (आर्टिफ़ैक्ट) ऐप की सब्ज़ियाँ, भाव, खरीद इतिहास, उधार खाते और संस्थाएँ यहाँ लाएँ। जो पहले से है वह नहीं बदलेगा।</p><button class="big ghost" data-migrate>पुराना डेटा लाएँ</button></div>
   <h3 style="margin:0 0 4px">सब्ज़ियाँ और रेट</h3><p class="note" style="margin:0 0 8px">बिक्री रेट = ग्राहक का रेट · खरीद रेट = मंडी का रेट (संस्था इसी पर लेगी)। फोटो बदलने के लिए फोटो पर टैप करें। ${(()=>{const n=S.items.filter(i=>!i.photo).length;return n?`<b style="color:var(--chili)">${n} सब्ज़ियों की असली फोटो अभी बाकी है।</b> अच्छी रोशनी में ऊपर से फोटो खींचकर लगाएँ।`:'<b style="color:var(--leaf)">सबकी फोटो लग चुकी है।</b>'})()}</p>
   <div class="list">${S.items.map(it=>`<div class="setitem" data-sid="${esc(it.id)}">
@@ -1362,6 +1371,7 @@ function reportA4(date){
   ${tr(["रद्द बिल",String(S.dayBills.filter(b=>b.cancelled).length)])}</table>
   <h2>सब्ज़ी-वार</h2><table><tr><th>सब्ज़ी</th><th class="r">मात्रा</th><th class="r">रकम</th><th class="r">खरीद लागत</th><th class="r">फायदा</th></tr>
   ${rows.map(p=>`<tr><td>${esc(p.name)}${p.inst?" (संस्था)":""}</td><td class="r">${fq(p.q,p.unit)}</td><td class="r">${rs(p.amt)}</td><td class="r">${rs(p.cost)}</td><td class="r">${p.inst?"—":rs(r2(p.amt-p.cost))}</td></tr>`).join("")}</table>
+  ${window.SF?SF.purchA4HTML():""}
   <h2>सभी बिल</h2><table><tr><th>बिल</th><th>समय</th><th>ग्राहक</th><th>बिलर</th><th class="r">रकम</th><th>भुगतान</th></tr>
   ${S.dayBills.map(b=>`<tr><td>${esc(b.no)}</td><td>${ftime(b.ts)}</td><td>${esc(b.partyName||"")}</td><td>${esc(b.byName||"")}</td><td class="r">${rs(b.total)}</td><td>${b.cancelled?"रद्द":[b.pay.cash?"नकद "+rs(b.pay.cash):"",b.pay.upi?"UPI "+rs(b.pay.upi):"",b.pay.udhar?"उधार "+rs(b.pay.udhar):"",b.mode==="inst"?"संस्था":""].filter(Boolean).join(", ")}</td></tr>`).join("")}</table>`;
 }
@@ -1385,6 +1395,7 @@ $("#who").onclick=()=>{if(!S.demo){$("#sheet").innerHTML=`<div class="scrim" dat
 
 /* ---------- data ---------- */
 function subBills(){
+  if(window.SF)SF.onDate(S.billsDate);
   if(S.demo){renderPane();return}
   if(S.unsubBills)S.unsubBills();
   S.dayBills=[];
@@ -1413,10 +1424,11 @@ async function boot(){
   SE._busy=()=>S.saving||cartTotal()>0;
   renderTabs();
   SE.watchPhotos(()=>renderPane());
+  if(window.SF)SF.onDb(db);
   if(S.isOwner)db.collection("staff").onSnapshot(s=>{S.staffDocs=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="set"&&!$("#p-set").contains(document.activeElement))renderSettings()},()=>{});
   setTimeout(()=>SE.checkUpdate(toast),4000);
   const sortItems=a=>a.sort((x,y)=>(x.order??999)-(y.order??999)||x.name.localeCompare(y.name,"hi"));
-  db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));S.cart.forEach(l=>{const it=item(l.id);if(it&&!l.changed&&!l.free){l.board=priceOf(it);l.rate=l.board;l.cost=+it.cost||0;l.amt=r2(l.qty*l.rate)}});renderPane();renderCart()},()=>toast("सब्ज़ी लिस्ट लोड नहीं हुई"));
+  db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(S.isOwner&&window.SF&&S.items.some(i=>!i.plu))SF.ensurePLU();S.cart.forEach(l=>{const it=item(l.id);if(it&&!l.changed&&!l.free){l.board=priceOf(it);l.rate=l.board;l.cost=+it.cost||0;l.amt=r2(l.qty*l.rate)}});renderPane();renderCart()},()=>toast("सब्ज़ी लिस्ट लोड नहीं हुई"));
   db.doc("settings/main").onSnapshot(s=>{S.settings=s.exists?s.data():{};checkLock();if(S.tab!=="set")renderPane()});
   if(S.isOwner)db.collection("presence").onSnapshot(s=>{S.presence=s.docs.map(d=>d.data());if(S.tab==="bills")renderBills()},()=>{});
   setTimeout(()=>{flushOutbox();beat();netbar()},1500);
@@ -1440,5 +1452,6 @@ async function loadTop7(){
 }
 boot();
 </script>
+<script src="se-features.js"></script>
 
 </body></html>

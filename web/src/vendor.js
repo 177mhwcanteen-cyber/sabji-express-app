@@ -6,8 +6,10 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { BarcodeScanner, BarcodeFormat } from "@capacitor-mlkit/barcode-scanning";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
+import JsBarcode from "jsbarcode";
 
 window.firebase = firebase;
+window.JsBarcode = JsBarcode;
 const BtPrinter = registerPlugin("BtPrinter");
 window.SENative = {
   isNative: Capacitor.isNativePlatform(),

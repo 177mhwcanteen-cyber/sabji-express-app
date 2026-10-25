@@ -17,6 +17,7 @@
     "@fontsource/mukta": "^5.3.0",
     "@zxing/library": "^0.21.3",
     "firebase": "13.1.0",
+    "jsbarcode": "^3.12.1",
     "qrcodejs": "^1.0.0"
   },
   "devDependencies": {

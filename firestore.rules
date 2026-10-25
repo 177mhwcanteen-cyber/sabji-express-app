@@ -58,6 +58,21 @@ service cloud.firestore {
     match /inward/{id}    { allow read, create: if active(); }
     match /presence/{id}  { allow read, write: if active(); }
 
+    // मंडी खरीद: कर्मचारी नई डाल सकते हैं, बाद में सिर्फ़ फोटो जुड़ सकती है — बदलना/मिटाना मालिक का
+    match /purchases/{id} {
+      allow read: if active();
+      allow create: if active() && request.resource.data.by == request.auth.uid;
+      allow update: if isOwner() || (active() && (noChange() || onlyKeys(['photos', 'photoPending'])));
+      allow delete: if false;
+    }
+    match /suppliers/{id} {
+      allow read, create: if active();
+      allow update: if isOwner() || (active() && onlyKeys(['lastTs', 'phone']));
+      allow delete: if false;
+    }
+    match /supPay/{id}   { allow read, create: if active(); allow update, delete: if isOwner(); }
+    match /labelLog/{id} { allow create: if active(); allow read: if isOwner(); }
+
     // पहरेदार की निजी छाप — सिर्फ़ मालिक
     match /data/users/{uid}/{doc} { allow read, write: if isOwner() && request.auth.uid == uid; }
   }
