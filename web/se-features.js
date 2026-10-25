@@ -382,11 +382,13 @@ SF.dayKpi=()=>{const rows=dayRows().filter(r=>r.active);return {buy:dayMoney(row
 const nTol=r=>r.it.unit==="kg"?Math.max(0.2,r2(r.avail*0.03)):0.99;
 function nightSheet(){
   const own=S.isOwner;
-  const rows=dayRows().filter(r=>r.active&&r.avail>0);
+  const all=dayRows(),rows=all.filter(r=>r.active&&r.avail>0),ids=new Set(rows.map(r=>r.it.id)),rest=all.filter(r=>!ids.has(r.it.id)&&r.it.active!==false);
+  const rowH=r=>`<div class="nrow">${tileHTML(r.it)}<div><b>${esc(r.it.name)}</b><span class="note">${own&&r.avail>0?`होना चाहिए ${fq(Math.max(0,r.expect),r.it.unit)}`:(r.it.unit==="kg"?"किलो में":"गिनती में")}</span></div>
+    <input class="inp" data-nclose="${esc(r.it.id)}" inputmode="decimal" placeholder="${r.it.unit==="kg"?"किलो":"गिनती"}" value="${r.close??""}" aria-label="${esc(r.it.name)} कितना बचा"></div>`;
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="रात का स्टॉक"><div class="grab"></div>
   <div class="sh-head"><div><h3>🌙 आज का बचा माल · ${fdate(S.billsDate)}</h3><span class="note">${own?"होना चाहिए वाला हिसाब सिर्फ़ आपको दिखता है":"तौलकर लिखें — कल सुबह यही माल आपकी शुरुआत में दिखेगा"}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
-  <div class="list" style="margin:0">${rows.map(r=>`<div class="nrow">${tileHTML(r.it)}<div><b>${esc(r.it.name)}</b><span class="note">${own?`होना चाहिए ${fq(Math.max(0,r.expect),r.it.unit)}`:(r.it.unit==="kg"?"किलो में":"गिनती में")}</span></div>
-    <input class="inp" data-nclose="${esc(r.it.id)}" inputmode="decimal" placeholder="${r.it.unit==="kg"?"किलो":"गिनती"}" value="${r.close??""}" aria-label="${esc(r.it.name)} कितना बचा"></div>`).join("")||'<p class="note">आज कोई माल नहीं।</p>'}</div>
+  ${rows.length?`<div class="list" style="margin:0">${rows.map(rowH).join("")}</div>`:""}
+  ${rest.length?`<details class="nsbox" ${rows.length?"":"open"} style="margin-top:8px"><summary>${rows.length?"➕ और सामान जो गाड़ी में बचा है":"गाड़ी में जो-जो माल बचा है, उसमें लिखें (बाकी खाली छोड़ दें)"}</summary><div class="list" style="margin:6px 0 0">${rest.map(rowH).join("")}</div></details>`:""}
   <button class="big" data-nsave style="margin-top:12px">✓ सेव करें</button></div></div>`;
   $("#sheet").onclick=async e=>{if(e.target.matches("[data-close]")){closeSheet();return}
     if(e.target.closest("[data-nsave]")){const items=S.stock.items||(S.stock.items={});let n=0;
@@ -406,7 +408,7 @@ SF.morningHTML=function(){
   return `<div class="morning"><b>🌅 कल रात आपने लिखा था</b><span>${L.join(" · ")}</span><small>आज की खरीद इसमें जुड़ती जाएगी</small></div>`;
 };
 /* 🌙 मालिक: रात का मिलान — फर्क, रकम, कॉल/WhatsApp, फैसला */
-function nightDiffs(){return dayRows().filter(r=>r.active&&r.close!=null&&r.short!=null&&Math.abs(r.short)>nTol(r)).map(r=>({r,val:r2(r.short*num(r.it.sale))}))}
+function nightDiffs(){return dayRows().filter(r=>r.active&&r.avail>0&&r.close!=null&&r.short!=null&&Math.abs(r.short)>nTol(r)).map(r=>({r,val:r2(r.short*num(r.it.sale))}))}
 SF.liveStockHTML=function(){
   if(!S.isOwner||S.billsDate!==today())return "";
   const rows=dayRows().filter(r=>r.avail>0||r.saleQ>0).sort((a,b)=>Math.max(0,b.expect)*num(b.it.sale)-Math.max(0,a.expect)*num(a.it.sale));
