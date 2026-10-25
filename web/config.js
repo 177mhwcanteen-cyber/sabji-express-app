@@ -10,7 +10,7 @@ window.SE_CONFIG = {
     messagingSenderId: "",
     appId: ""
   },
-  ownerEmail: "vikram7charan@gmail.com",
+  ownerEmail: "sabziexpress3600@gmail.com",
   ownerName: "विक्रम जी",
   updateUrl: "https://177mhwcanteen-cyber.github.io/sabji-express-app/"
 };

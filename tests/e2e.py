@@ -11,7 +11,7 @@ srv.RequestHandlerClass.log_message = lambda *a: None
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 URL = "http://127.0.0.1:8765/index.html"
 MOCK = open(os.path.join(H, "mock-firebase.js"), encoding="utf8").read()
-CFG = """window.SE_CONFIG={firebase:{apiKey:"TEST",projectId:"t"},ownerEmail:"vikram7charan@gmail.com",ownerName:"विक्रम जी",updateUrl:""};"""
+CFG = """window.SE_CONFIG={firebase:{apiKey:"TEST",projectId:"t"},ownerEmail:"sabziexpress3600@gmail.com",ownerName:"विक्रम जी",updateUrl:""};"""
 errs = []
 
 async def page(b, mock, users, cfg=True):
@@ -37,7 +37,7 @@ async def main():
         await pg.context.close()
 
         # ---------- 1) मालिक ----------
-        users = {"vikram7charan@gmail.com": {"uid": "own", "pw": "secret123"}}
+        users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
         pg = await page(b, {}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
