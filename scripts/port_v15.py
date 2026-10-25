@@ -44,3 +44,17 @@ rep(".toast{position:fixed;", """/* v15 खरीद, लेबल */
 .toast{position:fixed;""")
 rep('db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));',
     'db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(S.isOwner&&window.SF&&S.items.some(i=>!i.plu))SF.ensurePLU();')
+# v16: टैब में चित्र-निशान, चुना टैब सामने, रिपोर्ट में ग्राफ़
+rep('$("#tabs").innerHTML=tabsList().map(([k,v])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}">${v}</button>`).join("");',
+    'const TI={bill:"🧾",kharid:"🛒",udhar:"📒",bills:"📋",day:"🌙",label:"🏷️",report:"📈",set:"⚙️"};$("#tabs").innerHTML=tabsList().map(([k,v])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}"><span class="ti">${TI[k]||""}</span> ${v}</button>`).join("");{const a=$("#tabs [aria-selected=\\"true\\"]");if(a&&a.scrollIntoView)try{a.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}}')
+rep('<button class="big ghost" data-a4 style="margin-bottom:10px">🖨️ A4 रिपोर्ट प्रिंट / PDF</button>',
+    '<button class="big ghost" data-a4 style="margin-bottom:10px">🖨️ A4 रिपोर्ट प्रिंट / PDF</button>\n  ${window.SF?SF.chartsHTML():""}')
+rep(".toast{position:fixed;", """/* v16 ग्राफ़ */
+.ti{font-size:15px}
+.chart{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);padding:12px 14px;margin-bottom:12px}
+.chart h3{margin:0 0 2px;font-size:16px}.chart .note{margin:0 0 6px}
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.mixbar{display:flex;height:26px;border-radius:9px;overflow:hidden;margin:6px 0}.mixbar span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;min-width:0;overflow:hidden;white-space:nowrap}
+.hbar{display:grid;grid-template-columns:90px 1fr 64px;gap:8px;align-items:center;font-size:13px;margin:4px 0}.hbar .t{background:var(--bg);border-radius:6px;height:16px;overflow:hidden}.hbar .t i{display:block;height:100%;background:var(--leaf);border-radius:6px}.hbar b{text-align:right}
+.toast{position:fixed;""")

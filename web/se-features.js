@@ -483,6 +483,58 @@ SF.bindLabelSettings=function(){
     const s=e.target.closest("[data-lprnset]");if(s){LS.set("se_lbl",s.dataset.lprnset);LS.set("se_lbl_n",s.dataset.n);LS.set("se_lbl_t",s.dataset.t);renderSettings();toast("लेबल प्रिंटर चुना: "+s.dataset.n)}});
   $("#p-set").addEventListener("change",e=>{if(e.target.id==="lGap")LS.set("se_lgap",e.target.value.trim()||"2");if(e.target.id==="lInv")LS.set("se_linv",e.target.checked?"1":"0")});
 };
+/* =============== 📈 रिपोर्ट के ग्राफ़ (हल्के SVG, कोई भारी लाइब्रेरी नहीं) =============== */
+const CH={data:null,at:0,busy:false};
+async function loadWeek(){
+  if(CH.busy||S.demo||!S.db)return;CH.busy=true;
+  try{const end=S.repDate||today(),days=[];for(let i=6;i>=0;i--)days.push(dayAdd(end,-i));
+    const bills=await Promise.all(days.map(d=>d===S.billsDate?Promise.resolve(S.dayBills):S.db.collection("days/"+d+"/bills").get().then(q=>q.docs.map(x=>x.data())).catch(()=>[])));
+    const pur=await S.db.collection("purchases").where("date",">=",days[0]).get().then(q=>q.docs.map(x=>x.data())).catch(()=>[]);
+    CH.data=days.map((d,i)=>{const b=bills[i].filter(x=>!x.cancelled);const sale=r2(b.filter(x=>x.mode!=="inst").reduce((a,x)=>a+(x.total||0),0));
+      const cost=r2(b.filter(x=>x.mode!=="inst").reduce((a,x)=>a+(x.lines||[]).reduce((y,l)=>y+(l.cost||0)*(l.qty||0),0),0));
+      const buy=r2(pur.filter(p=>p.date===d&&!p.cancelled).reduce((a,p)=>a+num(p.total),0));return {d,sale,buy,gm:r2(sale-cost),n:b.length}});
+    CH.at=Date.now();CH.end=end;
+  }catch(e){}
+  CH.busy=false;if(S.tab==="report")renderReport();
+}
+function weekSVG(rows){
+  const W=340,H=170,L=34,B=24,T=10,max=Math.max(100,...rows.map(r=>Math.max(r.sale,r.buy)));
+  const bw=(W-L-6)/rows.length,y=v=>T+(H-T-B)*(1-v/max),ticks=[0,max/2,max];
+  const k=v=>v>=1000?(Math.round(v/100)/10)+"k":Math.round(v);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="7 दिन की बिक्री और खरीद">
+  ${ticks.map(t=>`<line x1="${L}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="currentColor" opacity=".12"/><text x="${L-4}" y="${y(t)+4}" font-size="10" text-anchor="end" fill="currentColor" opacity=".6">${k(t)}</text>`).join("")}
+  ${rows.map((r,i)=>{const x=L+i*bw+bw*.12,w=bw*.36;const [,m,dd]=r.d.split("-");const tod=r.d===today();
+    return `<rect x="${x}" y="${y(r.sale)}" width="${w}" height="${Math.max(0,H-B-y(r.sale))}" rx="3" fill="#1f8a4c"><title>${fdate(r.d)} बिक्री ${rs(r.sale)}</title></rect>
+    <rect x="${x+w+2}" y="${y(r.buy)}" width="${w}" height="${Math.max(0,H-B-y(r.buy))}" rx="3" fill="#f0a500"><title>${fdate(r.d)} खरीद ${rs(r.buy)}</title></rect>
+    ${r.sale?`<text x="${x+w/2}" y="${y(r.sale)-3}" font-size="9" text-anchor="middle" fill="currentColor">${k(r.sale)}</text>`:""}
+    <text x="${x+w+1}" y="${H-8}" font-size="10" text-anchor="middle" fill="currentColor" font-weight="${tod?800:400}">${dd}/${m}</text>`}).join("")}
+  </svg>`;
+}
+SF.chartsHTML=function(){
+  if(!S.isOwner)return "";
+  const end=S.repDate||today();
+  if(!CH.data||CH.end!==end||Date.now()-CH.at>120000)setTimeout(loadWeek,0);
+  const bills=liveBills(),sale=bills.filter(b=>b.mode!=="inst"),inst=bills.filter(b=>b.mode==="inst");
+  const sum=(a,f)=>r2(a.reduce((x,y)=>x+f(y),0));
+  const mix=[["नकद",sum(sale,b=>b.pay.cash||0),"#1f8a4c"],["UPI",sum(sale,b=>b.pay.upi||0),"#2f6fdb"],["उधार",sum(sale,b=>b.pay.udhar||0),"#d64545"],["संस्था",sum(inst,b=>b.total),"#8a63d2"]];
+  const mt=mix.reduce((a,m)=>a+m[1],0);
+  const per={};sale.forEach(b=>(b.lines||[]).forEach(l=>{per[l.name]=r2((per[l.name]||0)+(l.amt||0))}));
+  const top=Object.entries(per).sort((a,b)=>b[1]-a[1]).slice(0,8),tmax=top.length?top[0][1]:1;
+  const hours=new Array(24).fill(0);sale.forEach(b=>{hours[new Date(b.ts).getHours()]+=b.total||0});
+  const hs=hours.map((v,h)=>({h,v})).filter(x=>x.h>=6&&x.h<=22),hmax=Math.max(1,...hs.map(x=>x.v));
+  const wk=CH.data&&CH.end===end?CH.data:null;
+  const wkSale=wk?r2(wk.reduce((a,r)=>a+r.sale,0)):0,wkBuy=wk?r2(wk.reduce((a,r)=>a+r.buy,0)):0;
+  return `<div class="chart"><h3>📊 पिछले 7 दिन</h3><p class="note">${wk?`कुल बिक्री ${rs(wkSale)} · कुल मंडी खरीद ${rs(wkBuy)}`:"लोड हो रहा है…"}</p>
+    ${wk?weekSVG(wk):'<div style="height:170px"></div>'}
+    <div class="legend"><span><i style="background:#1f8a4c"></i>बिक्री (ग्राहक)</span><span><i style="background:#f0a500"></i>मंडी खरीद</span></div></div>
+  ${mt>0?`<div class="chart"><h3>💳 आज पैसा कैसे आया</h3>
+    <div class="mixbar">${mix.filter(m=>m[1]>0).map(m=>`<span style="flex:${m[1]};background:${m[2]}">${Math.round(m[1]/mt*100)}%</span>`).join("")}</div>
+    <div class="legend">${mix.map(m=>`<span><i style="background:${m[2]}"></i>${m[0]} ${rs(m[1])}</span>`).join("")}</div></div>`:""}
+  ${top.length?`<div class="chart"><h3>🥇 आज सबसे ज़्यादा बिकी</h3>${top.map(([n,v])=>`<div class="hbar"><span>${esc(n)}</span><span class="t"><i style="width:${Math.max(3,v/tmax*100)}%"></i></span><b>${rs(v)}</b></div>`).join("")}</div>`:""}
+  ${sale.length?`<div class="chart"><h3>⏰ किस समय कितनी बिक्री</h3>
+    <svg viewBox="0 0 340 90" role="img" aria-label="घंटे के हिसाब से बिक्री">${hs.map((x,i)=>{const bw=340/hs.length,hh=x.v/hmax*62;return `<rect x="${i*bw+2}" y="${70-hh}" width="${bw-4}" height="${hh}" rx="2" fill="#1f8a4c" opacity="${x.v?1:.15}"><title>${x.h}–${x.h+1} बजे: ${rs(x.v)}</title></rect>${x.h%3===0?`<text x="${i*bw+bw/2}" y="85" font-size="9" text-anchor="middle" fill="currentColor">${x.h>12?x.h-12:x.h}${x.h>=12?"pm":"am"}</text>`:""}`}).join("")}</svg></div>`:""}`;
+};
+
 /* A4 रिपोर्ट में खरीद */
 SF.purchA4HTML=function(){
   const list=livePurch();if(!list.length)return "";
