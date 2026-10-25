@@ -21,7 +21,7 @@ await build({ entryPoints: [path.join(W, "src/vendor.js")], bundle: true, minify
   target: ["chrome90"], outfile: path.join(OUT, "lib/vendor.js"), legalComments: "none", logLevel: "warning" });
 
 // 2) बाकी फ़ाइलें
-for (const f of ["index.html", "se-platform.js", "se-features.js", "config.js", "manifest.webmanifest", "migrate.json", "icon.png"])
+for (const f of ["index.html", "se-platform.js", "se-features.js", "se-nutri.js", "config.js", "manifest.webmanifest", "migrate.json", "icon.png"])
   if (fs.existsSync(path.join(W, f))) cp(path.join(W, f), path.join(OUT, f));
 cp(path.join(W, "img"), path.join(OUT, "img"));
 cp(path.join(R, "node_modules/qrcodejs/qrcode.min.js"), path.join(OUT, "lib/qrcode.min.js"));

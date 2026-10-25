@@ -266,7 +266,7 @@ SE.receiptCanvas=function(b,o,widthPx){
     x.fillText(a,cS,y);lines.forEach((ln,i)=>x.fillText(ln,cN,y+i*h));
     const rt=(t,xr)=>{const w=x.measureText(t).width;x.fillText(t,xr-w,y)};rt(q,cQ+fs(18));rt(r,cR+fs(14));rt(am,cA);y+=h*lines.length+fs(3)};
   row("क्र.","सामान","मात्रा","भाव","रकम",true);DASH();
-  (b.lines||[]).forEach((l,i)=>row(String(i+1),l.name,o.fq(l.qty,l.unit).replace(" कि.ग्रा"," kg"),l.free?"मुफ्त":"₹"+l.rate,"₹"+l.amt));
+  (b.lines||[]).forEach((l,i)=>row(String(i+1),window.SN?SN.withEn(l.name):l.name,o.fq(l.qty,l.unit).replace(" कि.ग्रा"," kg"),l.free?"मुफ्त":"₹"+l.rate,"₹"+l.amt));
   DASH();
   const sub=r2(b.sub!=null?b.sub:(b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
   if(b.disc){LR("जोड़",`₹${sub}`,fs(18));LR("छूट",`−₹${b.disc}`,fs(18))}
@@ -274,6 +274,15 @@ SE.receiptCanvas=function(b,o,widthPx){
   if(b.pay&&o.paid!==false){const p=b.pay;const parts=[p.cash?"नकद ₹"+p.cash:"",p.upi?"UPI ₹"+p.upi:"",p.udhar?"उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T("भुगतान: "+parts.join(" · "),fs(16),"l")}
   if(o.balance!=null)LR("खाते में कुल बाकी",`₹${o.balance}`,fs(18),true);
   if(o.qr){DASH();T("स्कैन करके भुगतान करें",fs(17),"c",true);const q=o.qr,s=Math.min(W*0.55,q.width*3);x.imageSmoothingEnabled=false;x.drawImage(q,(W-s)/2,y,s,s);y+=s+fs(4);if(o.upi)T(o.upi+(o.payee?" · "+o.payee:""),fs(14),"c")}
+  const t=o.nutri!==false&&window.SN&&SN.ofBill(b);
+  if(t){DASH();T("🥗 इस थैले में आपकी सेहत (लगभग)",fs(18),"c",true);
+    const cells=SN.cells(t),half=(W-2*P)/2;x.font=`500 ${fs(15)}px ${F}`;
+    for(let i=0;i<cells.length;i+=2){[cells[i],cells[i+1]].forEach((c,j)=>{if(!c)return;const x0=P+j*half;x.font=`500 ${fs(15)}px ${F}`;x.fillText(c[0]+" "+c[1],x0,y);
+      x.font=`800 ${fs(15)}px ${F}`;const v=c[2],vw=x.measureText(v).width;x.fillText(v,x0+half-vw-(j?fs(4):fs(18)),y)});y+=Math.round(fs(15)*1.45)}
+    const hl=SN.headline(t);if(hl){y+=fs(2);T(hl,fs(16),"c",true)}
+    SN.top(t,2).forEach(it=>T("• "+it.name+" ("+it.en+"): "+it.why,fs(14),"l"));
+    const ch=SN.cheer(t);if(ch)T(ch,fs(15),"c",true);
+    T(SN.note,fs(12),"c")}
   DASH();
   if(o.phone){const y0=y;y+=fs(8);T("📲 घर बैठे ताज़ी सब्ज़ी मँगाएँ",fs(18),"c",true);T("WhatsApp या कॉल करें",fs(15),"c");T(o.phone,fs(28),"c",true,FB);y+=fs(4);
     x.lineWidth=Math.max(2,fs(2));x.strokeRect(P,y0,W-2*P,y-y0);y+=fs(8)}

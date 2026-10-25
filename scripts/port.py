@@ -189,6 +189,16 @@ rep(r"${L}\n🧾 बिल नं: ${b.no}", r"${L}\n*${SF.custTag(b)}*\n🧾 �
 rep(r"if(S.settings.shopPh)t+=`📞 घर बैठे ऑर्डर: ${S.settings.shopPh}\n`;",
     r"if(SF.orderPh())t+=`\n📲 *घर बैठे ताज़ी सब्ज़ी मँगाएँ*\nWhatsApp या कॉल करें: *${SF.fmtPh(SF.orderPh())}*\nhttps://wa.me/91${SF.orderPh()}\n`;")
 
+# v21: अंग्रेज़ी नाम + पोषण
+rep('<script src="se-platform.js"></script>', '<script src="se-platform.js"></script>\n<script src="se-nutri.js"></script>')
+rep('<span class="nm">${esc(it.name)}</span>', '<span class="nm">${esc(it.name)}${SN.en(it)?`<small class="en">${esc(SN.en(it))}</small>`:""}</span>')
+rep('String(i.alias||"").toLowerCase().includes(ql)', 'String(i.alias||"").toLowerCase().includes(ql)||SN.en(i).toLowerCase().includes(ql)')
+rep("t+=l.free?`${i+1}. ${l.name} ${fq", "t+=l.free?`${i+1}. ${SN.withEn(l.name)} ${fq")
+rep(r":`${i+1}. ${l.name}\n    ${fq", r":`${i+1}. ${SN.withEn(l.name)}\n    ${fq")
+rep(r"t+=`${L}\n🙏 धन्यवाद! फिर पधारें\n`;", r"""{const nt=SN.ofBill(b);if(nt){t+=`${L}\n🥗 *इस थैले में आपकी सेहत* _(लगभग)_\n`;const cs=SN.cells(nt);for(let i=0;i<cs.length;i+=2)t+=cs.slice(i,i+2).map(c=>`${c[0]} ${c[1]} *${c[2]}*`).join("  ·  ")+"\n";
+    const hl=SN.headline(nt);if(hl)t+=`${hl}\n`;SN.top(nt,3).forEach(x=>t+=`⭐ ${x.name} (${x.en}): ${x.why}\n`);if(SN.cheer(nt))t+=SN.cheer(nt)+"\n";t+=`_${SN.note}_\n`}}
+  t+=`${L}\n🙏 धन्यवाद! फिर पधारें\n`;""")
+
 exec(open(__import__("os").path.join(__import__("os").path.dirname(__file__),"port_v15.py"),encoding="utf8").read())
 
 s = s.replace("आम ग्राहक", "VIP ग्राहक")

@@ -100,6 +100,18 @@ rep(".toast{position:fixed;", """/* v18 कागज़ की रसीद */
 .pp-tag{margin:6px 0 4px;text-align:center;font-weight:800;font-size:15px;border-radius:8px;padding:5px 8px;letter-spacing:.3px}
 .pp-tag.vip{background:linear-gradient(90deg,#b8860b,#f5c542,#b8860b);color:#1c1300;box-shadow:0 1px 0 #8a6508 inset}
 .pp-tag.ud{border:2px solid #d64545;color:#b42d2d}.pp-tag.inst{border:2px solid #2f6fdb;color:#2457b5}
+.pp-en{font-size:10.5px;color:#666;font-weight:500}
+.card .nm .en{display:block;font-family:var(--f-body,inherit);font-size:10.5px;font-weight:600;opacity:.62;letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.pp-nut{margin:8px 0;border:1.5px solid #9bd3ad;border-radius:12px;padding:9px 9px 7px;background:linear-gradient(180deg,#f2fbf4,#fff)}
+.pn-h{text-align:center;font-weight:800;color:#1f6b3c;font-size:14.5px;margin-bottom:6px}.pn-h small{font-weight:500;color:#5d7a66;font-size:11px}
+.pn-g{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
+.pn-g>div{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #e1efe5;border-radius:8px;padding:4px 7px;font-size:12px;color:#333}
+.pn-g>div:last-child:nth-child(odd){grid-column:1/-1;justify-content:center}
+.pn-g i{font-style:normal}.pn-g span{flex:1}.pn-g b{color:#111;font-size:12.5px}
+.pn-x{margin:7px 0 4px;text-align:center;font-weight:800;font-size:13px;color:#7a4b00;background:#fff4d6;border-radius:8px;padding:5px}
+.pn-top{font-size:11.5px;color:#333;display:grid;gap:2px}.pn-top b{color:#1f6b3c}
+.pn-c{text-align:center;font-weight:800;color:#c2410c;font-size:12.5px;margin-top:5px}
+.pn-n{text-align:center;font-size:10px;color:#888;margin-top:5px}
 .pp-order{margin:8px 0;border:2px solid #1f8a4c;border-radius:10px;padding:8px;text-align:center;display:flex;flex-direction:column;gap:1px;background:#f1faf3}
 .pp-order b{color:#1f6b3c;font-size:14px}.pp-order span{font-size:12px;color:#444}.pp-order big{font-size:22px;font-weight:800;letter-spacing:1px;color:#111}
 .pp-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.pp-actions:has(> :nth-child(2):last-child){grid-template-columns:1fr 1fr}
