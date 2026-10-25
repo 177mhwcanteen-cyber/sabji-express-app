@@ -83,6 +83,7 @@ function loginFlow(){
       try{
         let v=1;try{const x=await db.doc("staffIndex/"+st.phone).get();if(x.exists)v=+x.data().v||1}catch(e){}
         await auth.signInWithEmailAndPassword(staffEmail(st.phone,v),staffPass(st.phone,st.pin));
+        try{const h=await SE.pinHash(st.phone,st.pin);localStorage.setItem("se_pinh",h);localStorage.setItem("se_pinph",st.phone);localStorage.setItem("se_act",String(Date.now()))}catch(e){}
       }catch(e){st.busy=false;st.pin="";st.err=errHi(e);draw()}
     };
     L.onclick=async e=>{
@@ -164,7 +165,8 @@ SE.ownerDiag=async function(){
   try{await db.collection("settings").doc("main").get({source:"server"});return {ok:true,cl}}
   catch(e){return {ok:false,code:e.code||"",cl,why:!cl.email_verified?"ईमेल अभी पक्की नहीं (Gmail का लिंक दबाएँ, फिर लॉग-आउट करके दोबारा लॉगिन)":"Firestore के Rules में नया कोड Publish नहीं हुआ या गलत चिपका है"}}
 };
-SE.logout=async()=>{try{await auth.signOut()}catch(e){}location.reload()};
+SE.pinHash=async(ph,pin)=>{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("se|"+ph+"|"+pin));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")};
+SE.logout=async()=>{try{localStorage.removeItem("se_pinh")}catch(e){}try{await auth.signOut()}catch(e){}location.reload()};
 
 /* मालिक नया कर्मचारी जोड़े — मोबाइल + 4 अंक PIN */
 SE.addStaff=async function(name,phone,pin){
@@ -176,7 +178,7 @@ SE.addStaff=async function(name,phone,pin){
   const uid=r.user.uid;await sec.auth().signOut();
   // पुराने खाते (उसी नंबर के) बंद — PIN बदलने पर पुराना PIN काम नहीं करेगा
   try{const old=await db.collection("staff").where("phone","==",phone).get();for(const d of old.docs)if(d.id!==uid&&d.data().active!==false)await d.ref.update({active:false,offTs:Date.now(),offWhy:"नया PIN"})}catch(e){}
-  await db.doc("staff/"+uid).set({name,phone,active:true,owner:false,ts:Date.now(),by:auth.currentUser.uid});
+  await db.doc("staff/"+uid).set({name,phone,pin,active:true,owner:false,ts:Date.now(),by:auth.currentUser.uid});
   await db.doc("staffIndex/"+phone).set({v});
   return uid;
 };

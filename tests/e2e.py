@@ -86,6 +86,14 @@ async def main():
         await pg.wait_for_timeout(800)
         tabs = await pg.eval_on_selector_all("[data-tab]", "e=>e.map(x=>x.dataset.tab)")
         assert "set" not in tabs, "staff must not see settings"
+        # 🔒 1 घंटे बाद PIN
+        assert await pg.evaluate("!!localStorage.getItem('se_pinh')"), "pin hash not saved"
+        await pg.evaluate("localStorage.setItem('se_act',String(Date.now()-2*3600e3));SR.lockCheck()"); await pg.wait_for_selector("#plock")
+        for d in "1111": await pg.click(f'#plock [data-pk="{d}"]')
+        await pg.wait_for_timeout(300); assert await pg.query_selector("#plock"), "wrong pin must not unlock"
+        for d in "4321": await pg.click(f'#plock [data-pk="{d}"]')
+        await pg.wait_for_timeout(300); assert not await pg.query_selector("#plock"), "right pin should unlock"
+        print("idle PIN lock ok")
         assert "कमल" in await pg.inner_text("#who")
         await pg.screenshot(path=f"{SHOTS}/4-staff-billing.png")
         await pg.click('[data-item="tamatar"]'); await pg.fill("#qIn", "1.5"); await pg.click("[data-add]")
@@ -262,12 +270,25 @@ async def main():
         txt = await pg.inner_text("#p-day")
         assert "असली मुनाफ़ा" in txt, txt[:300]
         assert "रात का मिलान" in txt and "प्याज" in txt, txt[:600]
+        assert "अभी गाड़ी में (लाइव)" in txt, "live stock card"
         await pg.click("[data-nrevok]"); await pg.wait_for_timeout(500)
         assert await pg.evaluate("Object.keys(window.__MOCK__.ownerCfg||{}).some(k=>k.startsWith('rev_'))"), "review not saved"
         await pg.locator(".nrev").screenshot(path=f"{SHOTS}/19-night-review.png")
         mh = await pg.evaluate("(()=>{const o=S.prevStock;S.prevStock={pyaj:{close:88},tamatar:{close:26}};const h=SF.morningHTML();S.prevStock=o;return h})()")
         assert "कल रात आपने लिखा था" in mh and "प्याज 88" in mh, mh
         print("owner night review ok")
+        # 📒 पुराना बाकी (मालिक)
+        await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300)
+        await pg.click('#p-udhar [data-party="jco-mess"]'); await pg.wait_for_selector(".nsbox summary"); await pg.click(".nsbox summary")
+        await pg.fill("#obAmt", "1500"); await pg.fill("#obNote", "सितंबर तक का"); await pg.click("[data-opbal]"); await pg.wait_for_timeout(900)
+        led = await pg.evaluate("Object.values(window.__MOCK__.ledger||{}).filter(l=>l.opening)")
+        assert led and led[0]["amt"] == 1500 and led[0]["partyId"] == "jco-mess", led
+        assert "पुराना बाकी" in await pg.inner_text("#sheet")
+        await pg.evaluate("closeSheet()")
+        # 🔑 PIN दिखे
+        await pg.click('[data-tab="set"]'); await pg.wait_for_timeout(400)
+        assert "PIN 4321" in await pg.inner_text("#p-set"), "owner should see staff PIN"
+        print("opening balance + PIN view ok")
         # 📈 मालिक: टाइल पर मुनाफ़ा
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(400)
         mg = await pg.eval_on_selector_all("#grid .mg", "e=>e.map(x=>x.innerText)")

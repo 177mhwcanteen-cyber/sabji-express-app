@@ -57,7 +57,7 @@ service cloud.firestore {
     }
     match /parties/{id} {
       allow read, create: if active();
-      allow update: if isOwner() || (active() && onlyKeys(['lastCart', 'lastTs', 'phone']));
+      allow update: if isOwner() || (active() && onlyKeys(['lastCart', 'lastTs', 'phone', 'remindTs']));
       allow delete: if false;
     }
     match /customers/{id} { allow read, create, update: if active(); allow delete: if false; }

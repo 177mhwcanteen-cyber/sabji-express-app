@@ -403,6 +403,12 @@ main{padding-block:10px 120px}
 .sp-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}.sp-btns .big{padding:10px 6px;font-size:14.5px}
 .spinfo{background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;padding:8px 10px;font-size:13px;margin:8px 0}
 .sp-prev{display:flex;gap:10px;align-items:flex-start}.sp-prev input{margin-top:5px;width:20px;height:20px}
+.plock{position:fixed;inset:0;z-index:90;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+.pl-box{display:grid;justify-items:center;gap:10px;width:100%;max-width:340px;text-align:center}.pl-logo{font-size:44px}.pl-box b{font-family:var(--f-display);font-size:26px}.pl-box>span{color:var(--muted)}
+.pl-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}.pl-keys button{border:0;border-radius:16px;background:var(--surface);box-shadow:var(--shadow);font-size:26px;font-weight:800;padding:14px 0;color:var(--ink)}
+.pl-err{color:var(--chili);font-weight:800;margin:0}
+.lsgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.lsgrid div{display:grid;background:var(--bg);border-radius:10px;padding:6px 8px}.lsgrid b{font-size:13px}.lsgrid span{font-weight:800;font-size:15px}.lsgrid small{color:var(--muted);font-size:11px}
+.livestk{border:2px solid var(--leaf)}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -901,6 +907,7 @@ function renderUdhar(){
   const total=r2(rows.reduce((a,r)=>a+Math.max(0,r.b),0));
   $("#p-udhar").innerHTML=`<h2 class="sec">उधार खाता</h2>
   <div class="kpis"><div class="kpi hero"><span>कुल बकाया (सबका मिलाकर)</span><b>${rs(total)}</b></div></div>
+  ${window.SR?SR.udharTopHTML():""}
   <div class="list">${rows.length?rows.map(r=>`<button class="li" data-party="${esc(r.id)}"><div class="mid"><b>${esc(r.name)}</b><span>${r.qtr?"क्वार्टर "+esc(r.qtr)+" · ":""}${r.phone?esc(r.phone):"नंबर नहीं"}${r.b>0&&udharAge(r.id)!=null?` · <span class="pill ${udharAge(r.id)>15?"red":"blue"}">${udharAge(r.id)} दिन से बाकी</span>`:""}${+r.limit>0?` · सीमा ${rs(r.limit)}`:""}</span></div><div class="rt" style="color:${r.b>0?"var(--chili)":"var(--leaf)"}">${rs(r.b)}<small>${r.b>0?"बाकी":"साफ़"}</small></div></button>`).join(""):`<div class="empty"><b>कोई खाता नहीं</b>नीचे बटन से पहला खाता जोड़ें।</div>`}</div>
   <button class="big ghost" data-newparty ${S.demo?"":""}>+ नया उधार खाता</button>`;
 }
@@ -939,10 +946,11 @@ function openParty(pid){
     <div class="paym" style="margin:18px 0 0;grid-template-columns:1fr 1fr"><button data-jm="cash" aria-pressed="${st.mode==="cash"}">नकद</button><button data-jm="upi" aria-pressed="${st.mode==="upi"}">UPI</button></div></div>
     <div id="jqr"></div>
     <button class="big" data-jama>जमा दर्ज करें</button>
-    <a class="big ghost" style="margin-top:8px" target="_blank" rel="noopener" href="${waLink(`नमस्ते ${p.name} जी, सब्ज़ी एक्सप्रेस का आपका बाकी हिसाब ₹${b} है। कृपया भुगतान कर दें। UPI: ${upiId()} 🙏`,p.phone)}">WhatsApp पर बकाया याद दिलाएँ</a>
+    <a class="big ghost" style="margin-top:8px" target="_blank" rel="noopener" href="${waLink(window.SR?SR.remindText(p,b):`नमस्ते ${p.name} जी, सब्ज़ी एक्सप्रेस का आपका बाकी हिसाब ₹${b} है। UPI: ${upiId()} 🙏`,p.phone)}" data-remone="1">🟢 WhatsApp पर बकाया याद दिलाएँ</a>
+    ${window.SR?SR.openingHTML(p):""}
     ${S.isOwner&&!S.demo?`<label class="fld" style="margin-top:12px">उधार सीमा ₹ (इससे ज़्यादा होने पर बिलर को चेतावनी)<input class="inp" id="pLimit" inputmode="decimal" value="${+p.limit||""}" placeholder="जैसे 5000"></label>`:""}
     <h4 style="margin:16px 0 6px">पूरा हिसाब</h4>
-    <div class="list">${ents.length?ents.map(l=>`<div class="li"><div class="mid"><b>${l.type==="udhar"?"उधार · बिल "+esc(l.billNo||""):"जमा · "+(l.mode==="upi"?"UPI":"नकद")}</b><span>${fdate(l.date)} ${ftime(l.ts)} · ${esc(l.byName||"")}</span></div><div class="rt" style="color:${l.type==="udhar"?"var(--chili)":"var(--leaf)"}">${l.type==="udhar"?"+":"−"}${rs(l.amt)}</div></div>`).join(""):`<div class="empty">अभी कोई एंट्री नहीं</div>`}</div>
+    <div class="list">${ents.length?ents.map(l=>`<div class="li"><div class="mid"><b>${l.type==="udhar"?(l.opening?"📜 पुराना बाकी"+(l.note?" · "+esc(l.note):""):"उधार · बिल "+esc(l.billNo||"")):"जमा · "+(l.mode==="upi"?"UPI":"नकद")}</b><span>${fdate(l.date)} ${ftime(l.ts)} · ${esc(l.byName||"")}</span></div><div class="rt" style="color:${l.type==="udhar"?"var(--chili)":"var(--leaf)"}">${l.type==="udhar"?"+":"−"}${rs(l.amt)}</div></div>`).join(""):`<div class="empty">अभी कोई एंट्री नहीं</div>`}</div>
     </div></div>`;
   };
   draw();
@@ -951,13 +959,15 @@ function openParty(pid){
   $("#sheet").onchange=async e=>{if(e.target.id==="pLimit"){try{await S.db.collection("parties").doc(pid).update({limit:parseFloat(e.target.value)||0});toast("सीमा सेव हुई")}catch(err){toast("सीमा सेव नहीं हुई")}}};
   $("#sheet").onclick=async e=>{
     if(e.target.matches("[data-close]")){closeSheet();return}
+    if(e.target.closest("[data-opbal]")){if(window.SR&&await SR.saveOpening(p)){closeSheet();renderPane();setTimeout(()=>openParty(pid),300)}return}
+    if(e.target.closest("[data-remone]")&&!S.demo){S.db.collection("parties").doc(pid).update({remindTs:Date.now()}).catch(()=>{})}
     const m=e.target.closest("[data-jm]");if(m){st.mode=m.dataset.jm;$("#sheet").querySelectorAll("[data-jm]").forEach(x=>x.setAttribute("aria-pressed",x===m));jq();return}
     if(e.target.closest("[data-jama]")){
       const amt=parseFloat($("#jAmt").value)||0;if(amt<=0){toast("रकम लिखें");return}
       if(!biller()){openBiller(()=>openParty(pid));return}
       const now=Date.now(),id="j"+now.toString(36)+Math.random().toString(36).slice(2,4);
       const ent={ts:now,date:today(),partyId:pid,partyName:p.name,type:"jama",amt:r2(amt),mode:st.mode,by:S.uid||"",byName:biller()};
-      try{if(S.demo)S.ledger.push({id,...ent});else await S.db.collection("ledger").doc(id).set(ent);toast(rs(amt)+" जमा हुए");closeSheet();renderPane()}catch(err){toast("जमा नहीं हुआ, दोबारा कोशिश करें")}
+      try{if(S.demo)S.ledger.push({id,...ent});else await S.db.collection("ledger").doc(id).set(ent);toast(rs(amt)+" जमा हुए");closeSheet();renderPane();if(window.SR)setTimeout(()=>SR.jamaDone(p,r2(amt),st.mode),250)}catch(err){toast("जमा नहीं हुआ, दोबारा कोशिश करें")}
     }
   };
 }
@@ -1391,7 +1401,7 @@ function renderSettings(){
   </div>
   <div class="card2"><h3>🔐 कर्मचारी (लॉगिन खाते)</h3>
     <p class="note" style="margin:0">हर व्यक्ति अपने मोबाइल नंबर + 4 अंक के PIN से लॉगिन करेगा। बिल उसी के नाम से बनेंगे। किसी को हटाना हो तो "बंद करें" — उसका पुराना हिसाब कभी नहीं मिटेगा।</p>
-    <div>${S.staffDocs.filter(x=>!x.owner).length?S.staffDocs.filter(x=>!x.owner).map(x=>`<div class="staffrow"><b>👤 ${esc(x.name)}</b><span class="note">${esc(x.phone||"")} · ${x.active===false?"बंद":"चालू"}</span><button class="lnk" data-staffon="${esc(x.id)}" data-on="${x.active===false?1:0}" style="color:${x.active===false?"var(--leaf)":"var(--chili)"}">${x.active===false?"चालू करें":"बंद करें"}</button></div>`).join(""):'<p class="note" style="margin:0">अभी कोई कर्मचारी नहीं जोड़ा।</p>'}</div>
+    <div>${S.staffDocs.filter(x=>!x.owner).length?S.staffDocs.filter(x=>!x.owner).map(x=>`<div class="staffrow"><b>👤 ${esc(x.name)}</b><span class="note">${esc(x.phone||"")} · ${x.active===false?"बंद":"चालू"}</span>${window.SR&&x.active!==false?SR.pinHTML(x):""}<button class="lnk" data-staffon="${esc(x.id)}" data-on="${x.active===false?1:0}" style="color:${x.active===false?"var(--leaf)":"var(--chili)"}">${x.active===false?"चालू करें":"बंद करें"}</button></div>`).join(""):'<p class="note" style="margin:0">अभी कोई कर्मचारी नहीं जोड़ा।</p>'}</div>
     <input class="inp" id="stName" placeholder="नाम (जैसे कमल भाई)" aria-label="नाम">
     <div class="row2" style="margin:0"><input class="inp" id="stPhone" inputmode="tel" maxlength="20" placeholder="मोबाइल नंबर" aria-label="मोबाइल नंबर"><input class="inp" id="stPin" inputmode="numeric" maxlength="4" placeholder="4 अंक PIN" aria-label="4 अंक का PIN"></div>
     <button class="big ghost" data-staffadd>+ कर्मचारी जोड़ें / PIN बदलें</button></div>

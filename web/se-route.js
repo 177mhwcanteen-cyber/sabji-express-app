@@ -224,7 +224,7 @@ const R={date:null,map:null,live:[],day:null,agg:null,loading:false,custQ:"",cus
 SR.onDb=function(db){
   db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.day){R.day=analyze(R.day.date,R.day.docs,R.day.bills);SR.renderRoute()}},()=>{});
   if(S.isOwner)db.collection("live").onSnapshot(s=>{R.live=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route")SR.updateLive()},()=>{});
-  else setTimeout(SR.start,1500);
+  else{setTimeout(SR.start,1500);setTimeout(SR.lockCheck,1200)}
 };
 function parse(docs){
   const by={};
@@ -570,6 +570,77 @@ document.addEventListener("click",e=>{
   if(e.target.closest("[data-qnight]")){if(S.billsDate!==today()){toast("रात का स्टॉक आज का ही — दिन का हिसाब में आज की तारीख चुनें");return}if(window.SF&&SF.nightSheet)SF.nightSheet();return}
   if(e.target.closest("[data-qrate]")){S.rateMode=true;S.tab="bill";try{showTab()}catch(x){}try{renderBill()}catch(x){}toast("✏️ अब जिस सामान का भाव बदलना है, उसे दबाएँ");return}
 });
+
+/* ======================= 🔒 1 घंटे से ज़्यादा बंद रहा तो PIN (कर्मचारी) ======================= */
+const IDLE=60*60000;let lastMark=0;
+function markAct(){const n=Date.now();if(n-lastMark<30000)return;lastMark=n;LSx.set("se_act",String(n))}
+SR.lockCheck=function(){
+  if(S.isOwner||S.demo||!S.uid||document.getElementById("plock"))return;
+  const h=LSx.get("se_pinh"),ph=LSx.get("se_pinph"),last=+LSx.get("se_act")||0;
+  if(!h||!ph)return;
+  if(Date.now()-last<IDLE){markAct();return}
+  let pin="",bad=0;const el=document.createElement("div");el.id="plock";el.className="plock";document.body.appendChild(el);
+  const draw=(err)=>{el.innerHTML=`<div class="pl-box"><div class="pl-logo">🥬</div><b>सब्ज़ी एक्सप्रेस</b><span>नमस्ते ${esc(biller()||"")} 🙏 — अपना PIN डालें</span>
+    <div class="dots ${err?"bad":""}">${[0,1,2,3].map(i=>`<i class="${i<pin.length?"f":""}"></i>`).join("")}</div>${err?`<p class="pl-err">${esc(err)}</p>`:""}
+    <div class="pl-keys">${["1","2","3","4","5","6","7","8","9","c","0","b"].map(k=>`<button data-pk="${k}">${k==="c"?"साफ़":k==="b"?"⌫":k}</button>`).join("")}</div>
+    <button class="lnk" data-plout>दूसरा व्यक्ति? लॉग-आउट</button></div>`};
+  draw();
+  el.onclick=async e=>{
+    if(e.target.closest("[data-plout]")){SE.logout();return}
+    const k=e.target.closest("[data-pk]");if(!k)return;const v=k.dataset.pk;
+    if(v==="c")pin="";else if(v==="b")pin=pin.slice(0,-1);else if(pin.length<4)pin+=v;
+    draw();
+    if(pin.length===4){const ok=(await SE.pinHash(ph,pin))===h;
+      if(ok){el.remove();LSx.set("se_act",String(Date.now()));lastMark=Date.now();toast("🙏 स्वागत है")}
+      else{bad++;pin="";if(bad>=5){toast("5 बार गलत PIN — दोबारा लॉगिन करें");setTimeout(()=>SE.logout(),1200);return}draw("PIN गलत है ("+bad+"/5)")}}
+  };
+};
+["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,()=>{if(!document.getElementById("plock"))markAct()},{passive:true,capture:true}));
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)SR.lockCheck()});
+setInterval(()=>{if(!document.hidden)SR.lockCheck()},60000);
+
+/* ======================= 📒 उधार वसूली ======================= */
+SR.remindText=function(p,b){
+  const L=(S.ledger||[]).filter(l=>l.partyId===p.id).sort((a,c)=>c.ts-a.ts).slice(0,6);
+  const ph=window.SF?SF.orderPh():"";
+  return `🙏 नमस्ते ${p.name} जी,\nसब्ज़ी एक्सप्रेस का आपका बाकी हिसाब: *₹${b}*\n━━━━━━━━━━━━\n${L.map(l=>`${fdate(l.date).slice(0,5)} · ${l.type==="udhar"?(l.opening?"पुराना बाकी":"बिल "+(l.billNo||"")):"जमा ✓"} · ₹${l.amt}`).join("\n")}\n━━━━━━━━━━━━\nUPI से भुगतान: ${upiId()}${ph?"\nसवाल हो तो कॉल/WhatsApp: "+SF.fmtPh(ph):""}\nधन्यवाद 🙏`;
+};
+SR.jamaDone=function(p,amt,mode){
+  const b=bal(p.id);if(!p.phone)return;
+  const t=`🙏 ${p.name} जी, सब्ज़ी एक्सप्रेस में आपका ₹${amt} ${mode==="upi"?"UPI":"नकद"} जमा हो गया। धन्यवाद!\nअब बाकी: *₹${b}*`;
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="जमा की रसीद"><div class="grab"></div>
+  <div class="sh-head"><div><h3>✓ ${rs(amt)} जमा हुए</h3><span class="note">${esc(p.name)} · अब बाकी ${rs(b)}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <a class="big" style="display:block;text-align:center;text-decoration:none;background:#1f8a4c;color:#fff" target="_blank" rel="noopener" href="${waLink(t,p.phone)}" data-jrc>🟢 ग्राहक को रसीद भेजें</a></div></div>`;
+  $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}if(e.target.closest("[data-jrc]"))setTimeout(closeSheet,300)};
+};
+SR.udharTopHTML=function(){
+  const t=today(),L=(S.ledger||[]).filter(l=>l.type==="jama"&&l.date===t);const c=r2(L.filter(l=>l.mode!=="upi").reduce((a,l)=>a+l.amt,0)),u=r2(L.filter(l=>l.mode==="upi").reduce((a,l)=>a+l.amt,0));
+  const due=S.parties.map(p=>({p,b:bal(p.id)})).filter(x=>x.b>0&&x.p.phone);
+  return `<div class="kpis"><div class="kpi"><span>आज वसूली (नकद)</span><b>${rs(c)}</b></div><div class="kpi blue"><span>आज वसूली (UPI)</span><b>${rs(u)}</b></div></div>
+  ${due.length?`<button class="big ghost" data-remindall style="margin-bottom:10px">📩 याद दिलाने की सूची (${due.length} लोग)</button>`:""}`;
+};
+SR.remindAll=function(){
+  const due=S.parties.map(p=>({p,b:bal(p.id),age:udharAge(p.id)})).filter(x=>x.b>0&&x.p.phone).sort((a,c)=>c.b-a.b);
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="याद दिलाएँ"><div class="grab"></div>
+  <div class="sh-head"><div><h3>📩 बकाया याद दिलाएँ</h3><span class="note">हर नाम पर दबाएँ — WhatsApp में पूरा हिसाब तैयार मिलेगा</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="list" style="margin:0">${due.map(x=>`<a class="li" style="text-decoration:none;color:inherit" target="_blank" rel="noopener" data-rem="${esc(x.p.id)}" href="${waLink(SR.remindText(x.p,x.b),x.p.phone)}"><div class="mid"><b>${esc(x.p.name)}</b><span>${esc(x.p.phone)}${x.age!=null?" · "+x.age+" दिन से":""}${x.p.remindTs?" · पिछली याद "+fdate(today(new Date(x.p.remindTs))).slice(0,5):""}</span></div><div class="rt" style="color:var(--chili)">${rs(x.b)}<small>🟢 भेजें</small></div></a>`).join("")}</div></div></div>`;
+  $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}const a=e.target.closest("[data-rem]");if(a&&!S.demo)S.db.collection("parties").doc(a.dataset.rem).update({remindTs:Date.now()}).catch(()=>{})};
+};
+SR.openingHTML=function(p){if(!S.isOwner)return "";return `<details class="nsbox" style="margin-top:12px"><summary>📜 पुराना बाकी जोड़ें (सिर्फ़ मालिक)</summary>
+  <div class="row2" style="margin:6px 0 0"><input class="inp" id="obAmt" inputmode="decimal" placeholder="₹ पुराना उधार"><input class="inp" id="obNote" placeholder="जैसे सितंबर तक का"></div>
+  <button class="big ghost" data-opbal style="margin-top:6px">+ पुराना बाकी जोड़ें</button></details>`};
+SR.saveOpening=async function(p){
+  const amt=r2(parseFloat(String(($("#obAmt")||{}).value||"").replace(",","."))||0),note=String(($("#obNote")||{}).value||"").trim();if(!(amt>0)){toast("रकम लिखें");return false}
+  const now=Date.now(),id="o"+now.toString(36);const ent={ts:now,date:today(),partyId:p.id,partyName:p.name,type:"udhar",opening:true,note:note||"पुराना बाकी",amt,billNo:"",by:S.uid||"",byName:biller()};
+  try{if(S.demo)S.ledger.push({id,...ent});else await S.db.collection("ledger").doc(id).set(ent);if(!S.ledger.find(x=>x.id===id))S.ledger.push({id,...ent});toast("📜 "+p.name+" का पुराना बाकी "+rs(amt)+" जुड़ा");return true}catch(e){toast("नहीं जुड़ा: "+(e.code||""));return false}
+};
+document.addEventListener("click",e=>{if(e.target.closest("[data-remindall]"))SR.remindAll()});
+/* 🔑 मालिक: कर्मचारी का PIN देखें/बदलें */
+SR.pinHTML=function(x){return ` <span class="note">🔑 PIN ${x.pin?esc(x.pin):"—"}</span> <button class="lnk" data-pinch="${esc(x.id)}">PIN बदलें</button>`};
+document.addEventListener("click",async e=>{const b=e.target.closest("[data-pinch]");if(!b||!S.isOwner)return;const x=(S.staffDocs||[]).find(y=>y.id===b.dataset.pinch);if(!x)return;
+  const pin=(prompt(x.name+" का नया 4 अंक का PIN",x.pin||"")||"").trim();if(!pin)return;if(!/^\d{4}$/.test(pin)){toast("PIN 4 अंक का होना चाहिए");return}
+  try{toast("⏳ नया PIN लग रहा है…");await SE.addStaff(x.name,x.phone,pin);toast("🔑 "+x.name+" का नया PIN "+pin+" — उन्हें बता दें")}catch(err){toast("नहीं हुआ: "+(err.msg||err.code||err.message||""))}});
+
 /* SF के साथ जोड़ */
 if(window.SF){const _o=SF.onDb;SF.onDb=function(db){_o(db);try{SR.onDb(db)}catch(e){}}}
 })();

@@ -336,7 +336,7 @@ SF.dayStockHTML=function(){
   const rows=dayRows().filter(r=>r.active);
   const flags=rows.filter(r=>r.flag);
   const P2=dayMoney(rows);
-  return `${S.isOwner?SF.nightReviewHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html:""}
+  return `${S.isOwner?SF.liveStockHTML()+SF.nightReviewHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html:""}
   ${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>
     <p class="note" style="margin:0">दुकान बंद करते समय बचा माल तौलकर डालें। "होना चाहिए" = कल रात का + आज की खरीद − बिका − संस्था।</p>
@@ -407,6 +407,16 @@ SF.morningHTML=function(){
 };
 /* 🌙 मालिक: रात का मिलान — फर्क, रकम, कॉल/WhatsApp, फैसला */
 function nightDiffs(){return dayRows().filter(r=>r.active&&r.close!=null&&r.short!=null&&Math.abs(r.short)>nTol(r)).map(r=>({r,val:r2(r.short*num(r.it.sale))}))}
+SF.liveStockHTML=function(){
+  if(!S.isOwner||S.billsDate!==today())return "";
+  const rows=dayRows().filter(r=>r.avail>0||r.saleQ>0).sort((a,b)=>Math.max(0,b.expect)*num(b.it.sale)-Math.max(0,a.expect)*num(a.it.sale));
+  const sale=liveBills().filter(b=>b.mode!=="inst"),amt=r2(sale.reduce((a,b)=>a+num(b.total),0));
+  const val=r2(rows.reduce((a,r)=>a+Math.max(0,r.expect)*num(r.it.sale),0));
+  return `<div class="card2 livestk"><h3>📦 अभी गाड़ी में (लाइव) · ${ftime(Date.now())}</h3>
+  <div class="kpis" style="margin:0 0 6px"><div class="kpi"><span>आज अब तक बिक्री</span><b>${rs(amt)}</b></div><div class="kpi"><span>बिल</span><b>${sale.length}</b></div><div class="kpi"><span>गाड़ी में माल (बिक्री भाव)</span><b>${rs(val)}</b></div></div>
+  ${rows.length?`<div class="lsgrid">${rows.map(r=>`<div><b>${esc(r.it.name)}</b><span>${fq(Math.max(0,r.expect),r.it.unit)}</span><small>बिका ${fq(r.saleQ,r.it.unit)}</small></div>`).join("")}</div>`:'<p class="note" style="margin:0">आज अभी कोई माल नहीं — खरीद डलते ही यहाँ दिखेगा</p>'}
+  <p class="note" style="margin:6px 0 0">= कल रात का + आज खरीदा − बिका − संस्था − खराबी। मौके पर जाकर कभी भी मिलान कर सकते हैं।</p></div>`;
+};
 SF.nightReviewHTML=function(){
   if(!S.isOwner||!S.stock||!S.stock.nightTs)return "";
   const D=nightDiffs(),who=S.stock.nightBy||"",st=(S.staffDocs||[]).find(x=>x.name===who||x.id===S.stock.by)||{};const ph=String(st.phone||"").replace(/\D/g,"").slice(-10);
