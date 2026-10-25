@@ -661,8 +661,10 @@ function openCheckout(){
   if(S.mode==="udhar"&&!S.partyId){toast("पहले ऊपर उधार खाता चुनें");return}
   if(S.mode==="inst"&&!S.inst){toast("पहले ऊपर संस्था चुनें");return}
   if(!biller()){openBiller(openCheckout);return}
-  S.chk={no:newBillNo(),disc:0,pay:S.mode==="inst"?"inst":"cash",given:"",cashPart:"",upiOk:false};
+  const _t=S.bt[S.ai];const _keep=_t&&_t.no&&_t.noDate===today()?_t.no:"";
+  S.chk={no:_keep||(window.SF?"…":newBillNo()),disc:0,pay:S.mode==="inst"?"inst":"cash",given:"",cashPart:"",upiOk:false};
   drawCheckout();
+  if(!_keep&&window.SF){const c0=S.chk;SF.reserveBillNo().then(n=>{if(_t){_t.no=n;_t.noDate=today();lsSet("se_tabs",JSON.stringify(S.bt))}if(S.chk===c0){c0.no=n;if($("#sheet .sh-head"))drawCheckout()}})}
 }
 function chkTotal(){return Math.max(0,Math.round(cartTotal()-(+S.chk.disc||0)))}
 function drawCheckout(){
@@ -691,7 +693,7 @@ function drawCheckout(){
     <button class="big ghost" data-hold style="margin-bottom:8px">+ दूसरा ग्राहक (यह बिल ऊपर टैब में खुला रहेगा)</button>
     <button class="big ${c.pay==="upi"?"haldi":""}" data-save ${c.udPick||S.saving||(c.pay==="upi"&&!upiId())||tot<=0&&S.mode!=="inst"?"disabled":""}>${S.saving?"सेव हो रहा है…":c.pay==="upi"?"✓ पैसा आ गया · बिल सेव करें":"✓ बिल सेव करें"}</button>
   </div></div>`;
-  if(c.pay==="upi"&&upiId()&&window.QRCode){const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${tot.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Bill "+c.no)}`;try{new QRCode($("#qr"),{text:upi,width:208,height:208,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+  if(c.pay==="upi"&&upiId()&&window.QRCode){const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${tot.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+c.no)}`;try{new QRCode($("#qr"),{text:upi,width:208,height:208,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
   const sh=$("#sheet");
   sh.oninput=e=>{if(e.target.id==="udQ"){c.udQ=e.target.value;const l=$("#udList");if(l)l.innerHTML=udListHTML(c.udQ)}};
   sh.onclick=async e=>{
@@ -734,6 +736,7 @@ async function saveBill(){
   const lines=S.cart.map(l=>({id:l.id,name:l.name,emoji:l.emoji||"",unit:l.unit,qty:l.qty,rate:l.rate,board:l.board,cost:l.cost,amt:l.amt,changed:!!l.changed,free:!!l.free}));
   const cph=S.mode==="walk"?S.cust.phone:"",cnm=S.mode==="walk"?S.cust.name:"";
   const cost=r2(lines.reduce((a,l)=>a+l.cost*l.qty,0));
+  if(c.no==="…"&&window.SF)c.no=await SF.reserveBillNo();
   const bill={no:c.no,ts:now,date,by:S.uid||"",byName:biller(),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:S.mode==="udhar"?(party?.name||""):S.mode==="inst"?S.inst:(cnm||"आम ग्राहक"),custPhone:cph,custName:cnm,
     lines,sub:cartTotal(),disc:+c.disc||0,total:S.mode==="inst"?cartTotal():tot,pay,payMode:c.pay,cost,
     rateChanged:lines.some(l=>l.changed),cancelled:false};
@@ -777,6 +780,7 @@ function showReceipt(b,fresh,offline){
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिल रसीद"><div class="grab"></div>
     ${fresh?`<div class="done"><div class="tick">✓</div><h3 style="margin:0;font-family:var(--f-display);font-size:24px">बिल सेव हो गया</h3>${offline||b.pending?'<p class="note" style="margin:4px 0 0;color:var(--chili);font-weight:700">📴 फोन में सेव है — इंटरनेट मिलते ही अपने-आप भेज दिया जाएगा</p>':""}</div>`:`<div class="sh-head"><h3>बिल ${esc(b.no)}</h3><button class="x" data-close aria-label="बंद करें">✕</button></div>`}
     ${receiptHTML(b)}
+    ${S.isOwner&&window.SF&&SF.billLabel(b.no)?`<p class="note" style="margin:6px 0 0;text-align:center">🔐 ${esc(SF.billLabel(b.no))} (यह सिर्फ़ आपको दिखता है)</p>`:""}
     ${(party?.phone||b.custPhone)?`<div class="btnrow"><a class="big" style="background:#25d366;color:#04230f" target="_blank" rel="noopener" href="${waLink(receiptText(b),party?.phone||b.custPhone)}">💬 WhatsApp पर भेजें</a><button class="big haldi" data-close>${fresh?"नया बिल":"बंद करें"}</button></div>`
     :`<div class="btnrow"><button class="big" style="background:#25d366;color:#04230f" data-waask>💬 WhatsApp पर भेजें</button><button class="big haldi" data-close>${fresh?"नया बिल":"बंद करें"}</button></div><div class="waask" id="waask" hidden><input class="inp" id="waPh" inputmode="tel" autocomplete="off" placeholder="ग्राहक का WhatsApp नंबर" aria-label="ग्राहक का WhatsApp नंबर"><a class="big" id="waGo" style="background:#25d366;color:#04230f;padding:12px 16px" target="_blank" rel="noopener" href="#" aria-disabled="true">भेजें</a></div>`}
     <button class="big ghost" data-print style="margin-top:8px">🖨️ रसीद प्रिंट करें</button>
@@ -1361,7 +1365,7 @@ async function printBill(b){
   try{
     let qr=null;const due=b.pay&&b.pay.udhar?b.pay.udhar:0;
     if(window.QRCode&&upiId()){const box=document.createElement("div");const am=due||0;
-      const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${am?"&am="+(+am).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Bill "+b.no)}`;
+      const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${am?"&am="+(+am).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+b.no)}`;
       new QRCode(box,{text:upi,width:240,height:240,correctLevel:QRCode.CorrectLevel.M});qr=box.querySelector("canvas")}
     const how=await SE.printReceipt(b,{shop:"सब्ज़ी एक्सप्रेस",tag:"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:S.settings.shopPh||"",
       date:fdate(b.date)+" "+ftime(b.ts),fq,qr,upi:upiId(),balance:b.partyId?r2(bal(b.partyId)):null});

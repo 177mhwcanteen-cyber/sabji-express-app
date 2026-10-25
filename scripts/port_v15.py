@@ -58,3 +58,16 @@ rep(".toast{position:fixed;", """/* v16 ग्राफ़ */
 .mixbar{display:flex;height:26px;border-radius:9px;overflow:hidden;margin:6px 0}.mixbar span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;min-width:0;overflow:hidden;white-space:nowrap}
 .hbar{display:grid;grid-template-columns:90px 1fr 64px;gap:8px;align-items:center;font-size:13px;margin:4px 0}.hbar .t{background:var(--bg);border-radius:6px;height:16px;overflow:hidden}.hbar .t i{display:block;height:100%;background:var(--leaf);border-radius:6px}.hbar b{text-align:right}
 .toast{position:fixed;""")
+# v17: बिल नंबर — हर दिन 1 से, गुप्त कोड (SE-XXXXXX); UPI संदेश में "Sabji Express"
+rep('''  S.chk={no:newBillNo(),disc:0,pay:S.mode==="inst"?"inst":"cash",given:"",cashPart:"",upiOk:false};
+  drawCheckout();''','''  const _t=S.bt[S.ai];const _keep=_t&&_t.no&&_t.noDate===today()?_t.no:"";
+  S.chk={no:_keep||(window.SF?"…":newBillNo()),disc:0,pay:S.mode==="inst"?"inst":"cash",given:"",cashPart:"",upiOk:false};
+  drawCheckout();
+  if(!_keep&&window.SF){const c0=S.chk;SF.reserveBillNo().then(n=>{if(_t){_t.no=n;_t.noDate=today();lsSet("se_tabs",JSON.stringify(S.bt))}if(S.chk===c0){c0.no=n;if($("#sheet .sh-head"))drawCheckout()}})}''')
+rep('const bill={no:c.no,ts:now,date,', 'if(c.no==="…"&&window.SF)c.no=await SF.reserveBillNo();\n  const bill={no:c.no,ts:now,date,')
+rep('&tn=${encodeURIComponent("Bill "+c.no)}`;','&tn=${encodeURIComponent("Sabji Express | Bill No "+c.no)}`;')
+rep('&tn=${encodeURIComponent("Bill "+b.no)}`;','&tn=${encodeURIComponent("Sabji Express | Bill No "+b.no)}`;')
+rep('''    ${receiptHTML(b)}
+    ${(party?.phone||b.custPhone)?''','''    ${receiptHTML(b)}
+    ${S.isOwner&&window.SF&&SF.billLabel(b.no)?`<p class="note" style="margin:6px 0 0;text-align:center">🔐 ${esc(SF.billLabel(b.no))} (यह सिर्फ़ आपको दिखता है)</p>`:""}
+    ${(party?.phone||b.custPhone)?''')

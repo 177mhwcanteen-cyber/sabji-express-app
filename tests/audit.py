@@ -5,6 +5,8 @@ src = open(os.path.join(os.path.dirname(__file__), "e2e.py"), encoding="utf8").r
 __file__ = os.path.abspath(os.path.join(os.path.dirname(__file__), "e2e.py")); exec(src)
 from playwright.async_api import async_playwright
 CHECK = []
+import re as _re
+def SF_serials(labels): return [int(_re.search(r'#(\d+)', l).group(1)) for n, l in labels if l]
 def ok(name, cond, extra=""): CHECK.append((name, bool(cond), extra))
 async def m():
     async with async_playwright() as p:
@@ -84,7 +86,13 @@ async def m():
         ok("बिना इंटरनेट बिल (फोन में रुका)", await pg.evaluate("JSON.parse(localStorage.getItem('se_outbox')||'[]').length") >= 1)
         await pg.evaluate("closeSheet()"); await pg.context.set_offline(False); await pg.evaluate("window.dispatchEvent(new Event('online'))"); await pg.wait_for_timeout(3000)
         ok("नेट आते ही अपने-आप सर्वर पर", await pg.evaluate("JSON.parse(localStorage.getItem('se_outbox')||'[]').length") == 0)
-        ok("बिल नंबर अपने-आप (SE…)", await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.keys(v)).every(n=>/^SE\\d{4}-/.test(n))"))
+        await pg.click('[data-item="aloo"]'); await pg.fill("#qIn", "1"); await pg.click("[data-add]")
+        await pg.click("#cartbtn"); await pg.wait_for_timeout(500); await pg.click('[data-pay="cash"]'); await pg.click("[data-save]"); await pg.wait_for_timeout(1000); await pg.evaluate("closeSheet()")
+        ok("बिल नंबर अपने-आप (SE…)", await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.keys(v)).every(n=>/^SE-[0-9A-Z]{6}$/.test(n)||/^SE\\d{4}-/.test(n))"))
+        nos = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')&&k.includes(today())).flatMap(([k,v])=>Object.keys(v))")
+        labels = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')&&k.includes(today())).flatMap(([k,v])=>Object.keys(v)).map(n=>[n,SF.billLabel(n)])")
+        print("BILLS", labels)
+        ok("आज के बिल नंबर 1, 2, 3… क्रम से (गुप्त कोड में)", sorted(SF_serials(labels)) == list(range(1, len(SF_serials(labels))+1)) and len(SF_serials(labels))>=3, labels)
         await b.close()
     for n, c, e in CHECK: print(("✅" if c else "❌"), n, "" if c else e)
     print("errors:", errs)

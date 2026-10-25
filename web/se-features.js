@@ -535,6 +535,32 @@ SF.chartsHTML=function(){
     <svg viewBox="0 0 340 90" role="img" aria-label="घंटे के हिसाब से बिक्री">${hs.map((x,i)=>{const bw=340/hs.length,hh=x.v/hmax*62;return `<rect x="${i*bw+2}" y="${70-hh}" width="${bw-4}" height="${hh}" rx="2" fill="#1f8a4c" opacity="${x.v?1:.15}"><title>${x.h}–${x.h+1} बजे: ${rs(x.v)}</title></rect>${x.h%3===0?`<text x="${i*bw+bw/2}" y="85" font-size="9" text-anchor="middle" fill="currentColor">${x.h>12?x.h-12:x.h}${x.h>=12?"pm":"am"}</text>`:""}`}).join("")}</svg></div>`:""}`;
 };
 
+/* =============== बिल नंबर: हर दिन 1 से, पर ग्राहक/बाहर वाले को तारीख या गिनती नहीं दिखती =============== */
+/* अंदर: (दिन-क्रमांक × 10 + फोन) × 1000 + आज का क्रम → गुप्त गुणा → 6 अक्षर।  ऐप वापस खोलकर तारीख और क्रम बता देता है। */
+const BN={M:2176782336n,A:1000000007n,B:777777777n,AI:1863926711n,E:Date.UTC(2026,0,1)};
+const dayIdx=d=>Math.round((Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))-BN.E)/864e5);
+SF.encodeBill=function(date,serial,dev){const x=BigInt((dayIdx(date)*10+(dev||0))*1000+serial);const y=(BN.A*x+BN.B)%BN.M;return "SE-"+y.toString(36).toUpperCase().padStart(6,"0")};
+SF.decodeBill=function(no){const m=/^SE-([0-9A-Z]{6})$/.exec(String(no||""));if(!m)return null;
+  const y=BigInt(parseInt(m[1],36));const x=Number((((y-BN.B)%BN.M+BN.M)%BN.M*BN.AI)%BN.M);
+  const serial=x%1000,dev=Math.floor(x/1000)%10,di=Math.floor(x/10000);if(di<0||di>40000||serial<1)return null;
+  const dt=new Date(BN.E+di*864e5);const date=dt.getUTCFullYear()+"-"+String(dt.getUTCMonth()+1).padStart(2,"0")+"-"+String(dt.getUTCDate()).padStart(2,"0");
+  return {date,serial,dev}};
+SF.billLabel=no=>{const d=SF.decodeBill(no);return d?`${fdate(d.date)} का बिल #${d.serial}${d.dev?" · बिना नेट बना":""}`:""};
+function devSlot(){let v=LS.get("se_dev");if(!v){v=String(1+Math.floor(Math.random()*9));LS.set("se_dev",v)}return +v}
+SF.reserveBillNo=async function(){
+  const d=today(),k="se_cnt_"+d,loc=+LS.get(k)||0;
+  if(!S.demo&&S.db&&navigator.onLine!==false){
+    try{const ref=S.db.doc("days/"+d+"/meta/counter");
+      const n=await Promise.race([S.db.runTransaction(async t=>{const g=await t.get(ref);const n=Math.max(g.exists?(+g.data().n||0):0,loc)+1;t.set(ref,{n,ts:Date.now()},{merge:true});return n}),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),5000))]);
+      if(n>=1&&n<=999){LS.set(k,String(n));return SF.encodeBill(d,n,0)}
+    }catch(e){}
+  }
+  // बिना नेट: आगे का क्रम इसी फोन से; फोन-निशान अलग ताकि दो फोन का कोड कभी न टकराए। नेट आने पर सर्वर का क्रम इससे आगे बढ़ेगा।
+  const n=loc+1;LS.set(k,String(n));
+  return SF.encodeBill(d,Math.min(n,999),devSlot());
+};
+
 /* A4 रिपोर्ट में खरीद */
 SF.purchA4HTML=function(){
   const list=livePurch();if(!list.length)return "";
