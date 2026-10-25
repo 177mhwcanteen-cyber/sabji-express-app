@@ -846,6 +846,23 @@ SF.nutriHTML=function(b){
   ${SN.cheer(t)?`<div class="pn-c">${SN.cheer(t)}</div>`:""}
   <div class="pn-n">${SN.note}</div></div>`;
 };
+/* चेकआउट के लिए छोटा, कसा हुआ बिल — 10 सामान भी एक नज़र में, QR हमेशा कुल रकम के पास */
+SF.compactPaperHTML=function(b,o){
+  o=o||{};const ed=!!o.editable,sub=r2((b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
+  const cust=b.custPhone&&(!b.partyName||b.partyName==="ग्राहक "+b.custPhone||b.partyName==="VIP ग्राहक")?"📞 "+b.custPhone:(b.partyName||"")+(b.custPhone?" · "+b.custPhone:"");
+  const tag=b.mode==="inst"?'<span class="ppc-tag inst">🏢 संस्था</span>':b.mode==="udhar"?'<span class="ppc-tag ud">📒 उधार</span>':'<span class="ppc-tag vip">⭐ VIP</span>';
+  const qr=o.qr&&b.mode!=="inst"&&upiId();
+  return `<div class="paper pp-c${o.anim?" pp-anim":""}">
+  <div class="ppc-head"><span class="ppc-logo">🥬</span><b>सब्ज़ी एक्सप्रेस</b>${tag}</div>
+  <div class="ppc-meta"><span><b>${esc(b.no||"…")}</b> · ${fdate(b.date||today()).slice(0,5)} · ${ftime(b.ts||Date.now())}</span><span class="ppc-cust">${esc(cust)}</span></div>
+  <table class="pp-t ppc-t"><thead><tr><th>#</th><th>सामान</th><th class="r">मात्रा</th><th class="r">भाव</th><th class="r">रकम</th>${ed?"<th></th>":""}</tr></thead><tbody>
+  ${(b.lines||[]).map((l,i)=>`<tr${ed?` data-edit="${i}"`:""}><td>${i+1}</td><td>${esc(l.name)}${window.SN&&SN.en(l.name)?` <small class="pp-en">${esc(SN.en(l.name))}</small>`:""}${l.changed?' <span class="pp-chg">भाव बदला</span>':""}${l.free?' <span class="pp-chg">मुफ्त</span>':""}</td><td class="r">${fq(l.qty,l.unit).replace(" कि.ग्रा"," kg")}</td><td class="r">${l.free?"—":"₹"+l.rate}</td><td class="r"><b>₹${l.amt}</b></td>${ed?`<td><button class="pp-x" data-del="${i}" aria-label="${esc(l.name)} हटाएँ">✕</button></td>`:""}</tr>`).join("")}
+  </tbody></table>
+  ${b.disc?`<div class="pp-row"><span>जोड़ ₹${sub}</span><span>छूट −₹${b.disc}</span></div>`:""}
+  <div class="ppc-foot${qr?"":" noqr"}">${qr?`<div class="ppc-qr" id="${o.qrId||"ppqr"}"></div>`:""}
+    <div class="ppc-tot"><span>कुल रकम · ${(b.lines||[]).length} सामान</span><b>₹${b.total}</b>${qr?`<small>📱 स्कैन करके भुगतान<br>${esc(UPI_FIXED.payee)}</small>`:""}</div></div>
+  </div>`;
+};
 SF.paperHTML=function(b,o){
   o=o||{};const ed=!!o.editable;const sub=r2((b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
   const pay=b.pay;const stamp=pay?[pay.cash?"नकद "+rs(pay.cash):"",pay.upi?"UPI "+rs(pay.upi):"",pay.udhar?"उधार "+rs(pay.udhar):"",b.mode==="inst"?"संस्था · खरीद भाव":""].filter(Boolean).join(" · "):"";
@@ -871,8 +888,8 @@ SF.paperHTML=function(b,o){
   <div class="pp-thanks">🙏 धन्यवाद! फिर पधारें</div>
   </div>`;
 };
-function drawQR(id,amt,no){const el=document.getElementById(id);if(!el||!window.QRCode||!upiId())return;el.innerHTML="";
-  try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${(+amt).toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`,width:190,height:190,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+function drawQR(id,amt,no,size){const el=document.getElementById(id);if(!el||!window.QRCode||!upiId())return;el.innerHTML="";
+  try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${(+amt).toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`,width:size||190,height:size||190,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
 function draftBill(){
   const c=S.chk,party=S.parties.find(p=>p.id===S.partyId);
   const custName=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:""):(S.cust.name||(S.cust.phone?"ग्राहक "+S.cust.phone:"VIP ग्राहक"));
@@ -893,11 +910,10 @@ SF.drawCheckout=function(){
   const st=c.stage||"bill";
   let body="";
   if(st==="bill"){
-    body=`${anyChg?`<div class="warn">⚠ इस बिल में किसी सब्ज़ी का भाव बदला गया है। मालिक को रिपोर्ट में दिखेगा।</div>`:""}
+    body=`${anyChg?`<div class="warn" style="padding:6px 10px;margin-bottom:6px">⚠ इस बिल में किसी सब्ज़ी का भाव बदला गया है</div>`:""}
     ${overLim?`<div class="warn">⚠ ${esc(party.name)} की उधार सीमा ${rs(party.limit)} है। इस बिल के बाद बाकी ${rs(bal(party.id)+tot)} हो जाएगा।</div>`:""}
-    <div class="pp-slot"><div class="pp-printer"></div>${SF.paperHTML(b,{editable:true,qr:S.mode!=="inst",anim:!c.shown})}</div>
-    <p class="note" style="text-align:center;margin:6px 0 10px">किसी सामान पर टैप करके मात्रा बदलें · ✕ से हटाएँ</p>
-    ${S.mode==="inst"?"":`<label class="fld" style="margin-bottom:10px">छूट (₹) — ज़रूरी हो तभी<input class="inp ${(+c.disc)>0?"bad":""}" id="discIn" inputmode="decimal" value="${c.disc||""}" placeholder="0"></label>`}
+    ${SF.compactPaperHTML(b,{editable:true,qr:S.mode!=="inst",anim:!c.shown})}
+    <div class="ppc-under"><span class="note">सामान पर टैप = मात्रा बदलें</span>${S.mode==="inst"?"":`<label class="ppc-disc">छूट ₹<input class="inp ${(+c.disc)>0?"bad":""}" id="discIn" inputmode="decimal" value="${c.disc||""}" placeholder="0"></label>`}</div>
     <div class="pp-actions"><button data-ckedit>✏️<span>एडिट</span></button><button data-ckshare>📤<span>शेयर (PDF)</span></button><button data-ckprint>🖨️<span>प्रिंट</span></button></div>
     <button class="big" data-settle ${tot<=0&&S.mode!=="inst"?"disabled":""}>✓ बिल सेटल करें · ${rs(tot)}</button>
     <button class="big ghost" data-hold style="margin-top:8px">+ दूसरा ग्राहक (यह बिल ऊपर टैब में खुला रहेगा)</button>`;
@@ -918,10 +934,10 @@ SF.drawCheckout=function(){
     <button class="big ghost" data-unsettle style="margin-top:8px">← बिल पर वापस</button>`;
   }
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिल"><div class="grab"></div>
-    <div class="sh-head"><div><h3>${st==="bill"?"🧾 आपका बिल":"💰 बिल सेटल करें"}</h3><span class="note">बिलर: ${esc(biller())}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    <div class="sh-head ppc-sh"><h3>${st==="bill"?"🧾 बिल":"💰 बिल सेटल करें"} <small class="note">· ${esc(biller())}</small></h3><button class="x" data-close aria-label="बंद करें">✕</button></div>
     ${body}</div></div>`;
   c.shown=true;
-  if(st==="bill"&&S.mode!=="inst")drawQR("ppqr",tot,c.no);
+  if(st==="bill"&&S.mode!=="inst")drawQR("ppqr",tot,c.no,124);
   if(st==="settle"&&c.pay==="upi")drawQR("qr",tot,c.no);
   const sh=$("#sheet");
   sh.oninput=e=>{if(e.target.id==="udQ"){c.udQ=e.target.value;const l=$("#udList");if(l)l.innerHTML=udListHTML(c.udQ)}};

@@ -100,7 +100,7 @@ async def main():
         await pg.click('[data-item="aloo"]'); await pg.fill("#aIn", "40"); await pg.click("[data-add]")
         await pg.evaluate("S.settings.ownerPh='9509553600'")
         await pg.click("#cartbtn"); await pg.wait_for_timeout(300); await pg.screenshot(path=f"{SHOTS}/paper.png", full_page=True)
-        nut = await pg.query_selector(".pp-nut"); assert nut, "nutrition box missing"; await nut.screenshot(path=f"{SHOTS}/nutri.png")
+
         rc = await pg.evaluate("(()=>{S.settings.ownerPh=`9509553600`;const b={no:`SE-K7Q2MX`,date:today(),ts:Date.now(),mode:S.mode,partyName:`VIP ग्राहक`,byName:`कमल भाई`,lines:S.cart,total:cartTotal()};window.__tb=b;return SE.receiptCanvas(b,SF.rcptOpts(b,true),576).toDataURL()})()")
         import base64; open(f"{SHOTS}/rcpt-canvas.png","wb").write(base64.b64decode(rc.split(",")[1]))
         txt = await pg.evaluate("receiptText(window.__tb)"); assert "VIP" in txt and "95095 53600" in txt and "Potato" in txt and "सेहत" in txt, txt; print(txt)
@@ -116,6 +116,7 @@ async def main():
         await pg.click('[data-pay="cash"]') if await pg.query_selector('[data-pay="cash"]') else None
         await pg.click("[data-save]"); await pg.wait_for_timeout(1200)
         await pg.screenshot(path=f"{SHOTS}/5-receipt.png")
+        nut = await pg.query_selector(".pp-nut"); assert nut, "nutrition box missing on receipt"; await nut.screenshot(path=f"{SHOTS}/nutri.png")
         bills = await pg.evaluate("Object.values(window.__MOCK__).length&&Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).map(([k,v])=>Object.values(v))")
         flat = [x for arr in bills for x in arr]
         assert flat and flat[0]["byName"] == "कमल भाई" and flat[0]["by"] == kamal[0], flat[:1]
