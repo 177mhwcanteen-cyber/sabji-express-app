@@ -22,7 +22,7 @@ async def m():
             mock[f"days/{d}/bills"] = bills
             mock["purchases"][f"p{i}"] = {"date": d, "ts": 0, "total": random.randint(5000, 9000), "lines": [], "cancelled": False}
         pg = await page(b, mock, users)
-        await pg.click('[data-lg="to-owner"]'); await pg.fill("#lgPass", "secret123"); await pg.click('[data-lg="owner-go"]')
+        await pg.click('[data-lg="to-owner"]'); await pg.fill("#lgEmail", "sabziexpress3600@gmail.com"); await pg.fill("#lgPass", "secret123"); await pg.click('[data-lg="owner-go"]')
         await pg.wait_for_selector("#lock", state="hidden"); await pg.wait_for_timeout(1200)
         tabs = await pg.eval_on_selector_all("[data-tab]", "e=>e.map(x=>x.dataset.tab)")
         ok("सभी टैब (बिलिंग, खरीद, उधार, आज के बिल, दिन, लेबल, रिपोर्ट, सेटिंग)", set(["bill","kharid","udhar","bills","day","label","report","set"]) <= set(tabs), tabs)

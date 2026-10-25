@@ -12,7 +12,10 @@ const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:
 const STAFF_DOMAIN="staff.sabjiexpress.in";
 const staffEmail=(ph,v)=>`${ph}.v${v||1}@${STAFF_DOMAIN}`;
 const staffPass=(ph,pin)=>`se-${pin}-${ph}`;
-const ownerEmail=()=>String(CFG.ownerEmail||"").toLowerCase();
+// मालिक की ईमेल कोड में साफ़ नहीं लिखी — सिर्फ़ उसकी "छाप" (SHA-256), ताकि Public कोड में ईमेल न दिखे
+const OH={};
+async function isOwnerMail(email){email=String(email||"").trim().toLowerCase();if(!email||!CFG.ownerHash)return false;if(email in OH)return OH[email];
+  try{const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(email));OH[email]=[...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,"0")).join("")===String(CFG.ownerHash).toLowerCase()}catch(e){OH[email]=false}return OH[email]}
 SE.configured=!!(CFG.firebase&&CFG.firebase.apiKey&&!/^PASTE/.test(CFG.firebase.apiKey));
 
 /* ---------- Firebase शुरू ---------- */
@@ -37,7 +40,7 @@ function drawLogin(st){
     L.innerHTML=`<div style="font-size:44px">🥬</div><h2>सब्ज़ी एक्सप्रेस</h2>
     <p class="note" style="margin:-8px 0 0">${st.create?"मालिक का नया खाता बनाएँ":"मालिक लॉगिन"}</p>
     <div class="lgform">
-      <input class="inp" id="lgEmail" type="email" autocomplete="username" placeholder="ईमेल" value="${esc(st.email||CFG.ownerEmail||"")}">
+      <input class="inp" id="lgEmail" type="email" autocomplete="username" placeholder="ईमेल" value="${esc(st.email||"")}">
       <input class="inp" id="lgPass" type="password" autocomplete="${st.create?"new-password":"current-password"}" placeholder="पासवर्ड (कम से कम 6 अक्षर)">
       ${st.err?`<p class="lgerr">${esc(st.err)}</p>`:""}${st.msg?`<p class="lgmsg">${esc(st.msg)}</p>`:""}
       <button class="big" data-lg="owner-go">${st.busy?"रुकिए…":st.create?"खाता बनाएँ":"लॉगिन करें"}</button>
@@ -112,16 +115,16 @@ function loginFlow(){
     };
     let finished=false;
     const done=u=>{if(finished)return;finished=true;L.onclick=null;resolve(u)};
-    SE._loginWait=u=>{
+    SE._loginWait=async u=>{
       if(!u)return;
-      if(u.email&&u.email.toLowerCase()===ownerEmail()&&!u.emailVerified){st.mode="verify";st.email=u.email;draw();return}
+      if(u.email&&!u.emailVerified&&await isOwnerMail(u.email)){st.mode="verify";st.email=u.email;draw();return}
       done(u)};
   });
 }
 
 /* लॉगिन के बाद तय करें: मालिक या कर्मचारी */
 async function resolveRole(u){
-  const isOwner=!!(u.email&&u.email.toLowerCase()===ownerEmail()&&u.emailVerified);
+  const isOwner=!!(u.email&&u.emailVerified&&await isOwnerMail(u.email));
   if(isOwner){
     try{await db.doc("staff/"+u.uid).set({name:CFG.ownerName||"विक्रम जी",owner:true,active:true,email:u.email,ts:Date.now()},{merge:true})}catch(e){}
     return {uid:u.uid,name:CFG.ownerName||"विक्रम जी",isOwner:true}}
@@ -138,7 +141,7 @@ SE.start=async function(){
   for(;;){
     const first=await new Promise(r=>{const un=auth.onAuthStateChanged(u=>{un();r(u)})});
     let u=first;
-    if(!u||(u.email&&u.email.toLowerCase()===ownerEmail()&&!u.emailVerified)){
+    if(!u||(u.email&&!u.emailVerified&&await isOwnerMail(u.email))){
       const p=loginFlow();
       const un=auth.onAuthStateChanged(x=>{if(x&&SE._loginWait)SE._loginWait(x)});
       if(u)SE._loginWait(u);

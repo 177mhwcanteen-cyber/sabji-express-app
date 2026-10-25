@@ -11,7 +11,7 @@ srv.RequestHandlerClass.log_message = lambda *a: None
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 URL = "http://127.0.0.1:8765/index.html"
 MOCK = open(os.path.join(H, "mock-firebase.js"), encoding="utf8").read() + "\n" + open(os.path.join(H, "..", "node_modules/jsbarcode/dist/JsBarcode.all.min.js"), encoding="utf8").read()
-CFG = """window.SE_CONFIG={firebase:{apiKey:"TEST",projectId:"t"},ownerEmail:"sabziexpress3600@gmail.com",ownerName:"विक्रम जी",updateUrl:"",photoUrl:"http://127.0.0.1:8765/fake-upload"};"""
+CFG = """window.SE_CONFIG={firebase:{apiKey:"TEST",projectId:"t"},ownerHash:"465bf0ff70fca5f4025f1dab7dd7a1ad8298b39f1635f64b0ad3cfa0bb78c334",ownerName:"विक्रम जी",updateUrl:"",photoUrl:"http://127.0.0.1:8765/fake-upload"};"""
 errs = []
 UPLOADS = []
 
@@ -47,7 +47,7 @@ async def main():
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
-        await pg.fill("#lgPass", "secret123")
+        await pg.fill("#lgEmail", "sabziexpress3600@gmail.com"); await pg.fill("#lgPass", "secret123")
         await pg.click('[data-lg="owner-go"]')
         await pg.wait_for_selector("#lock", state="hidden")
         await pg.wait_for_timeout(500)
@@ -155,7 +155,7 @@ async def main():
         # ---------- 3) मालिक रिपोर्ट + A4 ----------
         pg = await page(b, mock, users)
         await pg.wait_for_selector("#lock:not([hidden])")
-        await pg.click('[data-lg="to-owner"]'); await pg.fill("#lgPass", "secret123"); await pg.click('[data-lg="owner-go"]')
+        await pg.click('[data-lg="to-owner"]'); await pg.fill("#lgEmail", "sabziexpress3600@gmail.com"); await pg.fill("#lgPass", "secret123"); await pg.click('[data-lg="owner-go"]')
         await pg.wait_for_selector("#lock", state="hidden"); await pg.wait_for_timeout(800)
         # किराना: नया सामान + पैकेट लेबल (दुकान, नाम, मात्रा, कीमत, एक्सपायरी, बारकोड) → स्कैन → 1 पैकेट
         await pg.click('[data-tab="label"]'); await pg.wait_for_timeout(200)

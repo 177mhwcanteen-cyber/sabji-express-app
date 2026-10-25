@@ -10,7 +10,8 @@ window.SE_CONFIG = {
     messagingSenderId: "",
     appId: ""
   },
-  ownerEmail: "sabziexpress3600@gmail.com",
+  // मालिक की ईमेल की छाप (SHA-256) — ईमेल यहाँ साफ़ नहीं लिखी जाती
+  ownerHash: "70e65847566f6e4609800a53bb14fbdf6a43dac12aedc32396337239937d229b",
   ownerName: "विक्रम जी",
   // Google Apps Script वेब-ऐप का URL (…/exec) — खरीद के बिल की फोटो Drive में भेजने के लिए
   photoUrl: "",
