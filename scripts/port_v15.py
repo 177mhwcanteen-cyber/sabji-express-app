@@ -21,9 +21,10 @@ rx(r'  <h3 style="margin:0 0 4px">माल: सुबह कितना आय
    '  ${window.SF?SF.dayStockHTML():""}`;')
 rep('async function handleScan(code){\n  code=String(code||"").trim();if(!code)return;',
     'async function handleScan(code){\n  code=String(code||"").trim();if(!code)return;\n'
-    '  const vw=window.SF&&!S.scanIn?SF.parseVW(code):null;\n'
+    '  const vw=window.SF&&!S.scanIn&&!findByCode(code)?SF.parseVW(code):null;\n'
     '  if(vw){if(vw.bad){beep(false);toast("लेबल की सब्ज़ी (कोड "+vw.plu+") लिस्ट में नहीं");return}\n'
-    '    if(S.tab!=="bill"){S.tab="bill";showTab()}if(!(priceOf(vw.it)>0)){toast(vw.it.name+" का रेट नहीं डाला गया");return}quickAdd(vw.it,vw.qty);return}')
+    '    if(S.tab!=="bill"){S.tab="bill";showTab()}if(vw.it.active===false){toast(vw.it.name+" अभी बंद है");return}if(!(priceOf(vw.it)>0)){toast(vw.it.name+" का रेट नहीं डाला गया");return}\n'
+    '    if(vw.kind==="fix"&&vw.it.unit!=="pc"){beep(true);openQty(vw.it);return}quickAdd(vw.it,vw.qty);return}')
 rep('<div class="card2"><h3>📦 पुराने ऐप का डेटा</h3>', '${window.SF?SF.labelSettingsHTML():""}\n  <div class="card2"><h3>📦 पुराने ऐप का डेटा</h3>')
 rep('डेमो मोड: यहाँ बने बिल सेव नहीं होंगे। असली ऐप claude.ai पर साइन-इन करके खोलें।', 'डेमो मोड: यहाँ बने बिल सेव नहीं होंगे। Firebase जुड़ते ही असली ऐप चलेगा।')
 rep('  if(S.isOwner)db.collection("staff").onSnapshot(', '  if(window.SF)SF.onDb(db);\n  if(S.isOwner)db.collection("staff").onSnapshot(')

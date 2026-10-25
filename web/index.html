@@ -883,9 +883,10 @@ async function adjStock(pairs,why){
 function trackedPairs(lines,sign){return lines.filter(l=>item(l.id)?.track).map(l=>[l.id,sign*l.qty])}
 async function handleScan(code){
   code=String(code||"").trim();if(!code)return;
-  const vw=window.SF&&!S.scanIn?SF.parseVW(code):null;
+  const vw=window.SF&&!S.scanIn&&!findByCode(code)?SF.parseVW(code):null;
   if(vw){if(vw.bad){beep(false);toast("लेबल की सब्ज़ी (कोड "+vw.plu+") लिस्ट में नहीं");return}
-    if(S.tab!=="bill"){S.tab="bill";showTab()}if(!(priceOf(vw.it)>0)){toast(vw.it.name+" का रेट नहीं डाला गया");return}quickAdd(vw.it,vw.qty);return}
+    if(S.tab!=="bill"){S.tab="bill";showTab()}if(vw.it.active===false){toast(vw.it.name+" अभी बंद है");return}if(!(priceOf(vw.it)>0)){toast(vw.it.name+" का रेट नहीं डाला गया");return}
+    if(vw.kind==="fix"&&vw.it.unit!=="pc"){beep(true);openQty(vw.it);return}quickAdd(vw.it,vw.qty);return}
   const it=findByCode(code);beep(!!it);
   if(!it){unknownCode(code);return}
   if(S.scanIn){
