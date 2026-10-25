@@ -12,7 +12,7 @@
  * बस। अब हर घंटे पिछले 3 दिन का हिसाब Sheet में अपने-आप उतरता रहेगा।
  * Sheet में कुछ भी हाथ से बदलने से ऐप का डेटा नहीं बदलता (सिर्फ़ पढ़ने की कॉपी है)।
  */
-const PROJECT_ID = 'PASTE_PROJECT_ID'; // Firebase प्रोजेक्ट ID, जैसे sabji-express-1a2b3
+const PROJECT_ID = 'sabji-express-9a8f0'; // Firebase प्रोजेक्ट ID, जैसे sabji-express-1a2b3
 const DAYS_BACK = 3;
 
 function setup() {
