@@ -254,12 +254,14 @@ SE.receiptCanvas=function(b,o,widthPx){
   if(o.addr)T(o.addr,fs(16),"c");
   if(o.phone)T("📞 ऑर्डर: "+o.phone,fs(16),"c");
   LINE();
+  if(o.custTag){const h=fs(34);x.fillStyle="#000";if(o.vip){x.fillRect(P,y,W-2*P,h);x.fillStyle="#fff"}else{x.lineWidth=Math.max(2,fs(2));x.strokeRect(P,y,W-2*P,h)}
+    x.font=`800 ${fs(20)}px ${FB}`;const tw=x.measureText(o.custTag).width;x.fillText(o.custTag,(W-tw)/2,y+fs(6));x.fillStyle="#000";y+=h+fs(8)}
   LR("बिल नं: "+b.no,"",fs(19),true);
   LR("तारीख: "+(o.date||""),"",fs(17));
-  if(b.partyName||b.custPhone)LR("ग्राहक: "+(b.partyName||"")+(b.custPhone?" · "+b.custPhone:""),"",fs(17));
+  if((b.partyName&&b.partyName!=="VIP ग्राहक")||b.custPhone)LR("ग्राहक: "+(b.partyName||"")+(b.custPhone?" · "+b.custPhone:""),"",fs(17));
   DASH();
   // टेबल: क्र. | सामान | मात्रा | भाव | रकम
-  const cS=P,cN=P+W*0.07,cQ=W*0.62,cR=W*0.79,cA=W-P,sz=fs(17);
+  const cS=P,cN=P+W*0.07,cQ=W*0.58,cR=W*0.765,cA=W-P,sz=fs(17);
   const row=(a,bn,q,r,am,bold)=>{x.font=`${bold?"800 ":"500 "}${sz}px ${F}`;const lines=wrapLines(x,bn,cQ-cN-fs(30));const h=Math.round(sz*1.32);
     x.fillText(a,cS,y);lines.forEach((ln,i)=>x.fillText(ln,cN,y+i*h));
     const rt=(t,xr)=>{const w=x.measureText(t).width;x.fillText(t,xr-w,y)};rt(q,cQ+fs(18));rt(r,cR+fs(14));rt(am,cA);y+=h*lines.length+fs(3)};
@@ -272,7 +274,10 @@ SE.receiptCanvas=function(b,o,widthPx){
   if(b.pay&&o.paid!==false){const p=b.pay;const parts=[p.cash?"नकद ₹"+p.cash:"",p.upi?"UPI ₹"+p.upi:"",p.udhar?"उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T("भुगतान: "+parts.join(" · "),fs(16),"l")}
   if(o.balance!=null)LR("खाते में कुल बाकी",`₹${o.balance}`,fs(18),true);
   if(o.qr){DASH();T("स्कैन करके भुगतान करें",fs(17),"c",true);const q=o.qr,s=Math.min(W*0.55,q.width*3);x.imageSmoothingEnabled=false;x.drawImage(q,(W-s)/2,y,s,s);y+=s+fs(4);if(o.upi)T(o.upi+(o.payee?" · "+o.payee:""),fs(14),"c")}
-  DASH();T("🙏 धन्यवाद! फिर पधारें",fs(19),"c",true);
+  DASH();
+  if(o.phone){const y0=y;y+=fs(8);T("📲 घर बैठे ताज़ी सब्ज़ी मँगाएँ",fs(18),"c",true);T("WhatsApp या कॉल करें",fs(15),"c");T(o.phone,fs(28),"c",true,FB);y+=fs(4);
+    x.lineWidth=Math.max(2,fs(2));x.strokeRect(P,y0,W-2*P,y-y0);y+=fs(8)}
+  T("🙏 धन्यवाद! फिर पधारें",fs(19),"c",true);
   if(b.byName)T("बिलर: "+b.byName,fs(14),"c");
   y+=fs(24);
   const out=document.createElement("canvas");out.width=W;out.height=Math.ceil(y);out.getContext("2d").drawImage(c,0,0);return out;
@@ -360,6 +365,8 @@ SE.checkUpdate=async function(toast){
     const pend=ls.get("se_upd_ready");
     let b;
     if(pend===v.version){try{const l=await U.list();b=(l.bundles||[]).find(x=>x.version===v.version)}catch(e){}}
+    // पिछली बार डाउनलोड हो चुका — ऐप खुलते ही (कोई बिल चालू न हो तो) तुरंत लगा दो
+    if(b&&!SE._busy()){toast&&toast("✨ नया अपडेट "+v.version+" लग रहा है…");try{await U.set({id:b.id});return}catch(e){}}
     if(!b){b=await U.download({url:new URL(v.url,CFG.updateUrl.replace(/\/?$/,"/")).href,version:v.version});ls.set("se_upd_ready",v.version)}
     SE._pendingBundle=b;
     toast&&toast("✨ नया अपडेट "+v.version+" आ गया — ऐप बंद करके खोलते ही लग जाएगा");

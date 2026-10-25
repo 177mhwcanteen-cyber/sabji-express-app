@@ -97,6 +97,11 @@ rep(".toast{position:fixed;", """/* v18 कागज़ की रसीद */
 .pp-stamp{margin:8px auto 2px;width:max-content;max-width:100%;border:2.5px solid #1f8a4c;color:#1f8a4c;font-weight:800;border-radius:8px;padding:3px 10px;transform:rotate(-3deg);font-size:14px}.pp-stamp.red{border-color:#c62828;color:#c62828}
 .pp-qr{display:grid;justify-items:center;gap:2px;margin-top:8px}.pp-qr b{font-size:15px}.pp-qr span{font-size:11px;color:#666}.pp-qr>div{background:#fff;padding:6px}
 .pp-thanks{text-align:center;font-weight:800;font-size:15px}
+.pp-tag{margin:6px 0 4px;text-align:center;font-weight:800;font-size:15px;border-radius:8px;padding:5px 8px;letter-spacing:.3px}
+.pp-tag.vip{background:linear-gradient(90deg,#b8860b,#f5c542,#b8860b);color:#1c1300;box-shadow:0 1px 0 #8a6508 inset}
+.pp-tag.ud{border:2px solid #d64545;color:#b42d2d}.pp-tag.inst{border:2px solid #2f6fdb;color:#2457b5}
+.pp-order{margin:8px 0;border:2px solid #1f8a4c;border-radius:10px;padding:8px;text-align:center;display:flex;flex-direction:column;gap:1px;background:#f1faf3}
+.pp-order b{color:#1f6b3c;font-size:14px}.pp-order span{font-size:12px;color:#444}.pp-order big{font-size:22px;font-weight:800;letter-spacing:1px;color:#111}
 .pp-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.pp-actions:has(> :nth-child(2):last-child){grid-template-columns:1fr 1fr}
 .pp-actions button{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 4px;font-size:22px;display:grid;justify-items:center;gap:2px}.pp-actions span{font-size:13px;font-weight:800}
 .settle-sum{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}.settle-sum b{font-size:24px}

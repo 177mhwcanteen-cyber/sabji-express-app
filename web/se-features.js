@@ -559,9 +559,13 @@ SF.qrCanvas=function(amount,no){
   try{new QRCode(box,{text:upi,width:240,height:240,correctLevel:QRCode.CorrectLevel.M})}catch(e){return null}
   return box.querySelector("canvas");
 };
+/* ग्राहक पर छपने वाला निशान + घर बैठे ऑर्डर नंबर */
+SF.orderPh=function(){const d=String(S.settings.shopPh||S.settings.ownerPh||"").replace(/\D/g,"").slice(-10);return d.length===10?d:""};
+SF.fmtPh=d=>d?d.slice(0,5)+" "+d.slice(5):"";
+SF.custTag=function(b){return b.mode==="inst"?"🏢 संस्था बिल":b.mode==="udhar"?"📒 क्रेडिट / उधार खाता":"⭐ VIP ग्राहक ⭐"};
 SF.rcptOpts=function(b,withQr){
   const due=b.pay?(b.pay.udhar||0):b.total;
-  return {shop:"सब्ज़ी एक्सप्रेस",tag:"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:S.settings.shopPh||"",
+  return {shop:"सब्ज़ी एक्सप्रेस",tag:"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:SF.fmtPh(SF.orderPh()),custTag:SF.custTag(b),vip:b.mode!=="inst"&&b.mode!=="udhar",
     date:fdate(b.date||today())+"  "+ftime(b.ts||Date.now()),fq,qr:withQr&&b.mode!=="inst"?SF.qrCanvas(due,b.no):null,upi:upiId(),payee:UPI_FIXED.payee,
     balance:b.partyId?r2(bal(b.partyId)+(b.pay?0:0)):null,paid:!!b.pay};
 };
@@ -569,10 +573,11 @@ SF.paperHTML=function(b,o){
   o=o||{};const ed=!!o.editable;const sub=r2((b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
   const pay=b.pay;const stamp=pay?[pay.cash?"नकद "+rs(pay.cash):"",pay.upi?"UPI "+rs(pay.upi):"",pay.udhar?"उधार "+rs(pay.udhar):"",b.mode==="inst"?"संस्था · खरीद भाव":""].filter(Boolean).join(" · "):"";
   return `<div class="paper${o.anim?" pp-anim":""}">
-  <div class="pp-head"><div class="pp-logo">🥬</div><b>सब्ज़ी एक्सप्रेस</b><small>ताज़ी सब्ज़ी, आपके दरवाज़े पर · जालीपा कैंट, बाड़मेर${S.settings.shopPh?" · 📞 "+esc(S.settings.shopPh):""}</small></div>
+  <div class="pp-head"><div class="pp-logo">🥬</div><b>सब्ज़ी एक्सप्रेस</b><small>ताज़ी सब्ज़ी, आपके दरवाज़े पर · जालीपा कैंट, बाड़मेर${SF.orderPh()?" · 📞 "+SF.fmtPh(SF.orderPh()):""}</small></div>
   <div class="pp-rule"></div>
+  <div class="pp-tag ${b.mode==="inst"?"inst":b.mode==="udhar"?"ud":"vip"}">${SF.custTag(b)}</div>
   <div class="pp-meta"><span>बिल नं <b>${esc(b.no||"…")}</b></span><span>${fdate(b.date||today())} · ${ftime(b.ts||Date.now())}</span></div>
-  <div class="pp-meta"><span>ग्राहक: <b>${esc(b.partyName||"आम ग्राहक")}</b>${b.custPhone?" · "+esc(b.custPhone):""}</span><span>बिलर: ${esc(b.byName||"")}</span></div>
+  <div class="pp-meta"><span>ग्राहक: <b>${esc(b.partyName||"VIP ग्राहक")}</b>${b.custPhone?" · "+esc(b.custPhone):""}</span><span>बिलर: ${esc(b.byName||"")}</span></div>
   <div class="pp-dash"></div>
   <table class="pp-t"><thead><tr><th>क्र.</th><th>सामान</th><th class="r">मात्रा</th><th class="r">भाव</th><th class="r">रकम</th>${ed?"<th></th>":""}</tr></thead><tbody>
   ${(b.lines||[]).map((l,i)=>`<tr${ed?` data-edit="${i}"`:""}><td>${i+1}</td><td>${esc(l.name)}${l.changed?' <span class="pp-chg">भाव बदला</span>':""}${l.free?' <span class="pp-chg">मुफ्त</span>':""}</td><td class="r">${fq(l.qty,l.unit).replace(" कि.ग्रा"," kg")}</td><td class="r">${l.free?"—":"₹"+l.rate}</td><td class="r"><b>₹${l.amt}</b></td>${ed?`<td><button class="pp-x" data-del="${i}" aria-label="${esc(l.name)} हटाएँ">✕</button></td>`:""}</tr>`).join("")}
@@ -584,6 +589,7 @@ SF.paperHTML=function(b,o){
   ${stamp?`<div class="pp-stamp${b.cancelled?" red":""}">${b.cancelled?"रद्द · "+esc(b.cancelReason||""):"✓ "+esc(stamp)}</div>`:""}
   ${o.qr&&b.mode!=="inst"&&upiId()?`<div class="pp-qr"><div id="${o.qrId||"ppqr"}"></div><b>स्कैन करके भुगतान करें · ₹${o.qrAmt!=null?o.qrAmt:b.total}</b><span>${esc(UPI_FIXED.payee)} · ${esc(upiId())}</span></div>`:""}
   <div class="pp-dash"></div>
+  ${SF.orderPh()?`<div class="pp-order"><b>📲 घर बैठे ताज़ी सब्ज़ी मँगाएँ</b><span>WhatsApp या कॉल करें</span><big>${SF.fmtPh(SF.orderPh())}</big></div>`:""}
   <div class="pp-thanks">🙏 धन्यवाद! फिर पधारें</div>
   </div>`;
 };
@@ -591,7 +597,7 @@ function drawQR(id,amt,no){const el=document.getElementById(id);if(!el||!window.
   try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${(+amt).toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`,width:190,height:190,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
 function draftBill(){
   const c=S.chk,party=S.parties.find(p=>p.id===S.partyId);
-  const custName=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:""):(S.cust.name||(S.cust.phone?"ग्राहक "+S.cust.phone:"आम ग्राहक"));
+  const custName=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:""):(S.cust.name||(S.cust.phone?"ग्राहक "+S.cust.phone:"VIP ग्राहक"));
   return {no:c.no,date:today(),ts:c.ts||(c.ts=Date.now()),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:custName,custPhone:S.cust.phone||(party&&party.phone)||"",
     byName:biller(),lines:S.cart,sub:cartTotal(),disc:+c.disc||0,total:chkTotal()};
 }

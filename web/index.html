@@ -339,6 +339,11 @@ main{padding-block:10px 120px}
 .pp-stamp{margin:8px auto 2px;width:max-content;max-width:100%;border:2.5px solid #1f8a4c;color:#1f8a4c;font-weight:800;border-radius:8px;padding:3px 10px;transform:rotate(-3deg);font-size:14px}.pp-stamp.red{border-color:#c62828;color:#c62828}
 .pp-qr{display:grid;justify-items:center;gap:2px;margin-top:8px}.pp-qr b{font-size:15px}.pp-qr span{font-size:11px;color:#666}.pp-qr>div{background:#fff;padding:6px}
 .pp-thanks{text-align:center;font-weight:800;font-size:15px}
+.pp-tag{margin:6px 0 4px;text-align:center;font-weight:800;font-size:15px;border-radius:8px;padding:5px 8px;letter-spacing:.3px}
+.pp-tag.vip{background:linear-gradient(90deg,#b8860b,#f5c542,#b8860b);color:#1c1300;box-shadow:0 1px 0 #8a6508 inset}
+.pp-tag.ud{border:2px solid #d64545;color:#b42d2d}.pp-tag.inst{border:2px solid #2f6fdb;color:#2457b5}
+.pp-order{margin:8px 0;border:2px solid #1f8a4c;border-radius:10px;padding:8px;text-align:center;display:flex;flex-direction:column;gap:1px;background:#f1faf3}
+.pp-order b{color:#1f6b3c;font-size:14px}.pp-order span{font-size:12px;color:#444}.pp-order big{font-size:22px;font-weight:800;letter-spacing:1px;color:#111}
 .pp-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.pp-actions:has(> :nth-child(2):last-child){grid-template-columns:1fr 1fr}
 .pp-actions button{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 4px;font-size:22px;display:grid;justify-items:center;gap:2px}.pp-actions span{font-size:13px;font-weight:800}
 .settle-sum{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}.settle-sum b{font-size:24px}
@@ -555,7 +560,7 @@ function billList(){
 function clearSearch(){if(S.q){S.q="";$("#q").value="";S.qq=0}}
 function renderBill(){
   $("#demo").hidden=!S.demo;syncTab();renderBillTabs();
-  $("#modes").innerHTML=[["walk","आम ग्राहक",""],["udhar","उधार खाता","ud"],["inst","अपनी संस्था","inst"]]
+  $("#modes").innerHTML=[["walk","⭐ VIP ग्राहक",""],["udhar","उधार / क्रेडिट","ud"],["inst","अपनी संस्था","inst"]]
     .map(([k,v,c])=>`<button class="chip ${c}" aria-pressed="${S.mode===k}" data-mode="${k}">${v}</button>`).join("");
   let cb="";
   if(S.mode==="udhar"){
@@ -609,7 +614,7 @@ function repeatLast(){
 function holdCurrent(){newTab()}
 function holdCurrentOld(){
   if(!S.cart.length)return;const party=S.parties.find(p=>p.id===S.partyId);
-  const label=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:"उधार"):(S.cust.name||S.cust.phone||"आम ग्राहक");
+  const label=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:"उधार"):(S.cust.name||S.cust.phone||"VIP ग्राहक");
   S.held.push({ts:Date.now(),label,mode:S.mode,partyId:S.partyId,inst:S.inst,cust:{...S.cust},cart:S.cart});saveHeld();
   S.cart=[];S.cust={phone:"",name:""};closeSheet();refreshAfterCart();toast("बिल रोक दिया — ऊपर से दोबारा खोलें");
 }
@@ -675,7 +680,7 @@ function refreshAfterCart(){renderCart();if(S.tab==="bill")renderBill()}
 function cartTotal(){return r2(S.cart.reduce((a,l)=>a+l.amt,0))}
 function renderCart(){
   const show=S.tab==="bill"&&S.cart.length>0;$("#cartbar").hidden=!show;renderBillTabs();if(!show)return;
-  $("#cartc").innerHTML=`${S.cart.length} चीज़ें<br>${S.mode==="inst"?"संस्था बिल":S.mode==="udhar"?"उधार खाता":"आम ग्राहक"}`;
+  $("#cartc").innerHTML=`${S.cart.length} चीज़ें<br>${S.mode==="inst"?"संस्था बिल":S.mode==="udhar"?"उधार खाता":"VIP ग्राहक"}`;
   $("#cartt").textContent=rs(cartTotal());
 }
 $("#cartbtn").onclick=()=>openCheckout();
@@ -694,7 +699,7 @@ function openCheckout(){
 function chkTotal(){return Math.max(0,Math.round(cartTotal()-(+S.chk.disc||0)))}
 function drawCheckout(){if(window.SF&&SF.drawCheckout)return SF.drawCheckout();
   const c=S.chk,tot=chkTotal(),party=S.parties.find(p=>p.id===S.partyId);
-  const custName=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:""):(S.cust.name||(S.cust.phone?"ग्राहक "+S.cust.phone:"आम ग्राहक"));
+  const custName=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:""):(S.cust.name||(S.cust.phone?"ग्राहक "+S.cust.phone:"VIP ग्राहक"));
   const anyChg=S.cart.some(l=>l.changed);
   const overLim=S.mode==="udhar"&&party&&(+party.limit>0)&&(bal(party.id)+tot>+party.limit);
   const pays=S.mode==="inst"?[["inst","संस्था खाते में"]]:[["cash","💵 नकद"],["upi","📱 UPI"],["udhar","📒 पूरा उधार"],["split","नकद + बाकी उधार"]];
@@ -762,7 +767,7 @@ async function saveBill(){
   const cph=S.mode==="walk"?S.cust.phone:"",cnm=S.mode==="walk"?S.cust.name:"";
   const cost=r2(lines.reduce((a,l)=>a+l.cost*l.qty,0));
   if(c.no==="…"&&window.SF)c.no=await SF.reserveBillNo();
-  const bill={no:c.no,ts:now,date,by:S.uid||"",byName:biller(),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:S.mode==="udhar"?(party?.name||""):S.mode==="inst"?S.inst:(cnm||"आम ग्राहक"),custPhone:cph,custName:cnm,
+  const bill={no:c.no,ts:now,date,by:S.uid||"",byName:biller(),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:S.mode==="udhar"?(party?.name||""):S.mode==="inst"?S.inst:(cnm||"VIP ग्राहक"),custPhone:cph,custName:cnm,
     lines,sub:cartTotal(),disc:+c.disc||0,total:S.mode==="inst"?cartTotal():tot,pay,payMode:c.pay,cost,
     rateChanged:lines.some(l=>l.changed),cancelled:false};
   S.saving=true;drawCheckout();
@@ -782,13 +787,13 @@ async function saveBill(){
 function receiptText(b){
   b={...b,pay:b.pay||{}};
   const L="━━━━━━━━━━━━━━━";
-  let t=`🥬 *सब्ज़ी एक्सप्रेस*\n_ताज़ी सब्ज़ी, आपके दरवाज़े पर_\nजालीपा कैंट, बाड़मेर\n${L}\n🧾 बिल नं: ${b.no}\n📅 ${fdate(b.date)} · ${ftime(b.ts)}\n👤 ${b.partyName}${b.custPhone?" ("+b.custPhone+")":""}\n${L}\n`;
+  let t=`🥬 *सब्ज़ी एक्सप्रेस*\n_ताज़ी सब्ज़ी, आपके दरवाज़े पर_\nजालीपा कैंट, बाड़मेर\n${L}\n*${SF.custTag(b)}*\n🧾 बिल नं: ${b.no}\n📅 ${fdate(b.date)} · ${ftime(b.ts)}\n👤 ${b.partyName}${b.custPhone?" ("+b.custPhone+")":""}\n${L}\n`;
   b.lines.forEach((l,i)=>t+=l.free?`${i+1}. ${l.name} ${fq(l.qty,l.unit)} — 🎁 मुफ्त\n`:`${i+1}. ${l.name}\n    ${fq(l.qty,l.unit)} × ₹${l.rate} = *₹${l.amt}*\n`);
   t+=`${L}\n`;if(b.disc)t+=`🏷️ छूट: −₹${b.disc}\n`;t+=`💰 *कुल रकम: ₹${b.total}*\n`;
   if(b.pay.cash)t+=`✅ नकद मिला: ₹${b.pay.cash}\n`;if(b.pay.upi)t+=`✅ UPI मिला: ₹${b.pay.upi}\n`;if(b.pay.udhar)t+=`📒 उधार में: ₹${b.pay.udhar}\n`;
   if(b.partyId){t+=`📒 खाते में कुल बाकी: *₹${r2(bal(b.partyId))}*\n`}
   t+=`${L}\n🙏 धन्यवाद! फिर पधारें\n`;
-  if(S.settings.shopPh)t+=`📞 घर बैठे ऑर्डर: ${S.settings.shopPh}\n`;
+  if(SF.orderPh())t+=`\n📲 *घर बैठे ताज़ी सब्ज़ी मँगाएँ*\nWhatsApp या कॉल करें: *${SF.fmtPh(SF.orderPh())}*\nhttps://wa.me/91${SF.orderPh()}\n`;
   if(b.pay.udhar)t+=`💳 UPI: ${upiId()}\n`;
   return t+`🧑‍🌾 बिलर: ${b.byName}`;
 }

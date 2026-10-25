@@ -183,8 +183,15 @@ rep('<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="pre
 # v20: बिल सेटल होने से पहले शेयर — भुगतान खाली हो तो भी संदेश बने
 rep("function receiptText(b){\n", "function receiptText(b){\n  b={...b,pay:b.pay||{}};\n")
 
+# v20: ग्राहक का निशान (VIP / क्रेडिट / संस्था) + घर बैठे ऑर्डर नंबर
+rep('["walk","आम ग्राहक",""],["udhar","उधार खाता","ud"]', '["walk","⭐ VIP ग्राहक",""],["udhar","उधार / क्रेडिट","ud"]')
+rep(r"${L}\n🧾 बिल नं: ${b.no}", r"${L}\n*${SF.custTag(b)}*\n🧾 बिल नं: ${b.no}")
+rep(r"if(S.settings.shopPh)t+=`📞 घर बैठे ऑर्डर: ${S.settings.shopPh}\n`;",
+    r"if(SF.orderPh())t+=`\n📲 *घर बैठे ताज़ी सब्ज़ी मँगाएँ*\nWhatsApp या कॉल करें: *${SF.fmtPh(SF.orderPh())}*\nhttps://wa.me/91${SF.orderPh()}\n`;")
+
 exec(open(__import__("os").path.join(__import__("os").path.dirname(__file__),"port_v15.py"),encoding="utf8").read())
 
+s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")
 
