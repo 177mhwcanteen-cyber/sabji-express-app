@@ -246,7 +246,7 @@ SF.bindKharid=function(){
 /* =============== 🌙 रात का स्टॉक + 📊 दिन का पूरा हिसाब =============== */
 function dayRows(){
   const st=S.stock.items||{},ps=S.prevStock||{},bills=liveBills();
-  return S.items.filter(i=>!i.track).map(it=>{
+  return S.items.filter(i=>!i.track&&!i.virtual).map(it=>{
     const o=st[it.id]||{},pv=ps[it.id]||{};
     const prev=pv.close!==undefined&&pv.close!==""?num(pv.close):0;
     const extra=num(o.open); // पुराने तरीके से हाथ से लिखा "सुबह आया"
@@ -264,7 +264,7 @@ SF.dayStockHTML=function(){
   const rows=dayRows().filter(r=>r.active);
   const flags=rows.filter(r=>r.flag);
   const P2=dayMoney(rows);
-  return `${S.isOwner?P2.html:""}
+  return `${S.isOwner?SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html:""}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>
     <p class="note" style="margin:0">दुकान बंद करते समय बचा माल तौलकर डालें। "होना चाहिए" = कल रात का + आज की खरीद − बिका − संस्था।</p>
     <button class="big" data-night>🌙 रात का स्टॉक डालें</button></div>
@@ -318,7 +318,138 @@ function nightSheet(){
   $("#sheet").onkeydown=e=>{if(e.key==="Enter"&&e.target.dataset.nclose){e.preventDefault();const all=[...document.querySelectorAll("[data-nclose]")];const i=all.indexOf(e.target);if(all[i+1])all[i+1].focus();else e.target.blur()}};
   const f=document.querySelector("[data-nclose]");if(f)f.focus();
 }
-SF.bindDay=function(){$("#p-day").addEventListener("click",e=>{if(e.target.closest("[data-night]"))nightSheet()})};
+SF.bindDay=function(){$("#p-day").addEventListener("click",e=>{if(e.target.closest("[data-night]"))nightSheet();
+  if(e.target.closest("[data-audcopy]"))SF.auditCopy();if(e.target.closest("[data-audfile]"))SF.auditFile()})};
+/* =============== 🤖 AI ऑडिट पैक — "कोई टोपी न पहना सके" =============== */
+SF.xyzWarnHTML=function(){
+  const L=[];liveBills().forEach(b=>(b.lines||[]).forEach(l=>{if(l.id==="xyz")L.push({b,l})}));if(!L.length)return "";
+  return `<div class="warn">🅧 आज XYZ (अन्य पैसा) से ${L.length} बार · ${rs(r2(L.reduce((a,x)=>a+num(x.l.amt),0)))}: ${L.map(x=>`${esc(x.l.note||x.l.name)} ${rs(x.l.amt)} (${esc(x.b.byName||"")} ${ftime(x.b.ts)})`).join(" · ")}</div>`;
+};
+SF.auditCardHTML=function(){
+  return `<div class="card2 audcard"><h3>🤖 AI ऑडिट पैक · ${fdate(S.billsDate)}</h3>
+  <p class="note" style="margin:0">इस तारीख का पूरा हिसाब + ऑडिटर की हिदायत एक साथ। Claude या किसी भी AI में चिपकाएँ — हर गड़बड़ रकम सहित मिलेगी।</p>
+  <div class="row2" style="margin:8px 0 0"><button class="big" data-audcopy>📋 कॉपी करें</button><button class="big ghost" data-audfile>⬇️ फाइल</button></div></div>`;
+};
+const T=(rows)=>rows.map(r=>"| "+r.map(x=>String(x??"").replace(/\|/g,"/").replace(/\n/g," ")).join(" | ")+" |").join("\n");
+const TH=(h)=>T([h])+"\n|"+h.map(()=>"---").join("|")+"|";
+SF.auditPack=async function(){
+  const d=S.billsDate,all=S.dayBills||[],bills=all.filter(b=>!b.cancelled),sale=bills.filter(b=>b.mode!=="inst"),inst=bills.filter(b=>b.mode==="inst");
+  const rows=dayRows().filter(r=>r.active),M=dayMoney(rows),C=typeof cashCalc==="function"?cashCalc(d):null;
+  const sum=(a,f)=>r2(a.reduce((x,y)=>x+num(f(y)),0));
+  const U=it=>UNITS[it.unit]||it.unit;
+  let t=`# 🔍 सब्ज़ी एक्सप्रेस — AI ऑडिट पैक · ${fdate(d)}
+(जालीपा कैंट, बाड़मेर · सब्ज़ी की गाड़ी · बनाया: ${new Date().toLocaleString("hi-IN")} · ऐप ${(window.SE&&SE.version)||""})
+
+## 🧑‍⚖️ AI के लिए हिदायत — पहले पूरा पढ़ें
+आप विक्रम जी (मालिक) के ईमानदार मुनीम और फॉरेंसिक ऑडिटर हैं। विक्रम जी को अकाउंटिंग नहीं आती — इसलिए **सरल हिंदी**, छोटे वाक्य, हर रकम का जोड़ दिखाकर लिखें।
+काम: नीचे दिए आँकड़ों से पकड़ें कि कहीं माल या पैसा कम तो नहीं, कोई "टोपी" तो नहीं पहनाई गई। सिर्फ़ इन्हीं आँकड़ों से बात करें; जहाँ पक्का सबूत नहीं, वहाँ "शक" लिखें, इल्ज़ाम नहीं।
+
+जाँच का तरीका (अंतरराष्ट्रीय रिटेल ऑडिट — stock reconciliation, cash reconciliation, exception review):
+1. **माल का मिलान (हर सब्ज़ी)**: कल रात बचा + आज खरीदा − ग्राहक को बिका − संस्था को − खराब = रात को होना चाहिए। फिर "होना चाहिए − असल में बचा" = कमी। कमी × बिक्री भाव = नुकसान ₹। किलो वाली में 150 ग्राम तक (सूखना/तौल) और पीस वाली में 1 तक माफ़। रात का स्टॉक नहीं लिखा हो तो सबसे बड़ा खतरा यही बताएँ।
+2. **पैसे का मिलान**: गल्ले में होना चाहिए (सुबह खुला + नकद बिक्री + नकद वसूली − नकद खर्च − गल्ले से खरीद) बनाम गिना हुआ। UPI और उधार अलग देखें। ₹5 से ज़्यादा का फर्क लिखें।
+3. **खरीद की जाँच**: भाव पिछली खरीद से 5% से ज़्यादा ऊपर? एक ही सामान दो बार? बिल की फोटो नहीं? गल्ले से भुगतान हुआ तो गल्ले के हिसाब में घटा या नहीं? खरीद ज़्यादा पर बिक्री कम?
+4. **बिक्री की जाँच (exceptions)**: भाव बदले/कम किए, मुफ्त, छूट, 🅧 XYZ (अन्य पैसा — हर एक को ध्यान से), रद्द बिल, बिल नंबर का क्रम टूटा, संस्था को ज़्यादा या बार-बार माल, उधार किसके नाम, बहुत छोटे-छोटे बिल एक साथ, गोल रकमें।
+5. **रूट/लोकेशन**: गाड़ी कहाँ कितनी देर रुकी, कहाँ बिक्री कम, लोकेशन कब बंद रही, बिना जगह वाले बिल। लोकेशन बंद रहने के समय बिक्री कम है तो शक लिखें।
+6. **मुनाफ़ा**: असली मुनाफ़ा = ग्राहकों से बिक्री − (कल रात का माल + आज खरीद − संस्था − आज रात का माल, सब खरीद भाव पर) − खर्च। जोड़ दिखाएँ।
+
+जवाब इसी क्रम में दें:
+A. **एक लाइन फैसला** — जैसे "आज ₹___ का हिसाब नहीं मिला" या "हिसाब ठीक है"।
+B. **🚨 गड़बड़ी तालिका** — | क्रम | क्या गड़बड़ | सबूत (आँकड़े) | रकम ₹ | पक्का / शक | — सबसे बड़ी रकम ऊपर।
+C. **असली मुनाफ़ा** — पूरा जोड़ दिखाकर।
+D. **कर्मचारी से पूछने वाले सवाल** — WhatsApp पर सीधे भेजने लायक, क्रम नंबर के साथ, विनम्र भाषा में।
+E. **कल के लिए 3 सुझाव** — कमाई बढ़ाने / चोरी रोकने के लिए (कौन सी जगह, कौन सा समय, कौन सी सब्ज़ी)।
+F. **कौन सा आँकड़ा अधूरा है** — जो ऐप में भरना रह गया।
+
+---
+## 1. एक नज़र में
+- कुल बिल: ${all.length} (रद्द ${all.length-bills.length}) · ग्राहक बिल ${sale.length} · संस्था बिल ${inst.length}
+- ग्राहकों से बिक्री: ₹${M.sales} · नकद ₹${sum(sale,b=>b.pay&&b.pay.cash)} · UPI ₹${sum(sale,b=>b.pay&&b.pay.upi)} · उधार ₹${sum(sale,b=>b.pay&&b.pay.udhar)}
+- संस्था को दिया: ₹${M.instVal}
+- मंडी खरीद: ₹${M.buyAll} (${livePurch().length} बिल)
+- कल रात का माल (खरीद भाव): ₹${M.openVal} · आज रात का माल: ₹${M.closeVal}${rows.length&&rows.every(r=>r.close!=null)?"":" ⚠ (रात का स्टॉक पूरा नहीं लिखा — अंदाज़ा)"}
+- ऐप का निकाला मुनाफ़ा (खर्च घटाए बिना): ₹${M.profit}
+- बोर्ड भाव से बिक्री होनी चाहिए थी: ₹${M.expSale} · असल ₹${M.sales} · फर्क ₹${M.gap}
+`;
+  if(C)t+=`
+## 2. गल्ला मिलान (नकद)
+- सुबह खुला पैसा: ₹${C.float}
+- + नकद बिक्री: ₹${C.cashSale}
+- + उधारी की नकद वसूली: ₹${C.jamaCash}
+- − नकद खर्च + गल्ले से खरीद: ₹${C.khCash}
+- = गल्ले में होना चाहिए: ₹${C.expected}
+- गिना हुआ: ${C.counted==null?"⚠ गिना ही नहीं गया":"₹"+C.counted+(S.close&&S.close.byName?" ("+S.close.byName+" ने "+ftime(S.close.ts)+" पर गिना)":"")}
+- फर्क: ${C.diff==null?"—":"₹"+C.diff}
+- कुल खर्च (नकद+UPI): ₹${C.khAll}
+`;
+  t+=`
+## 3. माल का मिलान (हर सब्ज़ी)
+${TH(["सामान","इकाई","कल रात","+खरीदा","खरीद भाव ₹","−ग्राहक","−संस्था","−खराब","होना चाहिए","रात बचा (लिखा)","कमी","कमी ₹ (बिक्री भाव)","बिक्री भाव ₹"])}
+${T(rows.map(r=>[r.it.name,U(r.it),r.prev,r.buyQ,r.rate,r.saleQ,r.instQ,r.waste,Math.max(0,r.expect),r.close==null?"⚠ नहीं लिखा":r.close,r.short==null?"—":r.short,r.short!=null&&r.short>0?r2(r.short*num(r.it.sale)):"",num(r.it.sale)]))}
+
+## 4. मंडी खरीद
+${TH(["नं","समय","दुकान","किसने","सामान","मात्रा","भाव ₹","पिछला भाव ₹","फर्क %","रकम ₹","भुगतान","फोटो"])}
+${T(livePurch().flatMap((p,i)=>(p.lines||[]).map(l=>{const pr=lastRate(l.id,p.ts);const diff=pr&&pr.rate>0?r2((num(l.rate)-pr.rate)/pr.rate*100):"";
+  return [pNo(p,i+1),ftime(p.ts),p.supName||"",p.byName||"",l.name,num(l.qty),num(l.rate),pr?pr.rate:"",diff,r2(num(l.qty)*num(l.rate)),PAY[p.pay]||p.pay||"",(p.photos&&p.photos.length)||p.photoPending?"हाँ":"⚠ नहीं"]})))}
+${S.purch.filter(p=>p.cancelled).length?"\nरद्द खरीद: "+S.purch.filter(p=>p.cancelled).map(p=>(p.supName||"")+" ₹"+p.total).join(", "):""}
+
+## 5. खर्च
+${S.kharch&&S.kharch.length?TH(["क्या","₹","कैसे","किसने"])+"\n"+T(S.kharch.map(k=>[k.what||k.note||k.name||"",num(k.amt),k.mode==="upi"?"UPI":"नकद",k.byName||""])):"कोई खर्च नहीं लिखा"}
+
+## 6. उधार (आज)
+${(()=>{const L=(S.ledger||[]).filter(l=>l.date===d);return L.length?TH(["किसका","दिया/जमा","₹","कैसे","बिल","किसने"])+"\n"+T(L.map(l=>[l.partyName||"",l.type==="jama"?"जमा (वसूली)":"उधार दिया",num(l.amt),l.mode||"",l.billNo||"",l.byName||""])):"आज कोई उधार/वसूली नहीं"})()}
+
+## 7. अपवाद (exceptions) — ध्यान से देखें
+`;
+  const ex=[];
+  all.forEach(b=>{
+    if(b.cancelled)ex.push(["रद्द बिल",b.no,ftime(b.ts),b.byName,"₹"+b.total,b.cancelReason||""]);
+    if(num(b.disc)>0)ex.push(["छूट",b.no,ftime(b.ts),b.byName,"₹"+b.disc,b.partyName||""]);
+    (b.lines||[]).forEach(l=>{
+      if(l.id==="xyz")ex.push(["🅧 XYZ अन्य पैसा",b.no,ftime(b.ts),b.byName,"₹"+l.amt,l.note||l.name]);
+      else if(l.free)ex.push(["मुफ्त दिया",b.no,ftime(b.ts),b.byName,l.name+" "+fq(l.qty,l.unit),""]);
+      else if(l.changed)ex.push(["भाव बदला",b.no,ftime(b.ts),b.byName,l.name+": बोर्ड ₹"+l.board+" → ₹"+l.rate,"फर्क ₹"+r2((num(l.board)-num(l.rate))*num(l.qty))]);
+    });
+  });
+  const dec=all.map(b=>SF.decodeBill(b.no)).filter(Boolean).filter(x=>x.date===d);
+  const bySlot={};dec.forEach(x=>(bySlot[x.dev||0]||(bySlot[x.dev||0]=[])).push(x.serial));
+  Object.entries(bySlot).forEach(([dev,ss])=>{ss.sort((a,b)=>a-b);const miss=[];for(let i=1;i<=ss[ss.length-1];i++)if(!ss.includes(i))miss.push(i);if(miss.length)ex.push(["बिल नंबर का क्रम टूटा",dev==="0"?"सर्वर क्रम":"फोन-क्रम "+dev,"","","गायब क्रम: "+miss.slice(0,30).join(", "),"(बिल बना पर सेव नहीं हुआ या मिटा)"])});
+  (S.cancelReqs||[]).filter(r=>r.date===d).forEach(r=>ex.push(["रद्द की अर्ज़ी (बाकी)",r.no,"",r.byName,"₹"+r.total,r.reason]));
+  S.items.filter(i=>i.addedTs&&dOf(i.addedTs)===d).forEach(i=>ex.push(["नया सामान जोड़ा",i.name,ftime(i.addedTs),i.addedByName||"","₹"+i.sale+"/"+U(i),i.pending?"मंज़ूरी बाकी":""]));
+  t+=ex.length?TH(["किस्म","बिल/सामान","समय","किसने","क्या","टिप्पणी"])+"\n"+T(ex):"कोई अपवाद नहीं";
+  const staff={};bills.forEach(b=>{const k=b.byName||"—";const o=staff[k]||(staff[k]={n:0,sale:0,cash:0,upi:0,ud:0,inst:0,first:b.ts,last:b.ts});o.n++;o.first=Math.min(o.first,b.ts);o.last=Math.max(o.last,b.ts);
+    if(b.mode==="inst")o.inst+=num(b.total);else{o.sale+=num(b.total);o.cash+=num(b.pay&&b.pay.cash);o.upi+=num(b.pay&&b.pay.upi);o.ud+=num(b.pay&&b.pay.udhar)}});
+  t+=`
+
+## 8. कर्मचारी-वार
+${TH(["कर्मचारी","बिल","पहला","आखिरी","बिक्री ₹","नकद","UPI","उधार","संस्था ₹"])}
+${T(Object.entries(staff).map(([k,o])=>[k,o.n,ftime(o.first),ftime(o.last),r2(o.sale),r2(o.cash),r2(o.upi),r2(o.ud),r2(o.inst)]))}
+
+## 9. घंटे के हिसाब से बिक्री
+${(()=>{const H={};sale.forEach(b=>{const h=new Date(b.ts).getHours();const o=H[h]||(H[h]={n:0,a:0});o.n++;o.a+=num(b.total)});return TH(["समय","बिल","₹"])+"\n"+T(Object.keys(H).sort((a,b)=>a-b).map(h=>[h+"–"+(+h+1)+" बजे",H[h].n,r2(H[h].a)]))})()}
+
+## 10. गाड़ी का रूट और जगह
+${window.SR?await SR.routeText(d):"—"}
+
+## 11. सभी बिल
+${TH(["बिल","समय","किसने","ग्राहक","मोड","सामान","₹","नकद","UPI","उधार","जगह","स्थिति"])}
+${T(all.slice().sort((a,b)=>a.ts-b.ts).map(b=>[b.no,ftime(b.ts),b.byName||"",(b.partyName||"")+(b.custPhone?" "+b.custPhone:""),b.mode==="inst"?"संस्था":b.mode==="udhar"?"उधार खाता":"ग्राहक",
+  (b.lines||[]).map(l=>l.name+" "+fq(l.qty,l.unit)+"×"+l.rate+(l.changed?"(बदला)":"")+(l.free?"(मुफ्त)":"")).join("; "),b.total,num(b.pay&&b.pay.cash),num(b.pay&&b.pay.upi),num(b.pay&&b.pay.udhar),b.place||(b.loc?"दर्ज":"—"),b.cancelled?"रद्द":b.pending?"फोन में (सर्वर पर नहीं गया)":"ठीक"]))}
+
+---
+(ऊपर की हिदायत के हिसाब से A से F तक जवाब दें।)
+`;
+  return t;
+};
+const dOf=ts=>today(new Date(ts));
+SF.auditCopy=async function(){
+  toast("⏳ ऑडिट पैक बन रहा है…");const t=await SF.auditPack();
+  try{await navigator.clipboard.writeText(t);toast("📋 कॉपी हो गया — अब Claude खोलकर चिपकाएँ (Paste)")}
+  catch(e){const a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast("📋 कॉपी हो गया — Claude में चिपकाएँ")}catch(x){toast("कॉपी नहीं हुआ — फाइल वाला बटन दबाएँ")}a.remove()}
+};
+SF.auditFile=async function(){
+  toast("⏳ ऑडिट फाइल बन रही है…");const t=await SF.auditPack();
+  if(window.SR)await SR.saveFile("SabjiExpress_Audit_"+S.billsDate+".txt",t,"text/plain");
+};
 
 /* =============== 🏷️ बारकोड लेबल =============== */
 /* दुकान के अंदर वाला GS1 तरीका (20–29 सिर्फ़ अपनी दुकान के लिए): 20 + सामान कोड(5) + 00000 + जाँच अंक = पक्का कोड।
@@ -611,7 +742,8 @@ function draftBill(){
   return {no:c.no,date:today(),ts:c.ts||(c.ts=Date.now()),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:custName,custPhone:S.cust.phone||(party&&party.phone)||"",
     byName:biller(),lines:S.cart,sub:cartTotal(),disc:+c.disc||0,total:chkTotal()};
 }
-SF.shareBill=async function(b,phone,saved){
+SF.shareBill=function(b,phone,saved){if(window.SR&&SR.shareAsk)return SR.shareAsk(b,phone,saved);return SF._shareNow(b,phone,saved)};
+SF._shareNow=async function(b,phone,saved){
   try{toast("📄 बिल का PDF बन रहा है…");
     const how=await SE.shareReceipt(b,SF.rcptOpts(b,!saved||(b.pay&&b.pay.udhar>0)),phone,receiptText(b));
     if(how==="download")toast("बिल की फोटो डाउनलोड हुई — WhatsApp में भेज दें")}

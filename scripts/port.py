@@ -201,6 +201,45 @@ rep(r"t+=`${L}\n🙏 धन्यवाद! फिर पधारें\n`;", r
 
 exec(open(__import__("os").path.join(__import__("os").path.dirname(__file__),"port_v15.py"),encoding="utf8").read())
 
+# v22: 📍 रूट/लोकेशन, ग्राहक रजिस्टर, बिल भेजना, नया सामान, XYZ — असली कोड web/se-route.js में
+rep('<section id="p-label" hidden></section>', '<section id="p-label" hidden></section>\n  <section id="p-route" hidden></section>')
+rep('<script src="se-features.js"></script>', '<script src="se-features.js"></script>\n<script src="se-route.js"></script>')
+rep('t.push(["label","लेबल"]);', 't.push(["label","लेबल"]);if(S.isOwner)t.push(["route","रूट"]);')
+rep('"kharid","label"].forEach(k=>$("#p-"+k).hidden=S.tab!==k);$("#sbar").hidden=S.tab==="kharid"||S.tab==="label";',
+    '"kharid","label","route"].forEach(k=>$("#p-"+k).hidden=S.tab!==k);$("#sbar").hidden=S.tab==="kharid"||S.tab==="label"||S.tab==="route";')
+rep('  else if(S.tab==="label"){if(window.SF)SF.renderLabel()}', '  else if(S.tab==="label"){if(window.SF)SF.renderLabel()}\n  else if(S.tab==="route"){if(window.SR)SR.renderRoute()}')
+rep('label:"🏷️",', 'label:"🏷️",route:"📍",')
+rep('S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));', 'S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(window.SR)SR.addVirtual();')
+rep('  }).join("");\n}\n$("#p-bill").addEventListener("click",e=>{', '  }).join("")+(window.SR?SR.addCardHTML():"");\n}\n$("#p-bill").addEventListener("click",e=>{')
+rep('दूसरा नाम लिखकर देखें।</div>`;return}', 'दूसरा नाम लिखकर देखें।</div>`+(window.SR?SR.addCardHTML(q):"");return}')
+rep('  const m=e.target.closest("[data-mode]");if(m){setMode(m.dataset.mode);return}', '  const ni=e.target.closest("[data-newitem]");if(ni&&window.SR){SR.newItemSheet(ni.dataset.newitem);return}\n  const m=e.target.closest("[data-mode]");if(m){setMode(m.dataset.mode);return}')
+rep('function openQty(it,lineIdx){', 'function openQty(it,lineIdx){if(it&&it.id==="xyz"&&window.SR)return SR.xyzSheet(null,lineIdx);')
+rep('function quickAdd(it,q){', 'function quickAdd(it,q){if(it&&it.id==="xyz"&&window.SR)return SR.xyzSheet(q);')
+rep('amt:l.amt,changed:!!l.changed,free:!!l.free}));', 'amt:l.amt,changed:!!l.changed,free:!!l.free,...(l.note?{note:l.note}:{})}));')
+rep('rateChanged:lines.some(l=>l.changed),cancelled:false};', 'rateChanged:lines.some(l=>l.changed),cancelled:false};if(window.SR)SR.stamp(bill);')
+rep('S.saving=false;closeCurTab();refreshAfterCart();showReceipt(bill,true,offline);', 'if(window.SR&&bill.custPhone)SR.custHist(bill,bill.custPhone);S.saving=false;closeCurTab();refreshAfterCart();showReceipt(bill,true,offline);')
+rep('$("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")', '$("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+(window.SR?SR.pendingItemsHTML():"")')
+rep('${S.items.map(it=>`<div class="setitem"', '${S.items.filter(i=>!i.virtual).map(it=>`<div class="setitem"')
+rep('return S.items.filter(i=>!i.track&&(i.active!==false||st[i.id])).map(it=>{', 'return S.items.filter(i=>!i.track&&!i.virtual&&(i.active!==false||st[i.id])).map(it=>{')
+rep(".toast{position:fixed;", """/* v22 रूट, ग्राहक, बिल भेजना, नया सामान */
+.locbar{display:block;width:100%;border:0;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;line-height:1.3;padding:10px 12px;text-align:center;border-radius:12px;margin-bottom:8px;animation:lbp 1.6s ease-in-out infinite}
+@keyframes lbp{50%{background:#dc2626}}@media (prefers-reduced-motion:reduce){.locbar{animation:none}}
+#shbox{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center}#shbox[hidden]{display:none}
+.shb-scrim{position:absolute;inset:0;background:rgba(5,15,9,.55)}
+.shb{position:relative;width:100%;max-width:520px;background:var(--surface);color:var(--ink);border-radius:24px 24px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 30px rgba(0,0,0,.25);animation:up .2s ease-out}
+.shb h3{margin:0 0 2px;font-size:20px}
+.card.addnew{border:2px dashed var(--leaf);background:transparent}.card.addnew .tile{display:flex;align-items:center;justify-content:center;background:var(--bg)}.card.addnew .em{font-size:30px}
+.ragg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 0}.ragg .big{padding:10px 4px}
+.rmap{position:relative;z-index:0;isolation:isolate;height:330px;border-radius:16px;overflow:hidden;margin:0 0 12px;background:var(--bg);box-shadow:var(--shadow)}
+.rlive .livep{display:flex;align-items:center;gap:10px;padding:6px 0}.rlive .mid{flex:1;display:grid}.rlive .mid span{font-size:13px;color:var(--muted)}
+.rstop{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.rs-t{display:grid;text-align:center;background:var(--bg);border-radius:10px;padding:4px}.rs-t b{font-size:14px}.rs-t span{font-size:11px;color:var(--muted)}
+.rs-m{display:grid;min-width:0}.rs-m b{font-size:15px}
+.rins{background:var(--bg);border-radius:10px;padding:8px 10px;margin:6px 0;font-size:14px}.rins.good{background:#e7f6ec;color:#14532d}.rins.bad{background:#fff3e0;color:#7c2d12}
+.rtable{overflow-x:auto;margin-top:8px}.rtable table{width:100%;border-collapse:collapse;font-size:13px}.rtable th{font-size:11px;color:var(--muted);text-align:left;padding:4px}.rtable td{padding:6px 4px;border-top:1px solid var(--line)}.rtable .r{text-align:right;white-space:nowrap}
+.audcard{border:2px solid #7c3aed;background:linear-gradient(135deg,rgba(124,58,237,.08),transparent)}
+.toast{position:fixed;""")
+
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")

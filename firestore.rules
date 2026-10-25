@@ -28,7 +28,12 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
-    match /items/{id}    { allow read: if active(); allow write: if isOwner(); }
+    // सामान: मालिक सब कुछ; कर्मचारी सिर्फ़ नया जोड़ सकते हैं (मालिक की मंज़ूरी बाकी रहती है)
+    match /items/{id} {
+      allow read: if active();
+      allow create: if isOwner() || (active() && request.resource.data.pending == true && request.resource.data.addedBy == request.auth.uid);
+      allow update, delete: if isOwner();
+    }
     match /settings/{id} { allow read: if active(); allow write: if isOwner(); }
     match /photos/{id}   { allow read: if active(); allow write: if isOwner(); }
     match /priceLog/{id} { allow read: if isOwner(); allow create: if isOwner(); }
@@ -54,6 +59,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /customers/{id} { allow read, create, update: if active(); allow delete: if false; }
+    // हर ग्राहक की पूरी खरीद का इतिहास — कभी नहीं मिटता
+    match /customers/{id}/hist/{h} { allow read, create, update: if active(); allow delete: if false; }
     match /pstock/{id}    { allow read, create, update: if active(); allow delete: if false; }
     match /stockLog/{id}  { allow read, create: if active(); }
     match /inward/{id}    { allow read, create: if active(); }
@@ -79,6 +86,18 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /labelLog/{id} { allow create: if active(); allow read: if isOwner(); }
+
+    // 📍 गाड़ी की लोकेशन: हर फोन सिर्फ़ अपनी लोकेशन लिखे, देखे सिर्फ़ मालिक; कोई मिटा नहीं सकता
+    match /trk/{id} {
+      allow read: if isOwner();
+      allow create, update: if active() && request.resource.data.uid == request.auth.uid;
+      allow delete: if false;
+    }
+    match /live/{uid} {
+      allow read: if isOwner() || (signedIn() && request.auth.uid == uid);
+      allow write: if active() && request.auth.uid == uid;
+    }
+    match /places/{id} { allow read: if active(); allow write: if isOwner(); }
 
     // पहरेदार की निजी छाप — सिर्फ़ मालिक
     match /data/users/{uid}/{doc} { allow read, write: if isOwner() && request.auth.uid == uid; }

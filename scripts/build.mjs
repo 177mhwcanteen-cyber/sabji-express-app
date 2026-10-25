@@ -21,11 +21,13 @@ await build({ entryPoints: [path.join(W, "src/vendor.js")], bundle: true, minify
   target: ["chrome90"], outfile: path.join(OUT, "lib/vendor.js"), legalComments: "none", logLevel: "warning" });
 
 // 2) बाकी फ़ाइलें
-for (const f of ["index.html", "se-platform.js", "se-features.js", "se-nutri.js", "config.js", "manifest.webmanifest", "migrate.json", "icon.png"])
+for (const f of ["index.html", "se-platform.js", "se-features.js", "se-nutri.js", "se-route.js", "config.js", "manifest.webmanifest", "migrate.json", "icon.png"])
   if (fs.existsSync(path.join(W, f))) cp(path.join(W, f), path.join(OUT, f));
 cp(path.join(W, "img"), path.join(OUT, "img"));
 cp(path.join(R, "node_modules/qrcodejs/qrcode.min.js"), path.join(OUT, "lib/qrcode.min.js"));
 cp(path.join(R, "node_modules/@zxing/library/umd/index.min.js"), path.join(OUT, "lib/zxing.min.js"));
+cp(path.join(R, "node_modules/leaflet/dist/leaflet.js"), path.join(OUT, "lib/leaflet.js"));
+cp(path.join(R, "node_modules/leaflet/dist/leaflet.css"), path.join(OUT, "lib/leaflet.css"));
 
 // 3) फ़ॉन्ट (देवनागरी + अंग्रेज़ी)
 const fontCss = [];

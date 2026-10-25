@@ -362,6 +362,23 @@ main{padding-block:10px 120px}
 .settle-sum{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}.settle-sum b{font-size:24px}
 .creq{margin-top:12px;border:1.5px dashed var(--chili);border-radius:12px;padding:8px 12px}.creq summary{font-weight:800;color:var(--chili);cursor:pointer}
 .creq-row{display:grid;gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}.creq-row>div:first-child{display:grid;gap:2px}
+/* v22 रूट, ग्राहक, बिल भेजना, नया सामान */
+.locbar{display:block;width:100%;border:0;background:#b91c1c;color:#fff;font-weight:800;font-size:14px;line-height:1.3;padding:10px 12px;text-align:center;border-radius:12px;margin-bottom:8px;animation:lbp 1.6s ease-in-out infinite}
+@keyframes lbp{50%{background:#dc2626}}@media (prefers-reduced-motion:reduce){.locbar{animation:none}}
+#shbox{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center}#shbox[hidden]{display:none}
+.shb-scrim{position:absolute;inset:0;background:rgba(5,15,9,.55)}
+.shb{position:relative;width:100%;max-width:520px;background:var(--surface);color:var(--ink);border-radius:24px 24px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 30px rgba(0,0,0,.25);animation:up .2s ease-out}
+.shb h3{margin:0 0 2px;font-size:20px}
+.card.addnew{border:2px dashed var(--leaf);background:transparent}.card.addnew .tile{display:flex;align-items:center;justify-content:center;background:var(--bg)}.card.addnew .em{font-size:30px}
+.ragg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 0}.ragg .big{padding:10px 4px}
+.rmap{position:relative;z-index:0;isolation:isolate;height:330px;border-radius:16px;overflow:hidden;margin:0 0 12px;background:var(--bg);box-shadow:var(--shadow)}
+.rlive .livep{display:flex;align-items:center;gap:10px;padding:6px 0}.rlive .mid{flex:1;display:grid}.rlive .mid span{font-size:13px;color:var(--muted)}
+.rstop{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.rs-t{display:grid;text-align:center;background:var(--bg);border-radius:10px;padding:4px}.rs-t b{font-size:14px}.rs-t span{font-size:11px;color:var(--muted)}
+.rs-m{display:grid;min-width:0}.rs-m b{font-size:15px}
+.rins{background:var(--bg);border-radius:10px;padding:8px 10px;margin:6px 0;font-size:14px}.rins.good{background:#e7f6ec;color:#14532d}.rins.bad{background:#fff3e0;color:#7c2d12}
+.rtable{overflow-x:auto;margin-top:8px}.rtable table{width:100%;border-collapse:collapse;font-size:13px}.rtable th{font-size:11px;color:var(--muted);text-align:left;padding:4px}.rtable td{padding:6px 4px;border-top:1px solid var(--line)}.rtable .r{text-align:right;white-space:nowrap}
+.audcard{border:2px solid #7c3aed;background:linear-gradient(135deg,rgba(124,58,237,.08),transparent)}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -444,6 +461,7 @@ a.big[aria-disabled="true"]{opacity:.45}
   <section id="p-set" hidden></section>
   <section id="p-kharid" hidden></section>
   <section id="p-label" hidden></section>
+  <section id="p-route" hidden></section>
 </main>
 
 <div class="cartbar px" id="cartbar" hidden>
@@ -536,15 +554,15 @@ $("#btabs").onclick=e=>{
 };
 
 /* ---------- tabs ---------- */
-function tabsList(){const t=[["bill","बिलिंग"],["kharid","खरीद"],["udhar","उधार खाता"],["bills","आज के बिल"],["day","दिन का हिसाब"]];t.push(["label","लेबल"]);const _cr=(S.cancelReqs||[]).length;if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()+_cr?" 🔴"+(guardOpen()+_cr):"")],["set","रेट व सेटिंग"]);return t}
+function tabsList(){const t=[["bill","बिलिंग"],["kharid","खरीद"],["udhar","उधार खाता"],["bills","आज के बिल"],["day","दिन का हिसाब"]];t.push(["label","लेबल"]);if(S.isOwner)t.push(["route","रूट"]);const _cr=(S.cancelReqs||[]).length;if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()+_cr?" 🔴"+(guardOpen()+_cr):"")],["set","रेट व सेटिंग"]);return t}
 function renderTabs(){
-  const TI={bill:"🧾",kharid:"🛒",udhar:"📒",bills:"📋",day:"🌙",label:"🏷️",report:"📈",set:"⚙️"};$("#tabs").innerHTML=tabsList().map(([k,v])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}"><span class="ti">${TI[k]||""}</span> ${v}</button>`).join("");{const a=$("#tabs [aria-selected=\"true\"]");if(a&&a.scrollIntoView)try{a.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}}
+  const TI={bill:"🧾",kharid:"🛒",udhar:"📒",bills:"📋",day:"🌙",label:"🏷️",route:"📍",report:"📈",set:"⚙️"};$("#tabs").innerHTML=tabsList().map(([k,v])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}"><span class="ti">${TI[k]||""}</span> ${v}</button>`).join("");{const a=$("#tabs [aria-selected=\"true\"]");if(a&&a.scrollIntoView)try{a.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}}
   $("#who").textContent="👤 "+(biller()||"नाम डालें");
 }
 $("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(!b)return;S.tab=b.dataset.tab;showTab()};
 function showTab(){
   renderTabs();
-  ["bill","udhar","bills","day","report","set","kharid","label"].forEach(k=>$("#p-"+k).hidden=S.tab!==k);$("#sbar").hidden=S.tab==="kharid"||S.tab==="label";
+  ["bill","udhar","bills","day","report","set","kharid","label","route"].forEach(k=>$("#p-"+k).hidden=S.tab!==k);$("#sbar").hidden=S.tab==="kharid"||S.tab==="label"||S.tab==="route";
   if(S.tab!=="day")S.scanIn=false;
   renderPane(true);renderCart();renderBillTabs();window.scrollTo(0,0);
 }
@@ -556,6 +574,7 @@ function renderPane(force){
   else if(S.tab==="report")renderReport();
   else if(S.tab==="kharid"){if(window.SF)SF.renderKharid()}
   else if(S.tab==="label"){if(window.SF)SF.renderLabel()}
+  else if(S.tab==="route"){if(window.SR)SR.renderRoute()}
   else if(S.tab==="set"){const p=$("#p-set");if(force||!p.contains(document.activeElement))renderSettings()}
 }
 
@@ -594,14 +613,15 @@ function renderBill(){
   $("#grid").classList.toggle("rows",S.view==="list");
   const q=bl.q,list=bl.list;
   if(!S.items.length){$("#grid").innerHTML=`<div class="empty" style="grid-column:1/-1"><b>सब्ज़ियों की लिस्ट अभी खाली है</b>मालिक "रेट व सेटिंग" में जाकर सब्ज़ी और उनके रेट डालें, फिर यहाँ फोटो वाले कार्ड दिखेंगे।</div>`;return}
-  if(!list.length){$("#grid").innerHTML=`<div class="empty" style="grid-column:1/-1"><b>"${esc(q)}" नहीं मिली</b>दूसरा नाम लिखकर देखें।</div>`;return}
+  if(!list.length){$("#grid").innerHTML=`<div class="empty" style="grid-column:1/-1"><b>"${esc(q)}" नहीं मिली</b>दूसरा नाम लिखकर देखें।</div>`+(window.SR?SR.addCardHTML(q):"");return}
   $("#grid").innerHTML=list.map(it=>{
     const p=priceOf(it);const inCart=S.cart.filter(l=>l.id===it.id).reduce((a,l)=>a+l.qty,0);
     const left=stockLeft(it.id);
     return `<button class="card ${p>0?"":"off"}" data-item="${esc(it.id)}">${tileHTML(it)}${left!=null?`<span class="stk ${left<=0.5?"low":""}">${left<=0?"खत्म":"बचा "+fq(left,it.unit)}</span>`:""}${inCart?`<span class="badge">${fq(inCart,it.unit)}</span>`:""}<span class="nm">${esc(it.name)}${SN.en(it)?`<small class="en">${esc(SN.en(it))}</small>`:""}</span><span class="pr">${p>0?`<b>${rs(p)}</b>/${UNITS[it.unit]||it.unit}`:"रेट बाकी"}</span></button>`;
-  }).join("");
+  }).join("")+(window.SR?SR.addCardHTML():"");
 }
 $("#p-bill").addEventListener("click",e=>{
+  const ni=e.target.closest("[data-newitem]");if(ni&&window.SR){SR.newItemSheet(ni.dataset.newitem);return}
   const m=e.target.closest("[data-mode]");if(m){setMode(m.dataset.mode);return}
   const c=e.target.closest("[data-cat]");if(c){S.cat=c.dataset.cat;renderBill();return}
   if(e.target.closest("[data-sorttop]")){S.sortTop=!S.sortTop;lsSet("se_sort",S.sortTop?"1":"0");toast(S.sortTop?"पिछले 14 दिन में सबसे ज़्यादा बिकी सब्ज़ियाँ ऊपर":"सब्ज़ियाँ पुराने क्रम में");renderBill();return}
@@ -639,7 +659,7 @@ function restoreHeld(i){
 $("#q").addEventListener("input",e=>{S.q=e.target.value;renderBill()});
 $("#q").addEventListener("focus",()=>{if(S.tab!=="bill"){S.tab="bill";showTab()}window.scrollTo(0,0)});
 $("#q").addEventListener("keydown",e=>{if(e.key!=="Enter"||e.defaultPrevented)return;const bl=billList();if(bl.list.length!==1)return;e.preventDefault();const x=bl.list[0];if(!(priceOf(x)>0)){toast("इसका रेट नहीं डाला गया");return}if(bl.qq>0)quickAdd(x,bl.qq);else{clearSearch();renderBill();openQty(x)}});
-function quickAdd(it,q){
+function quickAdd(it,q){if(it&&it.id==="xyz"&&window.SR)return SR.xyzSheet(q);
   const p=priceOf(it);if(!(p>0))return;
   const ex=S.cart.find(l=>l.id===it.id&&!l.changed&&!l.free);
   if(ex){ex.qty=Math.round((ex.qty+q)*1000)/1000;ex.amt=r2(ex.qty*ex.rate)}
@@ -654,7 +674,7 @@ function setMode(m){
 
 /* ---------- quantity sheet ---------- */
 function presets(it){if(it.unit==="kg")return [[.1,"0.1"],[.25,"¼ · 0.25"],[.5,"½ · 0.5"],[1,"1 किलो"],[1.5,"1.5 किलो"],[2,"2 किलो"],[3,"3 किलो"],[5,"5 किलो"]];return [1,2,3,4,5,6,10,12].map(n=>[n,n+" "+(UNITS[it.unit]||"")])}
-function openQty(it,lineIdx){
+function openQty(it,lineIdx){if(it&&it.id==="xyz"&&window.SR)return SR.xyzSheet(null,lineIdx);
   const ln=lineIdx!=null?S.cart[lineIdx]:null,kg=it.unit==="kg",u=UNITS[it.unit]||it.unit;
   const board=priceOf(it);let rate=ln&&it.flex?ln.rate:board;const st={qty:ln?ln.qty:0};
   const hd=$("header").getBoundingClientRect(),top=Math.max(8,Math.round(hd.bottom)+6);
@@ -776,13 +796,13 @@ async function saveBill(){
   if(c.pay==="cash")pay.cash=tot;else if(c.pay==="upi")pay.upi=tot;else if(c.pay==="udhar")pay.udhar=tot;
   else if(c.pay==="split"){const cp=Math.min(tot,parseFloat(c.cashPart)||0);pay.cash=cp;pay.udhar=r2(tot-cp)}
   const now=Date.now(),date=today();
-  const lines=S.cart.map(l=>({id:l.id,name:l.name,emoji:l.emoji||"",unit:l.unit,qty:l.qty,rate:l.rate,board:l.board,cost:l.cost,amt:l.amt,changed:!!l.changed,free:!!l.free}));
+  const lines=S.cart.map(l=>({id:l.id,name:l.name,emoji:l.emoji||"",unit:l.unit,qty:l.qty,rate:l.rate,board:l.board,cost:l.cost,amt:l.amt,changed:!!l.changed,free:!!l.free,...(l.note?{note:l.note}:{})}));
   const cph=S.mode==="walk"?S.cust.phone:"",cnm=S.mode==="walk"?S.cust.name:"";
   const cost=r2(lines.reduce((a,l)=>a+l.cost*l.qty,0));
   if(c.no==="…"&&window.SF)c.no=await SF.reserveBillNo();
   const bill={no:c.no,ts:now,date,by:S.uid||"",byName:biller(),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:S.mode==="udhar"?(party?.name||""):S.mode==="inst"?S.inst:(cnm||"VIP ग्राहक"),custPhone:cph,custName:cnm,
     lines,sub:cartTotal(),disc:+c.disc||0,total:S.mode==="inst"?cartTotal():tot,pay,payMode:c.pay,cost,
-    rateChanged:lines.some(l=>l.changed),cancelled:false};
+    rateChanged:lines.some(l=>l.changed),cancelled:false};if(window.SR)SR.stamp(bill);
   S.saving=true;drawCheckout();
   if(S.demo){S.dayBills=[bill,...S.dayBills];if(pay.udhar>0)S.ledger.push({id:c.no,ts:now,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:pay.udhar,billNo:c.no,byName:biller()});await adjStock(trackedPairs(lines,-1),"बिल "+c.no);S.saving=false;closeCurTab();refreshAfterCart();showReceipt(bill,true);return}
   const item={bill,done:{}};let offline=false;
@@ -795,7 +815,7 @@ async function saveBill(){
     if(pay.udhar>0)S.ledger.push({id:c.no,ts:now,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:pay.udhar,billNo:c.no,byName:biller()});
     if(!S.dayBills.find(x=>x.no===bill.no))S.dayBills=[bill,...S.dayBills];
   }
-  S.saving=false;closeCurTab();refreshAfterCart();showReceipt(bill,true,offline);netbar();beat();
+  if(window.SR&&bill.custPhone)SR.custHist(bill,bill.custPhone);S.saving=false;closeCurTab();refreshAfterCart();showReceipt(bill,true,offline);netbar();beat();
 }
 function receiptText(b){
   b={...b,pay:b.pay||{}};
@@ -1163,7 +1183,7 @@ function guardHTML(){
 /* ---------- day: stock, kharch, cash tally ---------- */
 function stockRows(){
   const st=S.stock.items||{};
-  return S.items.filter(i=>!i.track&&(i.active!==false||st[i.id])).map(it=>{
+  return S.items.filter(i=>!i.track&&!i.virtual&&(i.active!==false||st[i.id])).map(it=>{
     const o=st[it.id]||{},open=+o.open||0,amt=+o.amt||0,waste=+o.waste||0,hasClose=o.close!==undefined&&o.close!=="";
     const close=hasClose?+o.close:null,sold=soldQty(it.id);
     const short=hasClose&&open>0?r2((open-waste-sold-close)*1000)/1000:null;
@@ -1273,7 +1293,7 @@ function renderReport(){
   const topC=[...S.customers].sort((a,b)=>(b.spent||0)-(a.spent||0)).slice(0,5);
   const waText=`*सब्ज़ी एक्सप्रेस · ${fdate(date)}*\nबिक्री: ${rs(salesTot)} (${sale.length} बिल)\nनकद ${rs(cash)} · UPI ${rs(upi)} · उधार ${rs(ud)}\nवसूली: ${rs(jc+ju)}\nखर्चा: ${rs(cc.khAll)}\nमुनाफ़ा (खर्चे के बाद): ${rs(net)}\nगल्ला: ${cc.diff==null?"गिना नहीं":Math.abs(cc.diff)<=5?"पूरा मिला":rs(cc.diff)}\nमाल में कमी: ${rs(shortTot)}\nरेट बदले/छूट: ${flags.length} बिल`;
   const rows=Object.values(items).sort((a,b)=>b.amt-a.amt);
-  $("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
+  $("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
   <button class="big ghost" data-a4 style="margin-bottom:10px">🖨️ A4 रिपोर्ट प्रिंट / PDF</button>
   ${window.SF?SF.chartsHTML():""}
   <div class="kpis">
@@ -1355,7 +1375,7 @@ function renderSettings(){
   ${window.SF?SF.labelSettingsHTML():""}
   <div class="card2"><h3>📦 पुराने ऐप का डेटा</h3><p class="note" style="margin:0">पुराने (आर्टिफ़ैक्ट) ऐप की सब्ज़ियाँ, भाव, खरीद इतिहास, उधार खाते और संस्थाएँ यहाँ लाएँ। जो पहले से है वह नहीं बदलेगा।</p><button class="big ghost" data-migrate>पुराना डेटा लाएँ</button></div>
   <h3 style="margin:0 0 4px">सब्ज़ियाँ और रेट</h3><p class="note" style="margin:0 0 8px">बिक्री रेट = ग्राहक का रेट · खरीद रेट = मंडी का रेट (संस्था इसी पर लेगी)। फोटो बदलने के लिए फोटो पर टैप करें। ${(()=>{const n=S.items.filter(i=>!i.photo).length;return n?`<b style="color:var(--chili)">${n} सब्ज़ियों की असली फोटो अभी बाकी है।</b> अच्छी रोशनी में ऊपर से फोटो खींचकर लगाएँ।`:'<b style="color:var(--leaf)">सबकी फोटो लग चुकी है।</b>'})()}</p>
-  <div class="list">${S.items.map(it=>`<div class="setitem" data-sid="${esc(it.id)}">
+  <div class="list">${S.items.filter(i=>!i.virtual).map(it=>`<div class="setitem" data-sid="${esc(it.id)}">
     <button class="tile" data-photo="${esc(it.id)}" style="--h:${+(it.hue??120)}" aria-label="${esc(it.name)} की फोटो बदलें">${SE.photoSrc(it)?`<img src="${esc(SE.photoSrc(it))}" alt="">`:`<span class="em">${esc(it.emoji||"🥬")}</span>`}</button>
     <div style="min-width:0"><div class="flds">
       <label class="fld">नाम<input class="inp" id="n-${esc(it.id)}" data-if="name" value="${esc(it.name)}"></label>
@@ -1490,7 +1510,7 @@ async function boot(){
   if(S.isOwner)db.collection("staff").onSnapshot(s=>{S.staffDocs=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="set"&&!$("#p-set").contains(document.activeElement))renderSettings()},()=>{});
   setTimeout(()=>SE.checkUpdate(toast),4000);
   const sortItems=a=>a.sort((x,y)=>(x.order??999)-(y.order??999)||x.name.localeCompare(y.name,"hi"));
-  db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(S.isOwner&&window.SF&&S.items.some(i=>!i.plu))SF.ensurePLU();S.cart.forEach(l=>{const it=item(l.id);if(it&&!l.changed&&!l.free){l.board=priceOf(it);l.rate=l.board;l.cost=+it.cost||0;l.amt=r2(l.qty*l.rate)}});renderPane();renderCart()},()=>toast("सब्ज़ी लिस्ट लोड नहीं हुई"));
+  db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(window.SR)SR.addVirtual();if(S.isOwner&&window.SF&&S.items.some(i=>!i.plu))SF.ensurePLU();S.cart.forEach(l=>{const it=item(l.id);if(it&&!l.changed&&!l.free){l.board=priceOf(it);l.rate=l.board;l.cost=+it.cost||0;l.amt=r2(l.qty*l.rate)}});renderPane();renderCart()},()=>toast("सब्ज़ी लिस्ट लोड नहीं हुई"));
   db.doc("settings/main").onSnapshot(s=>{S.settings=s.exists?s.data():{};checkLock();if(S.tab!=="set")renderPane()});
   if(S.isOwner)db.collection("presence").onSnapshot(s=>{S.presence=s.docs.map(d=>d.data());if(S.tab==="bills")renderBills()},()=>{});
   setTimeout(()=>{flushOutbox();beat();netbar()},1500);
@@ -1515,5 +1535,6 @@ async function loadTop7(){
 boot();
 </script>
 <script src="se-features.js"></script>
+<script src="se-route.js"></script>
 
 </body></html>

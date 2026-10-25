@@ -12,7 +12,7 @@ function docRef(full){const p=full.split("/");const id=p.pop();const cp=p.join("
  delete:async()=>{delete coll(cp)[id];notify()},
  onSnapshot:(fn)=>{const s=()=>fn(snapDoc(cp,id));subs.push(s);setTimeout(s,5);return ()=>{}}}}
 const OPS={"==":(a,b)=>a===b,">=":(a,b)=>a>=b,"<=":(a,b)=>a<=b,">":(a,b)=>a>b,"<":(a,b)=>a<b};
-function q(path,filt){const ok=id=>!filt||OPS[filt[1]]((D[path][id]||{})[filt[0]],filt[2]);const o={where:(f,op,v)=>q(path,[f,op,v]),orderBy:()=>o,limit:()=>o,doc:id=>docRef(path+"/"+id),
+function q(path,filt){const ok=id=>!filt||OPS[filt[1]]((D[path][id]||{})[filt[0]],filt[2]);const o={where:(f,op,v)=>q(path,[f,op,v]),orderBy:()=>o,limit:()=>o,doc:id=>docRef(path+"/"+id),add:async d=>{const id="a"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);await docRef(path+"/"+id).set(d);return docRef(path+"/"+id)},
  get:async()=>({docs:Object.keys(D[path]||{}).filter(ok).map(id=>snapDoc(path,id))}),
  onSnapshot:(fn)=>{const s=()=>fn({docs:Object.keys(D[path]||{}).filter(ok).map(id=>snapDoc(path,id))});subs.push(s);setTimeout(s,5);return ()=>{}}};return o}
 const db={collection:q,doc:docRef,settings(){},enablePersistence:async()=>{},runTransaction:async fn=>fn({get:r=>r.get(),set:(r,d,o)=>r.set(d,o),update:(r,d)=>r.update(d)})};

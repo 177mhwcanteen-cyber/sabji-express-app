@@ -45,7 +45,11 @@ import java.util.UUID;
  */
 @CapacitorPlugin(
     name = "BtPrinter",
-    permissions = { @Permission(alias = "bt", strings = { Manifest.permission.BLUETOOTH_CONNECT }) }
+    permissions = {
+        @Permission(alias = "bt", strings = { Manifest.permission.BLUETOOTH_CONNECT }),
+        @Permission(alias = "loc", strings = { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }),
+        @Permission(alias = "notif", strings = { Manifest.permission.POST_NOTIFICATIONS })
+    }
 )
 public class BtPrinterPlugin extends Plugin {
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
@@ -225,5 +229,116 @@ public class BtPrinterPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("शेयर नहीं हुआ: " + e.getMessage());
         }
+    }
+
+    /* ================= 📍 गाड़ी की लोकेशन ================= */
+    private boolean locOk() { return getPermissionState("loc") == PermissionState.GRANTED; }
+
+    private boolean gpsOn() {
+        android.location.LocationManager lm = (android.location.LocationManager) getContext().getSystemService(Context.LOCATION_SERVICE);
+        if (lm == null) return false;
+        try { return lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER); } catch (Exception e) { return false; }
+    }
+
+    private JSObject trackState() {
+        JSObject o = new JSObject();
+        o.put("perm", locOk());
+        o.put("gps", gpsOn());
+        o.put("running", TrackService.running);
+        o.put("lastFix", TrackService.lastFix);
+        return o;
+    }
+
+    @PluginMethod
+    public void trackStatus(PluginCall call) { call.resolve(trackState()); }
+
+    @PluginMethod
+    public void trackStart(PluginCall call) {
+        if (!locOk()) { requestPermissionForAlias("loc", call, "afterLoc"); return; }
+        startTrack(call);
+    }
+
+    @PermissionCallback
+    private void afterLoc(PluginCall call) {
+        if (!locOk()) { call.resolve(trackState()); return; }
+        if (Build.VERSION.SDK_INT >= 33 && getPermissionState("notif") != PermissionState.GRANTED) {
+            requestPermissionForAlias("notif", call, "afterNotif");
+            return;
+        }
+        startTrack(call);
+    }
+
+    @PermissionCallback
+    private void afterNotif(PluginCall call) { startTrack(call); }
+
+    private void startTrack(PluginCall call) {
+        try {
+            Intent it = new Intent(getContext(), TrackService.class);
+            it.putExtra("name", call.getString("name", ""));
+            androidx.core.content.ContextCompat.startForegroundService(getContext(), it);
+        } catch (Exception e) {
+            JSObject o = trackState();
+            o.put("error", String.valueOf(e.getMessage()));
+            call.resolve(o);
+            return;
+        }
+        call.resolve(trackState());
+    }
+
+    @PluginMethod
+    public void trackStop(PluginCall call) {
+        try { getContext().stopService(new Intent(getContext(), TrackService.class)); } catch (Exception ignore) { }
+        call.resolve(trackState());
+    }
+
+    @PluginMethod
+    public void trackDrain(PluginCall call) {
+        JSObject o = trackState();
+        o.put("data", TrackService.drain(getContext()));
+        call.resolve(o);
+    }
+
+    @PluginMethod
+    public void openLocationSettings(PluginCall call) {
+        try {
+            Intent it = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(it);
+        } catch (Exception ignore) { }
+        call.resolve();
+    }
+
+    /* ✉️ SMS ऐप खोलकर संदेश तैयार */
+    @PluginMethod
+    public void sms(PluginCall call) {
+        try {
+            Intent it = new Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:" + call.getString("phone", "")));
+            it.putExtra("sms_body", call.getString("text", ""));
+            getActivity().startActivity(it);
+            call.resolve();
+        } catch (Exception e) { call.reject("SMS नहीं खुला: " + e.getMessage()); }
+    }
+
+    /* टेक्स्ट फाइल (AI ऑडिट पैक) बनाकर भेजना/सेव करना */
+    @PluginMethod
+    public void shareText(PluginCall call) {
+        try {
+            String name = call.getString("name", "report").replaceAll("[^A-Za-z0-9_.-]", "_");
+            File dir = new File(getContext().getCacheDir(), "share");
+            dir.mkdirs();
+            File f = new File(dir, name);
+            FileOutputStream os = new FileOutputStream(f);
+            os.write(call.getString("text", "").getBytes("UTF-8"));
+            os.close();
+            Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
+            Intent it = new Intent(Intent.ACTION_SEND);
+            it.setType(call.getString("mime", "text/plain"));
+            it.putExtra(Intent.EXTRA_STREAM, uri);
+            it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent ch = Intent.createChooser(it, "फाइल भेजें / सेव करें");
+            ch.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            getActivity().startActivity(ch);
+            call.resolve();
+        } catch (Exception e) { call.reject("फाइल नहीं बनी: " + e.getMessage()); }
     }
 }

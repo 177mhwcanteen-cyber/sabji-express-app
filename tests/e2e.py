@@ -16,7 +16,7 @@ errs = []
 UPLOADS = []
 
 async def page(b, mock, users, cfg=True):
-    ctx = await b.new_context(viewport={"width": 400, "height": 860}, service_workers="block")
+    ctx = await b.new_context(viewport={"width": 400, "height": 860}, service_workers="block", geolocation={"latitude": 25.7712, "longitude": 71.3521, "accuracy": 12}, permissions=["geolocation", "clipboard-read", "clipboard-write"])
     pg = await ctx.new_page()
     pg.on("pageerror", lambda e: errs.append("pageerror: " + str(e)))
     pg.on("console", lambda m: m.type == "error" and errs.append("console: " + m.text))
@@ -27,6 +27,7 @@ async def page(b, mock, users, cfg=True):
         UPLOADS.append(len(r.request.post_data or ""))
         await r.fulfill(body='{"ok":true,"id":"f%d","url":"https://drive.google.com/file/d/f%d"}' % (len(UPLOADS), len(UPLOADS)), content_type="application/json")
     await pg.route("**/fake-upload", up)
+    await pg.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(body=b"", status=204))
     await pg.goto(URL)
     return pg
 
@@ -96,7 +97,10 @@ async def main():
         import base64; open(f"{SHOTS}/rcpt-canvas.png","wb").write(base64.b64decode(rc.split(",")[1]))
         txt = await pg.evaluate("receiptText(window.__tb)"); assert "VIP" in txt and "95095 53600" in txt and "Potato" in txt and "सेहत" in txt, txt; print(txt)
         errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
-        await pg.wait_for_timeout(600); await pg.click("[data-ckshare]"); await pg.wait_for_timeout(1500)
+        await pg.wait_for_timeout(600); await pg.click("[data-ckshare]"); await pg.wait_for_selector("#shPh")
+        await pg.screenshot(path=f"{SHOTS}/14-share-ask.png")
+        await pg.fill("#shPh", "+91 98290 12345"); await pg.click("[data-shwa]"); await pg.wait_for_timeout(1500)
+        assert await pg.evaluate("S.cust.phone") == "9829012345", "phone not kept"
         tst = await pg.evaluate("(document.querySelector('.toast')||{}).innerText||''")
         assert "नहीं हुआ" not in tst and not errs, ("share before settle", tst, errs)
         print("share before settle ok:", tst[:60])
@@ -107,6 +111,15 @@ async def main():
         bills = await pg.evaluate("Object.values(window.__MOCK__).length&&Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).map(([k,v])=>Object.values(v))")
         flat = [x for arr in bills for x in arr]
         assert flat and flat[0]["byName"] == "कमल भाई" and flat[0]["by"] == kamal[0], flat[:1]
+        assert flat[0].get("custPhone") == "9829012345", flat[0].get("custPhone")
+        assert flat[0].get("loc") and abs(flat[0]["loc"]["lat"] - 25.7712) < 0.001, ("no location on bill", flat[0].get("loc"))
+        hist = await pg.evaluate("Object.keys(window.__MOCK__['customers/9829012345/hist']||{})")
+        assert hist == [flat[0]["no"]], ("customer history", hist)
+        await pg.evaluate("SR.tick()"); await pg.wait_for_timeout(800)
+        trk = await pg.evaluate("Object.values(window.__MOCK__.trk||{})"); live = await pg.evaluate("window.__MOCK__.live||{}")
+        assert trk and trk[0]["uid"] == kamal[0] and trk[0]["pts"], ("trk", trk)
+        assert kamal[0] in live and live[kamal[0]]["lat"], ("live", live)
+        print("location ok: bill loc", flat[0]["loc"], "trk pts", len(trk[0]["pts"]), "hist", hist)
         print("bill total", flat[0]["total"], "lines", [(l["name"], l["qty"], l["amt"]) for l in flat[0]["lines"]])
         await pg.click("[data-print]"); await pg.wait_for_timeout(1500)
         printed = await pg.evaluate("[...document.querySelectorAll('iframe')].length")
@@ -117,6 +130,28 @@ async def main():
         await pg.wait_for_timeout(300)
         await pg.locator("#rc").screenshot(path=f"{SHOTS}/6-thermal-receipt.png")
         await pg.evaluate("document.getElementById('rc').remove();closeSheet()")
+        # ---- 🅧 XYZ + ➕ नया सामान ----
+        await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(300)
+        await pg.click('#grid [data-item="xyz"]'); await pg.wait_for_selector("#xyAmt")
+        await pg.fill("#xyAmt", "50"); await pg.click("[data-xysave]"); await pg.wait_for_timeout(200)
+        assert await pg.evaluate("S.cart.length") == 0, "XYZ without note must be refused"
+        await pg.fill("#xyNote", "थैली"); await pg.click("[data-xysave]"); await pg.wait_for_timeout(200)
+        assert await pg.evaluate("S.cart.map(l=>[l.id,l.qty,l.rate,l.note])") == [["xyz", 50, 1, "थैली"]]
+        await pg.click('#grid [data-newitem]'); await pg.wait_for_selector("#niName")
+        await pg.fill("#niName", "शकरकंद"); await pg.fill("#niEn", "Sweet Potato"); await pg.fill("#niRate", "40")
+        await pg.screenshot(path=f"{SHOTS}/15-new-item.png")
+        await pg.click("[data-nisave]"); await pg.wait_for_timeout(600)
+        ni = [v for v in (await pg.evaluate("Object.values(window.__MOCK__.items)")) if v["name"] == "शकरकंद"]
+        assert ni and ni[0]["pending"] and ni[0]["addedByName"] == "कमल भाई" and ni[0]["sale"] == 40, ni
+        await pg.fill("#qIn", "2"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
+        await pg.click("#cartbtn"); await pg.wait_for_timeout(500)
+        await pg.click("[data-settle]"); await pg.wait_for_timeout(200)
+        await pg.click('[data-pay="upi"]') if await pg.query_selector('[data-pay="upi"]') else None
+        await pg.click("[data-save]"); await pg.wait_for_timeout(1200)
+        xb = [b for b in (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")) if any(l["id"] == "xyz" for l in b["lines"])]
+        assert xb and [l for l in xb[0]["lines"] if l["id"] == "xyz"][0]["note"] == "थैली" and xb[0]["total"] == 130, xb
+        print("xyz + new item bill", xb[0]["no"], xb[0]["total"])
+        await pg.evaluate("closeSheet()")
         # ---- खरीद (मंडी) ----
         await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
         await pg.fill("#nsName", "पवन सब्ज़ी भंडार"); await pg.fill("#nsPhone", "98290 11111"); await pg.click("[data-nsadd]"); await pg.wait_for_timeout(200)
@@ -148,6 +183,8 @@ async def main():
         await pg.locator(".lprev canvas").screenshot(path=f"{SHOTS}/10-label-sabzi.png")
         code = await pg.evaluate("SF.vwCode(item('tamatar').plu,'fix',0)")
         await pg.evaluate(f"handleScan('{code}')"); await pg.wait_for_timeout(300)
+        if not await pg.query_selector("#qIn"):
+            await pg.screenshot(path=f"{SHOTS}/dbg-scan.png"); print("DBG", code, await pg.evaluate("[S.tab,S.mode,!!SF.parseVW('%s'),JSON.stringify(SF.parseVW('%s')&&{k:SF.parseVW('%s').kind,id:SF.parseVW('%s').it&&SF.parseVW('%s').it.id}),document.querySelector('.toast')&&document.querySelector('.toast').innerText]" % (code,code,code,code,code)))
         await pg.fill("#qIn", "0.5"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
         cart = await pg.evaluate("S.cart.map(l=>[l.id,l.qty,l.amt])")
         assert ["tamatar", 0.5, 15] in cart, (code, cart)
@@ -191,8 +228,42 @@ async def main():
         await pg.screenshot(path=f"{SHOTS}/12-owner-day.png", full_page=True)
         txt = await pg.inner_text("#p-day")
         assert "असली मुनाफ़ा" in txt, txt[:300]
+        # 🤖 AI ऑडिट पैक
+        assert await pg.is_visible("[data-audcopy]")
+        pack = await pg.evaluate("SF.auditPack()")
+        open(f"{SHOTS}/audit-pack.txt", "w", encoding="utf8").write(pack)
+        assert "AI के लिए हिदायत" in pack and "माल का मिलान" in pack and "XYZ" in pack and "थैली" in pack and "शकरकंद" in pack, pack[:400]
+        await pg.click("[data-audcopy]"); await pg.wait_for_timeout(1200)
+        clip = await pg.evaluate("navigator.clipboard.readText()")
+        assert "ऑडिट पैक" in clip, clip[:100]
+        print("audit pack chars", len(pack))
+        # 📍 रूट: नकली 20 मिनट का पड़ाव + लाइव
+        await pg.evaluate("""(()=>{const d=today();const t0=new Date(d+'T09:00:00').getTime();const pts=[];
+          for(let i=0;i<25;i++)pts.push((t0+i*60000)+',25.771'+(i%3)+',71.3521,10');
+          for(let i=0;i<10;i++)pts.push((t0+(26+i)*60000)+','+(25.771+(i+1)*0.002).toFixed(6)+',71.36,10');
+          pts.push((t0+40*60000)+',OFF');pts.push((t0+55*60000)+',ON');
+          const uid=Object.entries(window.__MOCK__.staff).find(([k,v])=>v.phone==='9876543210')[0];
+          window.__MOCK__.trk=window.__MOCK__.trk||{};window.__MOCK__.trk[d+'_'+uid+'_09']={uid,name:'कमल भाई',date:d,hr:9,pts};
+          const B=window.__MOCK__['days/'+d+'/bills'];Object.values(B).forEach((b,i)=>{b.ts=t0+(5+i*3)*60000});S.dayBills.forEach((b,i)=>{b.ts=t0+(5+i*3)*60000})})()""")
+        await pg.click('[data-tab="route"]'); await pg.wait_for_timeout(2500)
+        stops = await pg.eval_on_selector_all("#p-route .rstop", "e=>e.map(x=>x.innerText)")
+        assert stops and "बिल" in stops[0] and "0 बिल" not in stops[0], stops
+        rtxt = await pg.inner_text("#p-route")
+        assert "लोकेशन में रुकावट" in rtxt and "कमल भाई" in rtxt, rtxt[:500]
+        await pg.click('#p-route [data-rname="0"]'); await pg.wait_for_selector("#plName")
+        await pg.fill("#plName", "सरल लाइन"); await pg.click("[data-plsave]"); await pg.wait_for_timeout(800)
+        assert any(p["name"] == "सरल लाइन" for p in (await pg.evaluate("Object.values(window.__MOCK__.places||{})")))
+        await pg.click('#p-route [data-ragg="7"]'); await pg.wait_for_timeout(1500)
+        agg = await pg.inner_text("#rAgg")
+        assert "सरल लाइन" in agg, agg[:400]
+        assert "9829012345" in await pg.inner_text("#rcl")
+        await pg.screenshot(path=f"{SHOTS}/16-route.png", full_page=True)
+        print("route stops", len(stops), "|", stops[0].replace("\n", " ")[:80])
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f"{SHOTS}/7-owner-report.png")
+        assert await pg.is_visible("[data-npok]"), "pending new item card missing"
+        await pg.click("[data-npok]"); await pg.wait_for_timeout(500)
+        assert not [v for v in (await pg.evaluate("Object.values(window.__MOCK__.items)")) if v.get("pending")], "approve failed"
         await pg.click('[data-crok]'); await pg.click('[data-crok]'); await pg.wait_for_timeout(800)
         cancelled = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).filter(b=>b.cancelled).length")
         assert cancelled == 1, cancelled
