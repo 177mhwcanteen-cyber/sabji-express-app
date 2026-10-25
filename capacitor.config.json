@@ -1,0 +1,19 @@
+{
+  "appId": "in.sabjiexpress.billing",
+  "appName": "सब्ज़ी एक्सप्रेस",
+  "webDir": "www",
+  "android": { "allowMixedContent": false, "captureInput": true },
+  "server": { "androidScheme": "https" },
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "appReadyTimeout": 15000,
+      "autoDeleteFailed": true,
+      "autoDeletePrevious": true,
+      "resetWhenUpdate": true,
+      "statsUrl": "",
+      "updateUrl": "",
+      "channelUrl": ""
+    }
+  }
+}

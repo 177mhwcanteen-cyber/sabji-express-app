@@ -1,0 +1,64 @@
+rules_version = '2';
+// सब्ज़ी एक्सप्रेस — सर्वर के पक्के नियम
+// • रेट, सब्ज़ी, सेटिंग, कर्मचारी: सिर्फ़ मालिक (विक्रम जी) बदल सकते हैं
+// • बिल, उधार, स्टॉक का इतिहास: कर्मचारी सिर्फ़ नया जोड़ सकते हैं — मिटा या बदल नहीं सकते
+// • कोई भी बिल कभी नहीं मिटता (रद्द होने पर भी निशान रहता है)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner() {
+      return signedIn()
+        && request.auth.token.email == 'vikram7charan@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+    function active() {
+      return isOwner() || (signedIn()
+        && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+        && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.active == true);
+    }
+    function onlyKeys(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    function noChange() { return request.resource.data.diff(resource.data).affectedKeys().size() == 0; }
+
+    // लॉगिन से पहले सिर्फ़ यह पता चलता है कि नंबर का कौन-सा खाता चालू है (नाम/PIN नहीं)
+    match /staffIndex/{phone} { allow read: if true; allow write: if isOwner(); }
+    match /staff/{uid} {
+      allow read: if isOwner() || (signedIn() && request.auth.uid == uid);
+      allow write: if isOwner();
+    }
+
+    match /items/{id}    { allow read: if active(); allow write: if isOwner(); }
+    match /settings/{id} { allow read: if active(); allow write: if isOwner(); }
+    match /photos/{id}   { allow read: if active(); allow write: if isOwner(); }
+    match /priceLog/{id} { allow read: if isOwner(); allow create: if isOwner(); }
+
+    match /days/{date}/bills/{no} {
+      allow read: if active();
+      allow create: if active() && request.resource.data.by == request.auth.uid;
+      // कर्मचारी सिर्फ़ ग्राहक का नंबर जोड़ सकते हैं; रद्द सिर्फ़ मालिक
+      allow update: if isOwner() || (active() && (noChange() || onlyKeys(['custPhone'])));
+      allow delete: if false;
+    }
+    match /days/{date}/meta/{doc}    { allow read, create, update: if active(); allow delete: if isOwner(); }
+    match /days/{date}/kharch/{id}   { allow read, create: if active(); allow update, delete: if isOwner(); }
+
+    match /ledger/{id} {
+      allow read, create: if active();
+      allow update: if isOwner() || (active() && noChange());
+      allow delete: if isOwner();
+    }
+    match /parties/{id} {
+      allow read, create: if active();
+      allow update: if isOwner() || (active() && onlyKeys(['lastCart', 'lastTs', 'phone']));
+      allow delete: if false;
+    }
+    match /customers/{id} { allow read, create, update: if active(); allow delete: if false; }
+    match /pstock/{id}    { allow read, create, update: if active(); allow delete: if false; }
+    match /stockLog/{id}  { allow read, create: if active(); }
+    match /inward/{id}    { allow read, create: if active(); }
+    match /presence/{id}  { allow read, write: if active(); }
+
+    // पहरेदार की निजी छाप — सिर्फ़ मालिक
+    match /data/users/{uid}/{doc} { allow read, write: if isOwner() && request.auth.uid == uid; }
+  }
+}

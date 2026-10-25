@@ -1,0 +1,92 @@
+# हर बदलाव पर अपने-आप:
+#  1) वेबसाइट + अपडेट फ़ाइल GitHub Pages पर (फोन वाले ऐप में अपने-आप नया लग जाता है)
+#  2) नई APK "Releases" में (ज़रूरत हो तभी दोबारा इंस्टॉल करनी पड़ती है)
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: v
+        run: echo "version=1.${{ github.run_number }}.$(date -u +%m%d)" >> "$GITHUB_OUTPUT"
+      - run: npm run build
+        env:
+          SE_VERSION: ${{ steps.v.outputs.version }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: www
+          path: www
+
+  pages:
+    needs: web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  apk:
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: www
+          path: www
+      - run: npx cap sync android
+      - name: APK बनाएँ
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew --no-daemon assembleRelease
+      - run: cp android/app/build/outputs/apk/release/app-release.apk sabji-express.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sabji-express-apk
+          path: sabji-express.apk
+      - name: Release में डालें (हमेशा एक ही लिंक से डाउनलोड)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-v${{ needs.web.outputs.version }}
+          name: सब्ज़ी एक्सप्रेस ${{ needs.web.outputs.version }}
+          body: |
+            इंस्टॉल: नीचे sabji-express.apk डाउनलोड करें → खोलें → इंस्टॉल।
+            पुराना ऐप हटाने की ज़रूरत नहीं — ऊपर से इंस्टॉल करें, डेटा नहीं मिटेगा।
+          files: sabji-express.apk
+          make_latest: true
