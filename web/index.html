@@ -419,6 +419,22 @@ main{padding-block:10px 120px}
 .ppc-tot{flex:1;display:grid;justify-items:end;text-align:right;gap:2px}.ppc-tot span{font-size:12px;color:#555}.ppc-tot b{font-family:'Baloo 2',sans-serif;font-size:40px;line-height:1;color:#111}.ppc-tot small{font-size:11px;color:#666;line-height:1.3}
 .ppc-under{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 2px 10px}.ppc-disc{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:var(--muted)}.ppc-disc .inp{width:90px;padding:6px 8px;font-size:16px}
 .ppc-sh{padding-bottom:4px}.ppc-sh h3{font-size:18px;margin:0}
+.sb-qr{display:flex;gap:12px;align-items:center;background:#fff;color:#111;border-radius:16px;padding:10px;margin:8px 0}.sb-qr>div:last-child{display:grid;gap:2px}.sb-qr b{font-family:var(--f-display);font-size:30px}
+.sb-change{font-size:18px;margin:6px 0 10px}.sb-change b{color:var(--leaf)}
+.sb-party{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--chili-bg,#fdecec);border-radius:12px;padding:8px 12px;margin:8px 0}
+.sb-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.sbe-list{display:grid;gap:6px}.sbe-row{display:grid;grid-template-columns:1fr auto 64px;gap:8px;align-items:center;background:var(--surface);border-radius:12px;padding:8px 10px;box-shadow:var(--shadow)}.sbe-row.gone{opacity:.45}
+.sbe-n{display:grid}.sbe-n b{font-size:16px}.sbe-n span{font-size:12px;color:var(--muted)}
+.sbe-q{display:flex;align-items:center;gap:4px}.sbe-q button{width:36px;height:36px;border:0;border-radius:10px;background:var(--bg);font-size:22px;font-weight:800;color:var(--ink)}.sbe-q input{width:64px;text-align:center;border:1.5px solid var(--line);border-radius:10px;padding:6px 2px;font-size:17px;font-weight:800;background:var(--bg);color:var(--ink)}
+.sbe-a{text-align:right}.sbe-add{margin-top:10px}
+.sb-pend{background:#fff7e6;border:1.5px solid #f59e0b;border-radius:14px;padding:8px 10px;margin:0 0 10px;color:#7c2d12}.sb-pend>div{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.sb-pend button{border:0;border-radius:999px;background:#f59e0b;color:#fff;font-weight:800;padding:6px 12px}
+.sb-ract{margin:8px 0;display:grid;gap:6px}
+.paper.pp-c{border-radius:14px;overflow:hidden;padding:0 0 12px;box-shadow:0 10px 26px rgba(0,0,0,.22)}
+.paper.pp-c .ppc-head{background:linear-gradient(135deg,#14532d,#1f8a4c);color:#fff;border:0;padding:9px 12px}.paper.pp-c .ppc-head b{color:#fff}
+.paper.pp-c .ppc-meta,.paper.pp-c .ppc-t,.paper.pp-c .pp-row{margin-left:12px;margin-right:12px;width:auto}.paper.pp-c .ppc-t{width:calc(100% - 24px)}
+.paper.pp-c .ppc-meta b{background:#ecfdf5;color:#14532d;border-radius:6px;padding:0 6px}
+.ppc-t tbody tr:nth-child(even) td{background:#f7faf7}
+.paper.pp-c .ppc-foot{margin:8px 12px 0}.ppc-qr{border:2px solid #14532d;border-radius:10px;position:relative;padding:3px}.ppc-qr::after{content:'UPI';position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:#14532d;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:0 6px}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -644,7 +660,7 @@ function renderBill(){
   if(S.mode==="walk"&&S.cust.phone.length===10){const c=S.cust;const known=c.phone.length===10?S.customers.find(x=>x.id===c.phone):null;
     cb=`${known?`<p class="custinfo">⭐ पुराने ग्राहक${known.name?" "+esc(known.name):""} · ${known.visits||0} बार आए · कुल ${rs(known.spent||0)}${known.lastItems?" · पिछली बार: "+esc(known.lastItems):""} ${known.lastCart&&known.lastCart.length?'<button class="lnk" data-repeat>पिछला सामान दोबारा जोड़ें</button>':""}</p>`:""}`}
   else if(S.mode==="udhar"&&S.partyId){const p=S.parties.find(x=>x.id===S.partyId);if(p&&p.lastCart&&p.lastCart.length)cb+=`<p class="note" style="margin:-4px 0 10px"><button class="lnk" data-repeat>${esc(p.name)} का पिछला सामान दोबारा जोड़ें</button></p>`}
-  $("#custbox").innerHTML=cb;
+  $("#custbox").innerHTML=(window.SB?SB.pendingHTML():"")+cb;
   const bl=billList(),searching=!!bl.raw;
   ["#modes","#custbox","#cats"].forEach(x=>$(x).hidden=searching);if(S.demo)$("#demo").hidden=searching||!S.demo;
   const tip=$("#qtip");tip.hidden=!searching;S.qq=bl.qq;
@@ -844,9 +860,9 @@ async function saveBill(){
   if(c.no==="…"&&window.SF)c.no=await SF.reserveBillNo();
   const bill={no:c.no,ts:now,date,by:S.uid||"",byName:biller(),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:S.mode==="udhar"?(party?.name||""):S.mode==="inst"?S.inst:(cnm||"VIP ग्राहक"),custPhone:cph,custName:cnm,
     lines,sub:cartTotal(),disc:+c.disc||0,total:S.mode==="inst"?cartTotal():tot,pay,payMode:c.pay,cost,
-    rateChanged:lines.some(l=>l.changed),cancelled:false};if(window.SR)SR.stamp(bill);
+    rateChanged:lines.some(l=>l.changed),cancelled:false,settled:c.pay!=="pending"};if(window.SR)SR.stamp(bill);
   S.saving=true;drawCheckout();
-  if(S.demo){S.dayBills=[bill,...S.dayBills];if(pay.udhar>0)S.ledger.push({id:c.no,ts:now,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:pay.udhar,billNo:c.no,byName:biller()});await adjStock(trackedPairs(lines,-1),"बिल "+c.no);S.saving=false;closeCurTab();refreshAfterCart();showReceipt(bill,true);return}
+  if(S.demo){S.dayBills=[bill,...S.dayBills];if(pay.udhar>0)S.ledger.push({id:c.no,ts:now,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:pay.udhar,billNo:c.no,byName:biller()});await adjStock(trackedPairs(lines,-1),"बिल "+c.no);S.saving=false;closeCurTab();refreshAfterCart();if(bill.settled===false&&window.SB)SB.settleSheet(bill);else showReceipt(bill,true);return}
   const item={bill,done:{}};let offline=false;
   try{if(navigator.onLine===false)throw {code:"offline"};await commitBill(item)}
   catch(err){
@@ -857,7 +873,7 @@ async function saveBill(){
     if(pay.udhar>0)S.ledger.push({id:c.no,ts:now,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:pay.udhar,billNo:c.no,byName:biller()});
     if(!S.dayBills.find(x=>x.no===bill.no))S.dayBills=[bill,...S.dayBills];
   }
-  if(window.SR&&bill.custPhone)SR.custHist(bill,bill.custPhone);S.saving=false;closeCurTab();refreshAfterCart();showReceipt(bill,true,offline);netbar();beat();
+  if(window.SR&&bill.custPhone)SR.custHist(bill,bill.custPhone);S.saving=false;closeCurTab();refreshAfterCart();if(bill.settled===false&&window.SB)SB.settleSheet(bill,offline);else showReceipt(bill,true,offline);netbar();beat();
 }
 function receiptText(b){
   b={...b,pay:b.pay||{}};
@@ -888,6 +904,7 @@ function showReceipt(b,fresh,offline){
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिल रसीद"><div class="grab"></div>
     ${fresh?`<div class="done"><div class="tick">✓</div><h3 style="margin:0;font-family:var(--f-display);font-size:24px">बिल सेव हो गया</h3>${offline||b.pending?'<p class="note" style="margin:4px 0 0;color:var(--chili);font-weight:700">📴 फोन में सेव है — इंटरनेट मिलते ही अपने-आप भेज दिया जाएगा</p>':""}</div>`:`<div class="sh-head"><h3>बिल ${esc(b.no)}</h3><button class="x" data-close aria-label="बंद करें">✕</button></div>`}
     ${receiptHTML(b)}
+    ${window.SB?SB.receiptActionsHTML(b):""}
     ${S.isOwner&&window.SF&&SF.billLabel(b.no)?`<p class="note" style="margin:6px 0 0;text-align:center">🔐 ${esc(SF.billLabel(b.no))} (यह सिर्फ़ आपको दिखता है)</p>`:""}
     ${(party?.phone||b.custPhone)?`<div class="btnrow"><a class="big" style="background:#25d366;color:#04230f" target="_blank" rel="noopener" href="${waLink(receiptText(b),party?.phone||b.custPhone)}">💬 WhatsApp पर भेजें</a><button class="big haldi" data-close>${fresh?"नया बिल":"बंद करें"}</button></div>`
     :`<div class="btnrow"><button class="big" style="background:#25d366;color:#04230f" data-waask>💬 WhatsApp पर भेजें</button><button class="big haldi" data-close>${fresh?"नया बिल":"बंद करें"}</button></div><div class="waask" id="waask" hidden><input class="inp" id="waPh" inputmode="tel" autocomplete="off" placeholder="ग्राहक का WhatsApp नंबर" aria-label="ग्राहक का WhatsApp नंबर"><a class="big" id="waGo" style="background:#25d366;color:#04230f;padding:12px 16px" target="_blank" rel="noopener" href="#" aria-disabled="true">भेजें</a></div>`}
@@ -1339,7 +1356,7 @@ function renderReport(){
   const topC=[...S.customers].sort((a,b)=>(b.spent||0)-(a.spent||0)).slice(0,5);
   const waText=`*सब्ज़ी एक्सप्रेस · ${fdate(date)}*\nबिक्री: ${rs(salesTot)} (${sale.length} बिल)\nनकद ${rs(cash)} · UPI ${rs(upi)} · उधार ${rs(ud)}\nवसूली: ${rs(jc+ju)}\nखर्चा: ${rs(cc.khAll)}\nमुनाफ़ा (खर्चे के बाद): ${rs(net)}\nगल्ला: ${cc.diff==null?"गिना नहीं":Math.abs(cc.diff)<=5?"पूरा मिला":rs(cc.diff)}\nमाल में कमी: ${rs(shortTot)}\nरेट बदले/छूट: ${flags.length} बिल`;
   const rows=Object.values(items).sort((a,b)=>b.amt-a.amt);
-  $("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
+  $("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
   <button class="big ghost" data-a4 style="margin-bottom:10px">🖨️ A4 रिपोर्ट प्रिंट / PDF</button>
   ${window.SF?SF.chartsHTML():""}
   <div class="kpis">
@@ -1583,5 +1600,6 @@ boot();
 <script src="se-features.js"></script>
 <script src="se-route.js"></script>
 <script src="se-pay.js"></script>
+<script src="se-bill.js"></script>
 
 </body></html>

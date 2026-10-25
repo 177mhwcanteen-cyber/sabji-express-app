@@ -44,7 +44,10 @@ service cloud.firestore {
       allow read: if active();
       allow create: if active() && request.resource.data.by == request.auth.uid;
       // कर्मचारी सिर्फ़ ग्राहक का नंबर जोड़ सकते हैं; रद्द सिर्फ़ मालिक
-      allow update: if isOwner() || (active() && (noChange() || onlyKeys(['custPhone'])));
+      // सेटल होने से पहले बनाने वाला खुद बदल/सेटल कर सकता है (हर बदलाव edits में दर्ज); सेटल के बाद ताला
+      allow update: if isOwner() || (active() && (noChange() || onlyKeys(['custPhone'])))
+        || (active() && resource.data.get('settled', true) == false && resource.data.by == request.auth.uid
+            && onlyKeys(['lines', 'sub', 'total', 'cost', 'rateChanged', 'edits', 'editCount', 'pay', 'payMode', 'settled', 'settleTs', 'mode', 'partyId', 'partyName', 'custPhone']));
       allow delete: if false;
     }
     match /days/{date}/meta/{doc}    { allow read, create, update: if active(); allow delete: if isOwner(); }

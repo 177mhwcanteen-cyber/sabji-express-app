@@ -540,6 +540,8 @@ ${(()=>{const L=(S.ledger||[]).filter(l=>l.date===d);return L.length?TH(["कि
   const ex=[];
   all.forEach(b=>{
     if(b.cancelled)ex.push(["रद्द बिल",b.no,ftime(b.ts),b.byName,"₹"+b.total,b.cancelReason||""]);
+    if(b.settled===false&&!b.cancelled)ex.push(["⏳ भुगतान बाकी (सेटल नहीं हुआ)",b.no,ftime(b.ts),b.byName,"₹"+b.total,""]);
+    (b.edits||[]).forEach(x=>ex.push(["✏️ सेव के बाद बिल बदला",b.no,ftime(x.ts),x.byName,"₹"+x.totalBefore+" → ₹"+x.totalAfter,x.diff]));
     if(num(b.disc)>0)ex.push(["छूट",b.no,ftime(b.ts),b.byName,"₹"+b.disc,b.partyName||""]);
     (b.lines||[]).forEach(l=>{
       if(l.id==="xyz")ex.push(["🅧 XYZ अन्य पैसा",b.no,ftime(b.ts),b.byName,"₹"+l.amt,l.note||l.name]);
@@ -865,7 +867,7 @@ SF.compactPaperHTML=function(b,o){
 };
 SF.paperHTML=function(b,o){
   o=o||{};const ed=!!o.editable;const sub=r2((b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
-  const pay=b.pay;const stamp=pay?[pay.cash?"नकद "+rs(pay.cash):"",pay.upi?"UPI "+rs(pay.upi):"",pay.udhar?"उधार "+rs(pay.udhar):"",b.mode==="inst"?"संस्था · खरीद भाव":""].filter(Boolean).join(" · "):"";
+  const pay=b.pay;const stamp=b.settled===false?"⏳ भुगतान बाकी":pay?[pay.cash?"नकद "+rs(pay.cash):"",pay.upi?"UPI "+rs(pay.upi):"",pay.udhar?"उधार "+rs(pay.udhar):"",b.mode==="inst"?"संस्था · खरीद भाव":""].filter(Boolean).join(" · "):"";
   return `<div class="paper${o.anim?" pp-anim":""}">
   <div class="pp-head"><div class="pp-logo">🥬</div><b>सब्ज़ी एक्सप्रेस</b><small>ताज़ी सब्ज़ी, आपके दरवाज़े पर · जालीपा कैंट, बाड़मेर${SF.orderPh()?" · 📞 "+SF.fmtPh(SF.orderPh()):""}</small></div>
   <div class="pp-rule"></div>
@@ -916,7 +918,7 @@ SF.drawCheckout=function(){
     ${SF.compactPaperHTML(b,{editable:true,qr:S.mode!=="inst",anim:!c.shown})}
     <p class="note" style="text-align:center;margin:0 0 10px">सामान पर टैप करके मात्रा बदलें · ✕ से हटाएँ</p>
     <div class="pp-actions"><button data-ckedit>✏️<span>एडिट</span></button><button data-ckshare>📤<span>शेयर (PDF)</span></button><button data-ckprint>🖨️<span>प्रिंट</span></button></div>
-    <button class="big" data-settle ${tot<=0&&S.mode!=="inst"?"disabled":""}>✓ बिल सेटल करें · ${rs(tot)}</button>
+    <button class="big" data-billsave ${(tot<=0&&S.mode!=="inst")||S.saving||c.no==="…"?"disabled":""}>${S.saving?"⏳ सेव हो रहा है…":S.mode==="inst"?"💾 संस्था बिल सेव करें · "+rs(tot):"💾 बिल सेव करें · "+rs(tot)}</button>
     <button class="big ghost" data-hold style="margin-top:8px">+ दूसरा ग्राहक (यह बिल ऊपर टैब में खुला रहेगा)</button>`;
   }else{
     const pays=S.mode==="inst"?[["inst","🏠 संस्था खाते में"]]:[["upi","📱 UPI / QR"],["cash","💵 नकद"],["udhar","📒 पूरा उधार"],["split","🔀 नकद + बाकी उधार"]];
@@ -957,6 +959,7 @@ SF.drawCheckout=function(){
       try{if(S.demo)S.parties.push({id,name,phone,qtr});else{await S.db.collection("parties").doc(id).set({name,phone,qtr,ts:Date.now(),by:S.uid||"",byName:biller()});if(!S.parties.find(x=>x.id===id))S.parties.push({id,name,phone,qtr})}toast(name+" का उधार खाता बना");pickUdhar(id)}catch(err){toast("खाता नहीं बना, दोबारा कोशिश करें")}return}
     const d=e.target.closest("[data-del]");if(d){e.stopPropagation();S.cart.splice(+d.dataset.del,1);refreshAfterCart();if(!S.cart.length)closeSheet();else SF.drawCheckout();return}
     const edr=e.target.closest("[data-edit]");if(edr){const l=S.cart[+edr.dataset.edit];const it=item(l.id);if(it)openQty(it,+edr.dataset.edit);return}
+    if(e.target.closest("[data-billsave]")){if(c.no==="…"){toast("बिल नंबर बन रहा है, एक पल…");return}c.pay=S.mode==="inst"?"inst":"pending";c.udPick=null;saveBill();return}
     if(e.target.closest("[data-hold]")){holdCurrent();return}
     if(e.target.closest("[data-save]"))saveBill();
   };

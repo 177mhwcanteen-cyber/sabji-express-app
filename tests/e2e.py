@@ -112,14 +112,25 @@ async def main():
         tst = await pg.evaluate("(document.querySelector('.toast')||{}).innerText||''")
         assert "नहीं हुआ" not in tst and not errs, ("share before settle", tst, errs)
         print("share before settle ok:", tst[:60])
-        await pg.click("[data-settle]"); await pg.wait_for_timeout(200)
-        await pg.click('[data-pay="cash"]') if await pg.query_selector('[data-pay="cash"]') else None
-        await pg.click("[data-save]"); await pg.wait_for_timeout(1200)
+        await pg.click("[data-billsave]"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(800)
+        b0 = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")
+        assert b0 and b0[0]["settled"] is False and b0[0]["pay"]["cash"] == 0, b0
+        await pg.screenshot(path=f"{SHOTS}/20-settle.png")
+        # ✏️ सेव के बाद बदलें: टमाटर +0.25, आलू हटाकर फिर…
+        await pg.click("[data-sbedit2]"); await pg.wait_for_selector(".sbe-row")
+        await pg.click('[data-sbp2="0"]'); await pg.fill("#sbeQ", "प्याज"); await pg.wait_for_timeout(200)
+        await pg.click('[data-sbadd="pyaj"]'); await pg.wait_for_timeout(200)
+        await pg.screenshot(path=f"{SHOTS}/21-edit.png")
+        await pg.click("[data-sbsave]"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(600)
+        b0 = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")[0] if False else (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))"))[0]
+        assert b0.get("editCount") == 1 and "प्याज" in b0["edits"][0]["diff"] and b0["total"] > 85, b0
+        print("edit after save ok:", b0["edits"][0]["diff"], b0["edits"][0]["totalBefore"], "->", b0["total"])
+        await pg.click('[data-sbpay="cash"]'); await pg.wait_for_timeout(150); await pg.click("[data-sbok]"); await pg.wait_for_timeout(1000)
         await pg.screenshot(path=f"{SHOTS}/5-receipt.png")
         nut = await pg.query_selector(".pp-nut"); assert nut, "nutrition box missing on receipt"; await nut.screenshot(path=f"{SHOTS}/nutri.png")
         bills = await pg.evaluate("Object.values(window.__MOCK__).length&&Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).map(([k,v])=>Object.values(v))")
         flat = [x for arr in bills for x in arr]
-        assert flat and flat[0]["byName"] == "कमल भाई" and flat[0]["by"] == kamal[0], flat[:1]
+        assert flat and flat[0]["byName"] == "कमल भाई" and flat[0]["by"] == kamal[0] and flat[0]["settled"] is True and flat[0]["pay"]["cash"] == flat[0]["total"], flat[:1]
         assert flat[0].get("custPhone") == "9829012345", flat[0].get("custPhone")
         assert flat[0].get("loc") and abs(flat[0]["loc"]["lat"] - 25.7712) < 0.001, ("no location on bill", flat[0].get("loc"))
         hist = await pg.evaluate("Object.keys(window.__MOCK__['customers/9829012345/hist']||{})")
@@ -165,9 +176,8 @@ async def main():
         assert ni and ni[0]["pending"] and ni[0]["addedByName"] == "कमल भाई" and ni[0]["sale"] == 40, ni
         await pg.fill("#qIn", "2"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
         await pg.click("#cartbtn"); await pg.wait_for_timeout(500)
-        await pg.click("[data-settle]"); await pg.wait_for_timeout(200)
-        await pg.click('[data-pay="upi"]') if await pg.query_selector('[data-pay="upi"]') else None
-        await pg.click("[data-save]"); await pg.wait_for_timeout(1200)
+        await pg.click("[data-billsave]"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(400)
+        await pg.click("[data-sbok]"); await pg.wait_for_timeout(1000)
         xb = [b for b in (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")) if any(l["id"] == "xyz" for l in b["lines"])]
         assert xb and [l for l in xb[0]["lines"] if l["id"] == "xyz"][0]["note"] == "थैली" and xb[0]["total"] == 130, xb
         print("xyz + new item bill", xb[0]["no"], xb[0]["total"])
@@ -178,7 +188,8 @@ async def main():
         await pg.fill("#pShop", "पवन सब्ज़ी भंडार"); await pg.fill("#pPh", "98290 11111")
         await pg.click('#pgrid [data-pitem="tamatar"]'); await pg.wait_for_selector("#piQ")
         await pg.fill("#piQ", "28"); await pg.press("#piQ", "Enter"); await pg.keyboard.type("10"); await pg.keyboard.press("Enter"); await pg.wait_for_timeout(300)
-        assert await pg.evaluate("document.activeElement.id") == "pq", "focus should go to search"
+        await pg.wait_for_function("document.activeElement&&document.activeElement.id==='pq'", timeout=4000)
+        ae = await pg.evaluate("[document.activeElement.id,document.activeElement.tagName,!!document.querySelector(\"#sheet .qpop\"),document.querySelector(\"#sheet\").innerText.slice(0,80)]"); assert ae[0] == "pq", ae
         await pg.keyboard.type("प्याज 92"); await pg.keyboard.press("Enter"); await pg.wait_for_selector("#piQ")
         assert await pg.input_value("#piQ") == "92"
         await pg.fill("#piR", "52"); await pg.press("#piR", "Enter"); await pg.wait_for_timeout(200)
