@@ -14,6 +14,7 @@ const PAY={vikram:"विक्रम जी ने दिया",galla:"गल�
 S.purch=[];S.purchHist=[];S.suppliers=[];S.supPay=[];S.prevStock={};
 let unsubP=null;
 SF.onDb=function(db){
+  SF.watchCancelReqs(db);
   db.collection("suppliers").onSnapshot(s=>{S.suppliers=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.lastTs||0)-(a.lastTs||0));if(S.tab==="kharid")SF.renderKharid()},()=>{});
   db.collection("supPay").onSnapshot(s=>{S.supPay=s.docs.map(d=>({id:d.id,...d.data()}))},()=>{});
   loadHist();
@@ -662,6 +663,49 @@ SF.drawCheckout=function(){
     if(e.target.id==="givenIn"){c.given=e.target.value;SF.drawCheckout()}
     if(e.target.id==="cashIn"){c.cashPart=e.target.value;SF.drawCheckout()}
   };
+};
+
+/* =============== 🚫 बिल रद्द करने की अर्ज़ी → विक्रम जी के WhatsApp + ऐप में =============== */
+S.cancelReqs=[];
+SF.watchCancelReqs=function(db){
+  db.collection("cancelReq").where("status","==","pending").onSnapshot(s=>{S.cancelReqs=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.ts-a.ts);
+    if(S.isOwner){renderTabs();if(S.tab==="report")renderReport();if(S.cancelReqs.length&&!SF._crToast){SF._crToast=1;toast("🚫 "+S.cancelReqs.length+" बिल रद्द करने की अर्ज़ी आई है — रिपोर्ट में देखें")}}},()=>{});
+};
+SF.cancelReqHTML=function(b,fresh){
+  if(S.isOwner||S.demo||b.cancelled||b.pending)return "";
+  const mine=S.cancelReqs.find(r=>r.no===b.no);
+  if(mine)return `<div class="warn" style="margin-top:10px">⏳ इस बिल को रद्द करने की अर्ज़ी विक्रम जी के पास गई है — उनके फैसले का इंतज़ार</div>`;
+  return `<details class="creq"><summary>🚫 यह बिल रद्द करवाना है? (विक्रम जी को अर्ज़ी)</summary>
+    <label class="fld">रद्द करने की वजह<input class="inp" id="crWhy" placeholder="जैसे ग्राहक ने सामान लौटाया / गलत बिल बना"></label>
+    <button class="big ghost" data-creq style="margin-top:8px;color:var(--chili)">📩 अर्ज़ी विक्रम जी को भेजें</button></details>`;
+};
+SF.sendCancelReq=async function(b){
+  const why=($("#crWhy")?.value||"").trim();if(!why){toast("पहले रद्द करने की वजह लिखें");return}
+  const req={no:b.no,date:b.date,total:b.total,partyName:b.partyName||"",byName:biller(),by:S.uid||"",reason:why,ts:Date.now(),status:"pending",billBy:b.byName||""};
+  try{await S.db.collection("cancelReq").doc(b.no).set(req)}catch(e){toast("अर्ज़ी सेव नहीं हुई: "+(e.code||""));return}
+  S.cancelReqs.push({id:b.no,...req});
+  const lbl=SF.billLabel(b.no);
+  const txt=`🚫 *बिल रद्द करने की अर्ज़ी*\nसब्ज़ी एक्सप्रेस\n━━━━━━━━━━━━\n🧾 बिल नं: ${b.no}\n📅 ${fdate(b.date)} · ${ftime(b.ts)}\n👤 ग्राहक: ${b.partyName||""}\n💰 रकम: ₹${b.total}\n📝 वजह: ${why}\n🧑‍🌾 अर्ज़ी: ${biller()}\n━━━━━━━━━━━━\nविक्रम जी, कृपया ऐप की "रिपोर्ट" में जाकर मंज़ूर या मना करें।`;
+  const ph=String(S.settings.ownerPh||"").replace(/\D/g,"").slice(-10);
+  closeSheet();toast("📩 अर्ज़ी ऐप में दर्ज हो गई");
+  if(ph.length===10)location.href=waLink(txt,ph);else toast("विक्रम जी का WhatsApp नंबर सेटिंग में नहीं है — अर्ज़ी सिर्फ़ ऐप में गई");
+};
+SF.cancelReqsHTML=function(){
+  if(!S.isOwner||!S.cancelReqs.length)return "";
+  return `<div class="card2" style="border:2px solid var(--chili)"><h3 style="color:var(--chili)">🚫 बिल रद्द करने की अर्ज़ियाँ (${S.cancelReqs.length})</h3>
+  ${S.cancelReqs.map(r=>`<div class="creq-row"><div><b>${esc(r.no)} · ${rs(r.total)}</b><span class="note">${fdate(r.date)} · ग्राहक ${esc(r.partyName)} · बिल ${esc(r.billBy)} · अर्ज़ी ${esc(r.byName)}</span><span>📝 ${esc(r.reason)}</span></div>
+    <div class="row2" style="margin:0"><button class="big" data-crok="${esc(r.id)}" style="background:var(--chili);color:#fff">✓ रद्द करें</button><button class="big ghost" data-crno="${esc(r.id)}">✗ मना करें</button></div></div>`).join("")}</div>`;
+};
+SF.decideCancel=async function(id,ok){
+  const r=S.cancelReqs.find(x=>x.id===id);if(!r)return;
+  try{
+    if(ok){const ref=S.db.doc("days/"+r.date+"/bills/"+r.no);const g=await ref.get();if(!g.exists){toast("बिल नहीं मिला");return}const b=g.data();
+      if(!b.cancelled){await ref.update({cancelled:true,cancelledBy:S.uid||"",cancelReason:"अर्ज़ी: "+r.reason+" ("+r.byName+")",cancelTs:Date.now()});
+        if(b.pay&&b.pay.udhar>0){try{await S.db.doc("ledger/"+b.no).delete()}catch(e){}}
+        await adjStock(trackedPairs(b.lines||[],1),"रद्द बिल "+b.no)}}
+    await S.db.doc("cancelReq/"+id).update({status:ok?"approved":"rejected",decidedTs:Date.now()});
+    S.cancelReqs=S.cancelReqs.filter(x=>x.id!==id);renderTabs();renderReport();toast(ok?"बिल रद्द किया":"अर्ज़ी मना की — बिल वैसा ही रहेगा");
+  }catch(e){toast("नहीं हुआ: "+(e.code||e.message||""))}
 };
 
 /* A4 रिपोर्ट में खरीद */

@@ -101,3 +101,15 @@ rep(".toast{position:fixed;", """/* v18 कागज़ की रसीद */
 .pp-actions button{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 4px;font-size:22px;display:grid;justify-items:center;gap:2px}.pp-actions span{font-size:13px;font-weight:800}
 .settle-sum{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}.settle-sum b{font-size:24px}
 .toast{position:fixed;""")
+# v19: बिल रद्द करने की अर्ज़ी (कर्मचारी → विक्रम जी)
+rep('''    ${!fresh&&S.isOwner&&!b.cancelled&&!S.demo?`<label class="fld" style="margin-top:10px">रद्द करने''','''    ${window.SF?SF.cancelReqHTML(b,fresh):""}
+    ${!fresh&&S.isOwner&&!b.cancelled&&!S.demo?`<label class="fld" style="margin-top:10px">रद्द करने''')
+rep('    if(e.target.closest("[data-print]")){printBill(b);return}','    if(e.target.closest("[data-print]")){printBill(b);return}\n    if(e.target.closest("[data-creq]")){SF.sendCancelReq(b);return}')
+rep('$("#p-report").innerHTML=guardHTML()+`','$("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+guardHTML()+`')
+rep('''$("#p-report").addEventListener("click",e=>{''','''$("#p-report").addEventListener("click",e=>{const crk=e.target.closest("[data-crok],[data-crno]");if(crk&&window.SF){const ok=!!crk.dataset.crok;if(ok&&crk.dataset.sure!=="1"){crk.dataset.sure="1";crk.textContent="पक्का? दोबारा दबाएँ";return}SF.decideCancel(crk.dataset.crok||crk.dataset.crno,ok);return}''')
+rep('''<label class="fld">दुकान/गाड़ी का ऑर्डर नंबर (बिल पर छपेगा)''','''<label class="fld">आपका WhatsApp नंबर (बिल रद्द की अर्ज़ी इसी पर आएगी)<input class="inp" id="s-ownerPh" data-sf="ownerPh" inputmode="tel" value="${esc(s.ownerPh||"")}" placeholder="10 अंक"></label>
+    <label class="fld">दुकान/गाड़ी का ऑर्डर नंबर (बिल पर छपेगा)''')
+rep('t.push(["label","लेबल"]);if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()?" 🔴"+guardOpen():"")]','t.push(["label","लेबल"]);const _cr=(S.cancelReqs||[]).length;if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()+_cr?" 🔴"+(guardOpen()+_cr):"")]')
+rep(".toast{position:fixed;", """.creq{margin-top:12px;border:1.5px dashed var(--chili);border-radius:12px;padding:8px 12px}.creq summary{font-weight:800;color:var(--chili);cursor:pointer}
+.creq-row{display:grid;gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}.creq-row>div:first-child{display:grid;gap:2px}
+.toast{position:fixed;""")

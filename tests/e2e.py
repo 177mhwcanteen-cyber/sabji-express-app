@@ -148,6 +148,13 @@ async def main():
         await pg.fill('[data-nclose="pyaj"]', "88"); await pg.fill('[data-nclose="tamatar"]', "26")
         await pg.click("[data-nsave]"); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f"{SHOTS}/11-day.png", full_page=True)
+        # बिल रद्द करने की अर्ज़ी (कर्मचारी)
+        await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
+        await pg.click('#p-bills [data-bill] >> nth=0'); await pg.wait_for_timeout(300)
+        await pg.click('details.creq summary'); await pg.fill('#crWhy', 'ग्राहक ने सामान लौटाया'); await pg.click('[data-creq]'); await pg.wait_for_timeout(600)
+        cr = await pg.evaluate("Object.values(window.__MOCK__.cancelReq||{})")
+        assert len(cr) == 1 and cr[0]["status"] == "pending", cr
+        print("cancel request", cr[0]["no"], cr[0]["reason"])
         mock = await pg.evaluate("window.__MOCK__")
         await pg.context.close()
 
@@ -175,6 +182,11 @@ async def main():
         assert "असली मुनाफ़ा" in txt, txt[:300]
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(500)
         await pg.screenshot(path=f"{SHOTS}/7-owner-report.png")
+        await pg.click('[data-crok]'); await pg.click('[data-crok]'); await pg.wait_for_timeout(800)
+        cancelled = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).filter(b=>b.cancelled).length")
+        assert cancelled == 1, cancelled
+        assert await pg.evaluate("Object.values(window.__MOCK__.cancelReq)[0].status") == "approved"
+        print("owner approved cancel")
         await pg.click("[data-a4]"); await pg.wait_for_timeout(800)
         html = await pg.evaluate("(()=>{const f=[...document.querySelectorAll('iframe')].pop();return f?f.contentDocument.documentElement.outerHTML:''})()")
         assert "सब्ज़ी-वार" in html and "टमाटर" in html and "मंडी खरीद" in html, html[:300]

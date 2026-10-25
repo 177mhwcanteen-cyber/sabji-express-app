@@ -72,6 +72,12 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /supPay/{id}   { allow read, create: if active(); allow update, delete: if isOwner(); }
+    match /cancelReq/{id} {
+      allow read: if active();
+      allow create: if active() && request.resource.data.by == request.auth.uid && request.resource.data.status == 'pending';
+      allow update: if isOwner();
+      allow delete: if false;
+    }
     match /labelLog/{id} { allow create: if active(); allow read: if isOwner(); }
 
     // पहरेदार की निजी छाप — सिर्फ़ मालिक

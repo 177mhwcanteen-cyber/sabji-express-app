@@ -342,6 +342,8 @@ main{padding-block:10px 120px}
 .pp-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.pp-actions:has(> :nth-child(2):last-child){grid-template-columns:1fr 1fr}
 .pp-actions button{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 4px;font-size:22px;display:grid;justify-items:center;gap:2px}.pp-actions span{font-size:13px;font-weight:800}
 .settle-sum{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}.settle-sum b{font-size:24px}
+.creq{margin-top:12px;border:1.5px dashed var(--chili);border-radius:12px;padding:8px 12px}.creq summary{font-weight:800;color:var(--chili);cursor:pointer}
+.creq-row{display:grid;gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}.creq-row>div:first-child{display:grid;gap:2px}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -516,7 +518,7 @@ $("#btabs").onclick=e=>{
 };
 
 /* ---------- tabs ---------- */
-function tabsList(){const t=[["bill","बिलिंग"],["kharid","खरीद"],["udhar","उधार खाता"],["bills","आज के बिल"],["day","दिन का हिसाब"]];t.push(["label","लेबल"]);if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()?" 🔴"+guardOpen():"")],["set","रेट व सेटिंग"]);return t}
+function tabsList(){const t=[["bill","बिलिंग"],["kharid","खरीद"],["udhar","उधार खाता"],["bills","आज के बिल"],["day","दिन का हिसाब"]];t.push(["label","लेबल"]);const _cr=(S.cancelReqs||[]).length;if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()+_cr?" 🔴"+(guardOpen()+_cr):"")],["set","रेट व सेटिंग"]);return t}
 function renderTabs(){
   const TI={bill:"🧾",kharid:"🛒",udhar:"📒",bills:"📋",day:"🌙",label:"🏷️",report:"📈",set:"⚙️"};$("#tabs").innerHTML=tabsList().map(([k,v])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}"><span class="ti">${TI[k]||""}</span> ${v}</button>`).join("");{const a=$("#tabs [aria-selected=\"true\"]");if(a&&a.scrollIntoView)try{a.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}}
   $("#who").textContent="👤 "+(biller()||"नाम डालें");
@@ -807,12 +809,14 @@ function showReceipt(b,fresh,offline){
     ${(party?.phone||b.custPhone)?`<div class="btnrow"><a class="big" style="background:#25d366;color:#04230f" target="_blank" rel="noopener" href="${waLink(receiptText(b),party?.phone||b.custPhone)}">💬 WhatsApp पर भेजें</a><button class="big haldi" data-close>${fresh?"नया बिल":"बंद करें"}</button></div>`
     :`<div class="btnrow"><button class="big" style="background:#25d366;color:#04230f" data-waask>💬 WhatsApp पर भेजें</button><button class="big haldi" data-close>${fresh?"नया बिल":"बंद करें"}</button></div><div class="waask" id="waask" hidden><input class="inp" id="waPh" inputmode="tel" autocomplete="off" placeholder="ग्राहक का WhatsApp नंबर" aria-label="ग्राहक का WhatsApp नंबर"><a class="big" id="waGo" style="background:#25d366;color:#04230f;padding:12px 16px" target="_blank" rel="noopener" href="#" aria-disabled="true">भेजें</a></div>`}
     <div class="pp-actions" style="margin-top:10px"><button data-sharepdf>📤<span>PDF शेयर</span></button><button data-print>🖨️<span>प्रिंट</span></button></div>
+    ${window.SF?SF.cancelReqHTML(b,fresh):""}
     ${!fresh&&S.isOwner&&!b.cancelled&&!S.demo?`<label class="fld" style="margin-top:10px">रद्द करने की वजह<input class="inp" id="cReason" placeholder="जैसे ग्राहक ने सामान लौटाया"></label><button class="big ghost" data-cancel style="margin-top:8px">यह बिल रद्द करें</button>`:""}
   </div></div>`;
   $("#sheet").oninput=e=>{if(e.target.id==="waPh"){const ph=e.target.value.replace(/\D/g,"").slice(-10),go=$("#waGo");go.setAttribute("aria-disabled",ph.length===10?"false":"true");go.href=ph.length===10?waLink(receiptText({...b,custPhone:ph}),ph):"#"}};
   $("#sheet").onclick=async e=>{
     if(e.target.matches("[data-close]")){closeSheet();return}
     if(e.target.closest("[data-print]")){printBill(b);return}
+    if(e.target.closest("[data-creq]")){SF.sendCancelReq(b);return}
     if(e.target.closest("[data-sharepdf]")){if(window.SF)SF.shareBill(b,(party&&party.phone)||b.custPhone,true);return}
     if(e.target.closest("[data-waask]")){$("#waask").hidden=false;$("#waPh").focus();return}
     const go=e.target.closest("#waGo");if(go){const ph=$("#waPh").value.replace(/\D/g,"").slice(-10);if(ph.length!==10){e.preventDefault();toast("10 अंक का मोबाइल नंबर डालें");return}saveCustPhone(b,ph);toast("नंबर "+ph+" इस बिल व ग्राहक में सेव हुआ");return}
@@ -1248,7 +1252,7 @@ function renderReport(){
   const topC=[...S.customers].sort((a,b)=>(b.spent||0)-(a.spent||0)).slice(0,5);
   const waText=`*सब्ज़ी एक्सप्रेस · ${fdate(date)}*\nबिक्री: ${rs(salesTot)} (${sale.length} बिल)\nनकद ${rs(cash)} · UPI ${rs(upi)} · उधार ${rs(ud)}\nवसूली: ${rs(jc+ju)}\nखर्चा: ${rs(cc.khAll)}\nमुनाफ़ा (खर्चे के बाद): ${rs(net)}\nगल्ला: ${cc.diff==null?"गिना नहीं":Math.abs(cc.diff)<=5?"पूरा मिला":rs(cc.diff)}\nमाल में कमी: ${rs(shortTot)}\nरेट बदले/छूट: ${flags.length} बिल`;
   const rows=Object.values(items).sort((a,b)=>b.amt-a.amt);
-  $("#p-report").innerHTML=guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
+  $("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
   <button class="big ghost" data-a4 style="margin-bottom:10px">🖨️ A4 रिपोर्ट प्रिंट / PDF</button>
   ${window.SF?SF.chartsHTML():""}
   <div class="kpis">
@@ -1303,7 +1307,7 @@ async function loadRange(n){
   }catch(e){S.range=null;toast("पुरानी बिक्री लोड नहीं हुई")}
   if(S.tab==="report")$("#rangeBox").innerHTML=rangeHTML();
 }
-$("#p-report").addEventListener("click",e=>{if(e.target.closest("[data-a4]")){SE.printA4("दिन की रिपोर्ट · "+fdate(S.repDate),reportA4(S.repDate)).catch(err=>toast("प्रिंट नहीं हुआ: "+(err.message||"")));return}if(e.target.closest("[data-gseen]")){G.alarms.forEach(a=>a.seen=true);gset("g_alarms",{list:G.alarms});renderTabs();renderReport();return}const rb=e.target.closest("[data-range]");if(rb){loadRange(+rb.dataset.range);$("#p-report").querySelectorAll("[data-range]").forEach(x=>x.setAttribute("aria-pressed",x===rb));return}
+$("#p-report").addEventListener("click",e=>{const crk=e.target.closest("[data-crok],[data-crno]");if(crk&&window.SF){const ok=!!crk.dataset.crok;if(ok&&crk.dataset.sure!=="1"){crk.dataset.sure="1";crk.textContent="पक्का? दोबारा दबाएँ";return}SF.decideCancel(crk.dataset.crok||crk.dataset.crno,ok);return}if(e.target.closest("[data-a4]")){SE.printA4("दिन की रिपोर्ट · "+fdate(S.repDate),reportA4(S.repDate)).catch(err=>toast("प्रिंट नहीं हुआ: "+(err.message||"")));return}if(e.target.closest("[data-gseen]")){G.alarms.forEach(a=>a.seen=true);gset("g_alarms",{list:G.alarms});renderTabs();renderReport();return}const rb=e.target.closest("[data-range]");if(rb){loadRange(+rb.dataset.range);$("#p-report").querySelectorAll("[data-range]").forEach(x=>x.setAttribute("aria-pressed",x===rb));return}
   const b=e.target.closest("[data-bill]");if(b){const x=S.dayBills.find(y=>y.no===b.dataset.bill);if(x)showReceipt(x,false)}});
 
 /* ---------- settings (owner) ---------- */
@@ -1313,6 +1317,7 @@ function renderSettings(){
   <p class="note" style="margin-top:-6px">यहाँ बदला रेट तुरंत सब कर्मचारियों के फोन पर लागू होगा। कर्मचारी ये पेज नहीं देख सकता।</p>
   <div class="list" style="padding:12px 14px;display:grid;gap:10px">
     <div class="lock">🔒<div><span class="note">UPI पक्की लगी है (कोई नहीं बदल सकता)</span><b>${esc(UPI_FIXED.upi)}</b><span class="note">${esc(UPI_FIXED.payee)} · Google Pay · बदलनी हो तो विक्रम जी Claude से बदलवाएँ</span></div></div>
+    <label class="fld">आपका WhatsApp नंबर (बिल रद्द की अर्ज़ी इसी पर आएगी)<input class="inp" id="s-ownerPh" data-sf="ownerPh" inputmode="tel" value="${esc(s.ownerPh||"")}" placeholder="10 अंक"></label>
     <label class="fld">दुकान/गाड़ी का ऑर्डर नंबर (बिल पर छपेगा)<input class="inp" id="s-shopPh" data-sf="shopPh" inputmode="tel" value="${esc(s.shopPh||"")}" placeholder="10 अंक"></label>
     <label class="fld">सुबह गल्ले में रोज़ कितना खुला पैसा रखते हैं (₹)<input class="inp" id="s-float" data-sf="float" inputmode="decimal" value="${esc(s.float||"")}" placeholder="जैसे 500"></label>
     <label class="fld">अपनी संस्थाएँ (हर लाइन में एक)<textarea class="inp" id="s-insts" data-sf="insts" rows="4">${esc(insts().join("\n"))}</textarea></label>
