@@ -173,7 +173,9 @@ async function migrateOld(){
   if(!S.isOwner||S.demo){toast("सिर्फ मालिक");return}
   try{toast("पुराना डेटा ला रहे हैं…");const r=await fetch("migrate.json",{cache:"no-store"});const m=await r.json();let n=0,skip=0;
     for(const [col,docs] of Object.entries(m)){for(const [id,data] of Object.entries(docs)){const ref=S.db.collection(col).doc(id);const g=await ref.get();if(g.exists){skip++;continue}await ref.set(data);n++}}
-    toast(`✓ ${n} चीज़ें आईं · ${skip} पहले से थीं (नहीं बदलीं)`)}catch(err){toast("नहीं आया: "+(err.message||err.code||""))}
+    toast(`✓ ${n} चीज़ें आईं · ${skip} पहले से थीं (नहीं बदलीं)`)}catch(err){
+    if(/permission/i.test(err.code||err.message||"")){const d=await SE.ownerDiag();toast(d.ok?"अनुमति अब ठीक है — दोबारा दबाएँ":"सर्वर ने मना किया: "+d.why);return}
+    toast("नहीं आया: "+(err.message||err.code||""))}
 }
 '''
 rep('/* ---------- biller name ---------- */', EXTRA + '\n/* ---------- biller name ---------- */')

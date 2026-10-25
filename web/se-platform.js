@@ -126,6 +126,7 @@ function loginFlow(){
 async function resolveRole(u){
   const isOwner=!!(u.email&&u.emailVerified&&await isOwnerMail(u.email));
   if(isOwner){
+    try{await u.getIdToken(true)}catch(e){} // ईमेल पक्की होने के बाद नया टिकट — वरना सर्वर पुराना "पक्की नहीं" वाला देखता है
     try{await db.doc("staff/"+u.uid).set({name:CFG.ownerName||"विक्रम जी",owner:true,active:true,email:u.email,ts:Date.now()},{merge:true})}catch(e){}
     return {uid:u.uid,name:CFG.ownerName||"विक्रम जी",isOwner:true}}
   let d=null;
@@ -155,6 +156,13 @@ SE.start=async function(){
     L.innerHTML=`<div style="font-size:44px">⛔</div><h2>खाता चालू नहीं है</h2><p class="note">यह नंबर अभी चालू नहीं है। विक्रम जी से कहें कि "रेट व सेटिंग" में आपका नाम जोड़ें।</p><button class="big" onclick="location.reload()">दोबारा कोशिश करें</button>`;
     await new Promise(()=>{});
   }
+};
+/* मालिक को सर्वर से अनुमति मिल रही है या नहीं — गड़बड़ हो तो साफ़ कारण */
+SE.ownerDiag=async function(){
+  const u=auth&&auth.currentUser;if(!u)return {ok:false,why:"लॉगिन नहीं"};
+  let cl={};try{cl=(await u.getIdTokenResult(true)).claims||{}}catch(e){}
+  try{await db.collection("settings").doc("main").get({source:"server"});return {ok:true,cl}}
+  catch(e){return {ok:false,code:e.code||"",cl,why:!cl.email_verified?"ईमेल अभी पक्की नहीं (Gmail का लिंक दबाएँ, फिर लॉग-आउट करके दोबारा लॉगिन)":"Firestore के Rules में नया कोड Publish नहीं हुआ या गलत चिपका है"}}
 };
 SE.logout=async()=>{try{await auth.signOut()}catch(e){}location.reload()};
 
