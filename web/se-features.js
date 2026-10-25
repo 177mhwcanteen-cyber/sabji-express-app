@@ -904,6 +904,7 @@ SF._shareNow=async function(b,phone,saved){
   catch(e){if(e&&e.code==="oldapk"){toast(e.msg);location.href=waLink(receiptText(b),phone);return}toast(e.msg||("शेयर नहीं हुआ: "+(e.message||"")))}
 };
 SF.drawCheckout=function(){
+  if(S.chk&&S.chk.disc)S.chk.disc=0; // छूट बंद — किसी को छूट नहीं
   const c=S.chk,tot=chkTotal(),party=S.parties.find(p=>p.id===S.partyId),b=draftBill();
   const anyChg=S.cart.some(l=>l.changed);
   const overLim=S.mode==="udhar"&&party&&(+party.limit>0)&&(bal(party.id)+tot>+party.limit);
@@ -913,7 +914,7 @@ SF.drawCheckout=function(){
     body=`${anyChg?`<div class="warn" style="padding:6px 10px;margin-bottom:6px">⚠ इस बिल में किसी सब्ज़ी का भाव बदला गया है</div>`:""}
     ${overLim?`<div class="warn">⚠ ${esc(party.name)} की उधार सीमा ${rs(party.limit)} है। इस बिल के बाद बाकी ${rs(bal(party.id)+tot)} हो जाएगा।</div>`:""}
     ${SF.compactPaperHTML(b,{editable:true,qr:S.mode!=="inst",anim:!c.shown})}
-    <div class="ppc-under"><span class="note">सामान पर टैप = मात्रा बदलें</span>${S.mode==="inst"?"":`<label class="ppc-disc">छूट ₹<input class="inp ${(+c.disc)>0?"bad":""}" id="discIn" inputmode="decimal" value="${c.disc||""}" placeholder="0"></label>`}</div>
+    <p class="note" style="text-align:center;margin:0 0 10px">सामान पर टैप करके मात्रा बदलें · ✕ से हटाएँ</p>
     <div class="pp-actions"><button data-ckedit>✏️<span>एडिट</span></button><button data-ckshare>📤<span>शेयर (PDF)</span></button><button data-ckprint>🖨️<span>प्रिंट</span></button></div>
     <button class="big" data-settle ${tot<=0&&S.mode!=="inst"?"disabled":""}>✓ बिल सेटल करें · ${rs(tot)}</button>
     <button class="big ghost" data-hold style="margin-top:8px">+ दूसरा ग्राहक (यह बिल ऊपर टैब में खुला रहेगा)</button>`;
