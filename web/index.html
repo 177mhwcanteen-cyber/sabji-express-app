@@ -319,6 +319,29 @@ main{padding-block:10px 120px}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .mixbar{display:flex;height:26px;border-radius:9px;overflow:hidden;margin:6px 0}.mixbar span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;min-width:0;overflow:hidden;white-space:nowrap}
 .hbar{display:grid;grid-template-columns:90px 1fr 64px;gap:8px;align-items:center;font-size:13px;margin:4px 0}.hbar .t{background:var(--bg);border-radius:6px;height:16px;overflow:hidden}.hbar .t i{display:block;height:100%;background:var(--leaf);border-radius:6px}.hbar b{text-align:right}
+/* v18 कागज़ की रसीद */
+.pp-slot{position:relative;padding-top:10px}
+.pp-printer{height:14px;margin:0 6px;border-radius:10px;background:linear-gradient(#2b2f36,#4a505a);box-shadow:inset 0 -3px 0 #1c1f24}
+.paper{position:relative;margin:-6px 14px 18px;background:#fffefa;color:#1b1b1b;padding:18px 16px 22px;font-family:"Mukta",system-ui,sans-serif;box-shadow:0 10px 24px rgba(0,0,0,.18);border-radius:2px}
+.paper::after{content:"";position:absolute;left:0;right:0;bottom:-10px;height:10px;background:linear-gradient(-45deg,transparent 7px,#fffefa 0) 0 0/14px 10px repeat-x,linear-gradient(45deg,transparent 7px,#fffefa 0) 0 0/14px 10px repeat-x}
+.pp-anim{animation:ppIn .55s cubic-bezier(.2,.8,.2,1)}
+@keyframes ppIn{from{transform:translateY(-70%);clip-path:inset(70% 0 0 0)}to{transform:none;clip-path:inset(0 0 0 0)}}
+.pp-head{text-align:center;display:grid;gap:0}.pp-head .pp-logo{font-size:30px;line-height:1}.pp-head b{font-family:"Baloo 2",sans-serif;font-size:24px;font-weight:800;letter-spacing:.3px}.pp-head small{color:#555;font-size:12px}
+.pp-rule{height:2px;background:#1b1b1b;margin:10px 0 8px}
+.pp-dash{border-top:1.5px dashed #9a9a9a;margin:8px 0}
+.pp-meta{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:#333;flex-wrap:wrap}.pp-meta b{color:#000}
+.pp-t{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}.pp-t th{font-size:12px;color:#555;font-weight:700;text-align:left;padding:2px 3px}.pp-t td{padding:5px 3px;vertical-align:top;border-bottom:1px dotted #ddd}
+.pp-t .r{text-align:right;white-space:nowrap}.pp-t tr[data-edit]{cursor:pointer}.pp-t tr[data-edit]:active{background:#f3f7ef}
+.pp-x{border:0;background:#fde8e8;color:#c62828;border-radius:8px;width:26px;height:26px;font-weight:800}
+.pp-chg{display:inline-block;font-size:10px;background:#fde8e8;color:#c62828;border-radius:6px;padding:0 5px}
+.pp-row{display:flex;justify-content:space-between;font-size:14px;color:#333}.pp-row.note{font-size:12px;color:#777}
+.pp-total{display:flex;justify-content:space-between;align-items:baseline;margin:4px 0}.pp-total span{font-weight:800;font-size:16px}.pp-total b{font-family:"Baloo 2",sans-serif;font-size:32px}
+.pp-stamp{margin:8px auto 2px;width:max-content;max-width:100%;border:2.5px solid #1f8a4c;color:#1f8a4c;font-weight:800;border-radius:8px;padding:3px 10px;transform:rotate(-3deg);font-size:14px}.pp-stamp.red{border-color:#c62828;color:#c62828}
+.pp-qr{display:grid;justify-items:center;gap:2px;margin-top:8px}.pp-qr b{font-size:15px}.pp-qr span{font-size:11px;color:#666}.pp-qr>div{background:#fff;padding:6px}
+.pp-thanks{text-align:center;font-weight:800;font-size:15px}
+.pp-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.pp-actions:has(> :nth-child(2):last-child){grid-template-columns:1fr 1fr}
+.pp-actions button{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 4px;font-size:22px;display:grid;justify-items:center;gap:2px}.pp-actions span{font-size:13px;font-weight:800}
+.settle-sum{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}.settle-sum b{font-size:24px}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -667,7 +690,7 @@ function openCheckout(){
   if(!_keep&&window.SF){const c0=S.chk;SF.reserveBillNo().then(n=>{if(_t){_t.no=n;_t.noDate=today();lsSet("se_tabs",JSON.stringify(S.bt))}if(S.chk===c0){c0.no=n;if($("#sheet .sh-head"))drawCheckout()}})}
 }
 function chkTotal(){return Math.max(0,Math.round(cartTotal()-(+S.chk.disc||0)))}
-function drawCheckout(){
+function drawCheckout(){if(window.SF&&SF.drawCheckout)return SF.drawCheckout();
   const c=S.chk,tot=chkTotal(),party=S.parties.find(p=>p.id===S.partyId);
   const custName=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:""):(S.cust.name||(S.cust.phone?"ग्राहक "+S.cust.phone:"आम ग्राहक"));
   const anyChg=S.cart.some(l=>l.changed);
@@ -766,7 +789,7 @@ function receiptText(b){
   if(b.pay.udhar)t+=`💳 UPI: ${upiId()}\n`;
   return t+`🧑‍🌾 बिलर: ${b.byName}`;
 }
-function receiptHTML(b){
+function receiptHTML(b){if(window.SF)return SF.paperHTML(b,{});
   return `<div class="receipt"><h4>सब्ज़ी एक्सप्रेस</h4><div class="meta"><span>${esc(b.no)}</span><span>${fdate(b.date)} · ${ftime(b.ts)}</span></div>
   <div class="meta"><span>ग्राहक: <b style="color:var(--ink)">${esc(b.partyName)}</b></span><span>बिलर: ${esc(b.byName)}</span></div>
   <table>${b.lines.map(l=>`<tr><td>${esc(l.name)} <span class="note">${fq(l.qty,l.unit)} × ${l.free?"मुफ्त":rs(l.rate)}</span>${l.changed?' <span class="pill red">रेट बदला</span>':""}${l.free?' <span class="pill red">मुफ्त</span>':""}</td><td class="r">${rs(l.amt)}</td></tr>`).join("")}
@@ -783,13 +806,14 @@ function showReceipt(b,fresh,offline){
     ${S.isOwner&&window.SF&&SF.billLabel(b.no)?`<p class="note" style="margin:6px 0 0;text-align:center">🔐 ${esc(SF.billLabel(b.no))} (यह सिर्फ़ आपको दिखता है)</p>`:""}
     ${(party?.phone||b.custPhone)?`<div class="btnrow"><a class="big" style="background:#25d366;color:#04230f" target="_blank" rel="noopener" href="${waLink(receiptText(b),party?.phone||b.custPhone)}">💬 WhatsApp पर भेजें</a><button class="big haldi" data-close>${fresh?"नया बिल":"बंद करें"}</button></div>`
     :`<div class="btnrow"><button class="big" style="background:#25d366;color:#04230f" data-waask>💬 WhatsApp पर भेजें</button><button class="big haldi" data-close>${fresh?"नया बिल":"बंद करें"}</button></div><div class="waask" id="waask" hidden><input class="inp" id="waPh" inputmode="tel" autocomplete="off" placeholder="ग्राहक का WhatsApp नंबर" aria-label="ग्राहक का WhatsApp नंबर"><a class="big" id="waGo" style="background:#25d366;color:#04230f;padding:12px 16px" target="_blank" rel="noopener" href="#" aria-disabled="true">भेजें</a></div>`}
-    <button class="big ghost" data-print style="margin-top:8px">🖨️ रसीद प्रिंट करें</button>
+    <div class="pp-actions" style="margin-top:10px"><button data-sharepdf>📤<span>PDF शेयर</span></button><button data-print>🖨️<span>प्रिंट</span></button></div>
     ${!fresh&&S.isOwner&&!b.cancelled&&!S.demo?`<label class="fld" style="margin-top:10px">रद्द करने की वजह<input class="inp" id="cReason" placeholder="जैसे ग्राहक ने सामान लौटाया"></label><button class="big ghost" data-cancel style="margin-top:8px">यह बिल रद्द करें</button>`:""}
   </div></div>`;
   $("#sheet").oninput=e=>{if(e.target.id==="waPh"){const ph=e.target.value.replace(/\D/g,"").slice(-10),go=$("#waGo");go.setAttribute("aria-disabled",ph.length===10?"false":"true");go.href=ph.length===10?waLink(receiptText({...b,custPhone:ph}),ph):"#"}};
   $("#sheet").onclick=async e=>{
     if(e.target.matches("[data-close]")){closeSheet();return}
     if(e.target.closest("[data-print]")){printBill(b);return}
+    if(e.target.closest("[data-sharepdf]")){if(window.SF)SF.shareBill(b,(party&&party.phone)||b.custPhone,true);return}
     if(e.target.closest("[data-waask]")){$("#waask").hidden=false;$("#waPh").focus();return}
     const go=e.target.closest("#waGo");if(go){const ph=$("#waPh").value.replace(/\D/g,"").slice(-10);if(ph.length!==10){e.preventDefault();toast("10 अंक का मोबाइल नंबर डालें");return}saveCustPhone(b,ph);toast("नंबर "+ph+" इस बिल व ग्राहक में सेव हुआ");return}
     const cb=e.target.closest("[data-cancel]");
@@ -1300,8 +1324,8 @@ function renderSettings(){
     <div class="row2" style="margin:0"><input class="inp" id="stPhone" inputmode="tel" maxlength="20" placeholder="मोबाइल नंबर" aria-label="मोबाइल नंबर"><input class="inp" id="stPin" inputmode="numeric" maxlength="4" placeholder="4 अंक PIN" aria-label="4 अंक का PIN"></div>
     <button class="big ghost" data-staffadd>+ कर्मचारी जोड़ें / PIN बदलें</button></div>
   <div class="card2"><h3>🖨️ ब्लूटूथ प्रिंटर</h3>
-    <p class="note" style="margin:0">${SE.isNative?(SE.printer.addr?"चुना हुआ: <b>"+esc(SE.printer.name)+"</b> · "+(SE.printer.width>400?"80mm":"58mm"):"पहले फोन की Bluetooth सेटिंग में प्रिंटर को pair करें, फिर यहाँ चुनें।"):"प्रिंटर Android ऐप में चुना जाता है। वेब में बिल फोन के प्रिंट से छपेगा।"}</p>
-    ${SE.isNative?'<div class="row2" style="margin:0"><button class="big ghost" data-prnpick="58">58mm प्रिंटर चुनें</button><button class="big ghost" data-prnpick="80">80mm प्रिंटर चुनें</button></div><div id="prnList"></div><button class="big ghost" data-prntest>टेस्ट प्रिंट</button>':""}</div>
+    <p class="note" style="margin:0">${SE.isNative?(SE.printer.addr?"चुना हुआ: <b>"+esc(SE.printer.name)+"</b> · "+(SE.printer.mm==="100"?"4 इंच · लेबल-भाषा (TSPL)":SE.printer.mm+"mm"):"पहले फोन की Bluetooth सेटिंग में प्रिंटर को pair करें, फिर यहाँ चुनें।"):"प्रिंटर Android ऐप में चुना जाता है। वेब में बिल फोन के प्रिंट से छपेगा।"}</p>
+    ${SE.isNative?'<div class="row2" style="margin:0"><button class="big ghost" data-prnpick="58">58mm प्रिंटर चुनें</button><button class="big ghost" data-prnpick="80">80mm प्रिंटर चुनें</button></div><button class="big ghost" data-prnpick="100">4 इंच प्रिंटर (Xprinter XP-D4601B जैसा) चुनें</button><div id="prnList"></div><button class="big ghost" data-prntest>टेस्ट प्रिंट</button>':""}</div>
   ${window.SF?SF.labelSettingsHTML():""}
   <div class="card2"><h3>📦 पुराने ऐप का डेटा</h3><p class="note" style="margin:0">पुराने (आर्टिफ़ैक्ट) ऐप की सब्ज़ियाँ, भाव, खरीद इतिहास, उधार खाते और संस्थाएँ यहाँ लाएँ। जो पहले से है वह नहीं बदलेगा।</p><button class="big ghost" data-migrate>पुराना डेटा लाएँ</button></div>
   <h3 style="margin:0 0 4px">सब्ज़ियाँ और रेट</h3><p class="note" style="margin:0 0 8px">बिक्री रेट = ग्राहक का रेट · खरीद रेट = मंडी का रेट (संस्था इसी पर लेगी)। फोटो बदलने के लिए फोटो पर टैप करें। ${(()=>{const n=S.items.filter(i=>!i.photo).length;return n?`<b style="color:var(--chili)">${n} सब्ज़ियों की असली फोटो अभी बाकी है।</b> अच्छी रोशनी में ऊपर से फोटो खींचकर लगाएँ।`:'<b style="color:var(--leaf)">सबकी फोटो लग चुकी है।</b>'})()}</p>
@@ -1363,12 +1387,8 @@ function shrink(file){return new Promise((res,rej)=>{const img=new Image();const
 /* ---------- प्रिंट ---------- */
 async function printBill(b){
   try{
-    let qr=null;const due=b.pay&&b.pay.udhar?b.pay.udhar:0;
-    if(window.QRCode&&upiId()){const box=document.createElement("div");const am=due||0;
-      const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${am?"&am="+(+am).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+b.no)}`;
-      new QRCode(box,{text:upi,width:240,height:240,correctLevel:QRCode.CorrectLevel.M});qr=box.querySelector("canvas")}
-    const how=await SE.printReceipt(b,{shop:"सब्ज़ी एक्सप्रेस",tag:"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:S.settings.shopPh||"",
-      date:fdate(b.date)+" "+ftime(b.ts),fq,qr,upi:upiId(),balance:b.partyId?r2(bal(b.partyId)):null});
+    const o=window.SF?SF.rcptOpts(b,!b.pay||(b.pay.udhar>0)):{shop:"सब्ज़ी एक्सप्रेस",date:fdate(b.date)+" "+ftime(b.ts),fq};
+    const how=await SE.printReceipt(b,o);
     toast(how==="bt"?"🖨️ रसीद छप रही है":"प्रिंट खुल गया");
   }catch(err){toast(err.msg||("प्रिंट नहीं हुआ: "+(err.message||err.code||"")))}
 }

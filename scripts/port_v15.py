@@ -66,8 +66,38 @@ rep('''  S.chk={no:newBillNo(),disc:0,pay:S.mode==="inst"?"inst":"cash",given:""
   if(!_keep&&window.SF){const c0=S.chk;SF.reserveBillNo().then(n=>{if(_t){_t.no=n;_t.noDate=today();lsSet("se_tabs",JSON.stringify(S.bt))}if(S.chk===c0){c0.no=n;if($("#sheet .sh-head"))drawCheckout()}})}''')
 rep('const bill={no:c.no,ts:now,date,', 'if(c.no==="…"&&window.SF)c.no=await SF.reserveBillNo();\n  const bill={no:c.no,ts:now,date,')
 rep('&tn=${encodeURIComponent("Bill "+c.no)}`;','&tn=${encodeURIComponent("Sabji Express | Bill No "+c.no)}`;')
-rep('&tn=${encodeURIComponent("Bill "+b.no)}`;','&tn=${encodeURIComponent("Sabji Express | Bill No "+b.no)}`;')
 rep('''    ${receiptHTML(b)}
     ${(party?.phone||b.custPhone)?''','''    ${receiptHTML(b)}
     ${S.isOwner&&window.SF&&SF.billLabel(b.no)?`<p class="note" style="margin:6px 0 0;text-align:center">🔐 ${esc(SF.billLabel(b.no))} (यह सिर्फ़ आपको दिखता है)</p>`:""}
     ${(party?.phone||b.custPhone)?''')
+# v18: कागज़ जैसी रसीद, सेटल, PDF शेयर
+rep('function drawCheckout(){\n', 'function drawCheckout(){if(window.SF&&SF.drawCheckout)return SF.drawCheckout();\n')
+rep('function receiptHTML(b){\n', 'function receiptHTML(b){if(window.SF)return SF.paperHTML(b,{});\n')
+rep('<button class="big ghost" data-print style="margin-top:8px">🖨️ रसीद प्रिंट करें</button>',
+    '<div class="pp-actions" style="margin-top:10px"><button data-sharepdf>📤<span>PDF शेयर</span></button><button data-print>🖨️<span>प्रिंट</span></button></div>')
+rep('    if(e.target.closest("[data-print]")){printBill(b);return}',
+    '    if(e.target.closest("[data-print]")){printBill(b);return}\n    if(e.target.closest("[data-sharepdf]")){if(window.SF)SF.shareBill(b,(party&&party.phone)||b.custPhone,true);return}')
+rep(".toast{position:fixed;", """/* v18 कागज़ की रसीद */
+.pp-slot{position:relative;padding-top:10px}
+.pp-printer{height:14px;margin:0 6px;border-radius:10px;background:linear-gradient(#2b2f36,#4a505a);box-shadow:inset 0 -3px 0 #1c1f24}
+.paper{position:relative;margin:-6px 14px 18px;background:#fffefa;color:#1b1b1b;padding:18px 16px 22px;font-family:"Mukta",system-ui,sans-serif;box-shadow:0 10px 24px rgba(0,0,0,.18);border-radius:2px}
+.paper::after{content:"";position:absolute;left:0;right:0;bottom:-10px;height:10px;background:linear-gradient(-45deg,transparent 7px,#fffefa 0) 0 0/14px 10px repeat-x,linear-gradient(45deg,transparent 7px,#fffefa 0) 0 0/14px 10px repeat-x}
+.pp-anim{animation:ppIn .55s cubic-bezier(.2,.8,.2,1)}
+@keyframes ppIn{from{transform:translateY(-70%);clip-path:inset(70% 0 0 0)}to{transform:none;clip-path:inset(0 0 0 0)}}
+.pp-head{text-align:center;display:grid;gap:0}.pp-head .pp-logo{font-size:30px;line-height:1}.pp-head b{font-family:"Baloo 2",sans-serif;font-size:24px;font-weight:800;letter-spacing:.3px}.pp-head small{color:#555;font-size:12px}
+.pp-rule{height:2px;background:#1b1b1b;margin:10px 0 8px}
+.pp-dash{border-top:1.5px dashed #9a9a9a;margin:8px 0}
+.pp-meta{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:#333;flex-wrap:wrap}.pp-meta b{color:#000}
+.pp-t{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}.pp-t th{font-size:12px;color:#555;font-weight:700;text-align:left;padding:2px 3px}.pp-t td{padding:5px 3px;vertical-align:top;border-bottom:1px dotted #ddd}
+.pp-t .r{text-align:right;white-space:nowrap}.pp-t tr[data-edit]{cursor:pointer}.pp-t tr[data-edit]:active{background:#f3f7ef}
+.pp-x{border:0;background:#fde8e8;color:#c62828;border-radius:8px;width:26px;height:26px;font-weight:800}
+.pp-chg{display:inline-block;font-size:10px;background:#fde8e8;color:#c62828;border-radius:6px;padding:0 5px}
+.pp-row{display:flex;justify-content:space-between;font-size:14px;color:#333}.pp-row.note{font-size:12px;color:#777}
+.pp-total{display:flex;justify-content:space-between;align-items:baseline;margin:4px 0}.pp-total span{font-weight:800;font-size:16px}.pp-total b{font-family:"Baloo 2",sans-serif;font-size:32px}
+.pp-stamp{margin:8px auto 2px;width:max-content;max-width:100%;border:2.5px solid #1f8a4c;color:#1f8a4c;font-weight:800;border-radius:8px;padding:3px 10px;transform:rotate(-3deg);font-size:14px}.pp-stamp.red{border-color:#c62828;color:#c62828}
+.pp-qr{display:grid;justify-items:center;gap:2px;margin-top:8px}.pp-qr b{font-size:15px}.pp-qr span{font-size:11px;color:#666}.pp-qr>div{background:#fff;padding:6px}
+.pp-thanks{text-align:center;font-weight:800;font-size:15px}
+.pp-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.pp-actions:has(> :nth-child(2):last-child){grid-template-columns:1fr 1fr}
+.pp-actions button{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:14px;padding:10px 4px;font-size:22px;display:grid;justify-items:center;gap:2px}.pp-actions span{font-size:13px;font-weight:800}
+.settle-sum{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px}.settle-sum b{font-size:24px}
+.toast{position:fixed;""")

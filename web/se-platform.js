@@ -230,40 +230,54 @@ SE.scan=async function(){
 /* ---------- ब्लूटूथ थर्मल प्रिंटर (58/80mm, ESC/POS इमेज) ---------- */
 SE.printer={
   get addr(){return ls.get("se_prn")||""},get name(){return ls.get("se_prn_n")||""},
-  get width(){return ls.get("se_prn_w")==="80"?576:384},
+  /* चौड़ाई डॉट में: 58mm=384, 80mm=576, 4 इंच (Xprinter XP-D4601B जैसे)=800 */
+  get mm(){return ls.get("se_prn_w")||"58"},
+  get width(){const m=this.mm;return m==="100"?800:m==="80"?576:384},
+  get type(){return ls.get("se_prn_t")||(this.mm==="100"?"tspl":"escpos")},
   async list(){if(!SE.isNative)throw {msg:"प्रिंटर सिर्फ़ Android ऐप में जुड़ता है"};const r=await N.BtPrinter.list();return r.devices||[]},
-  pick(addr,name,w){ls.set("se_prn",addr);ls.set("se_prn_n",name||addr);if(w)ls.set("se_prn_w",String(w))},
+  pick(addr,name,w,t){ls.set("se_prn",addr);ls.set("se_prn_n",name||addr);if(w)ls.set("se_prn_w",String(w));ls.set("se_prn_t",t||(String(w)==="100"?"tspl":"escpos"))},
 };
 function wrapLines(ctx,text,maxW){const words=String(text).split(" ");const out=[];let cur="";for(const w of words){const t=cur?cur+" "+w:w;if(ctx.measureText(t).width>maxW&&cur){out.push(cur);cur=w}else cur=t}if(cur)out.push(cur);return out}
-SE.receiptCanvas=function(b,o){
-  const W=SE.printer.width,P=8,F='"Noto Sans Devanagari","Noto Sans",sans-serif';
-  const c=document.createElement("canvas");c.width=W;c.height=4000;const x=c.getContext("2d");
+/* कागज़ जैसी रसीद की तस्वीर — प्रिंट, PDF और WhatsApp तीनों में यही */
+SE.receiptCanvas=function(b,o,widthPx){
+  const W=widthPx||SE.printer.width,P=Math.round(W*0.03),F='"Mukta","Noto Sans Devanagari","Noto Sans",sans-serif',FB='"Baloo 2","Mukta","Noto Sans Devanagari",sans-serif';
+  const k=W/384;const fs=n=>Math.round(n*k);
+  const c=document.createElement("canvas");c.width=W;c.height=6000;const x=c.getContext("2d");
   x.fillStyle="#fff";x.fillRect(0,0,W,c.height);x.fillStyle="#000";x.textBaseline="top";
-  let y=6;
-  const T=(t,sz,al,bold)=>{x.font=`${bold?"700 ":""}${sz}px ${F}`;for(const ln of wrapLines(x,t,W-2*P)){const w=x.measureText(ln).width;x.fillText(ln,al==="c"?(W-w)/2:al==="r"?W-P-w:P,y);y+=Math.round(sz*1.35)}};
-  const LR=(l,r,sz,bold)=>{x.font=`${bold?"700 ":""}${sz}px ${F}`;const rw=x.measureText(r).width;const ls2=wrapLines(x,l,W-2*P-rw-10);ls2.forEach((ln,i)=>{x.fillText(ln,P,y);if(i===ls2.length-1)x.fillText(r,W-P-rw,y);y+=Math.round(sz*1.35)})};
-  const HR=()=>{y+=4;x.fillRect(P,y,W-2*P,2);y+=8};
-  const big=W>400?1.25:1;
-  T(o.shop||"सब्ज़ी एक्सप्रेस",Math.round(30*big),"c",true);
-  if(o.tag)T(o.tag,Math.round(18*big),"c");
-  if(o.addr)T(o.addr,Math.round(18*big),"c");
-  if(o.phone)T("📞 "+o.phone,Math.round(18*big),"c");
-  HR();
-  LR("बिल: "+b.no,o.date||"",Math.round(18*big));
-  T("ग्राहक: "+(b.partyName||"")+(b.custPhone?" ("+b.custPhone+")":""),Math.round(18*big));
-  HR();
-  (b.lines||[]).forEach((l,i)=>{T(`${i+1}. ${l.name}`,Math.round(20*big),"l",true);LR(`   ${o.fq(l.qty,l.unit)} × ${l.free?"मुफ्त":"₹"+l.rate}`,"₹"+l.amt,Math.round(20*big))});
-  HR();
-  if(b.disc)LR("छूट","−₹"+b.disc,Math.round(20*big));
-  LR("कुल रकम","₹"+b.total,Math.round(28*big),true);
-  if(b.pay){if(b.pay.cash)LR("नकद","₹"+b.pay.cash,Math.round(20*big));if(b.pay.upi)LR("UPI","₹"+b.pay.upi,Math.round(20*big));if(b.pay.udhar)LR("उधार","₹"+b.pay.udhar,Math.round(20*big),true)}
-  if(o.balance!=null)LR("खाते में कुल बाकी","₹"+o.balance,Math.round(20*big),true);
-  if(o.qr){HR();T("UPI से भुगतान करें",Math.round(18*big),"c");const q=o.qr,s=Math.min(q.width,Math.round(W*0.55));x.drawImage(q,(W-s)/2,y,s,s);y+=s+4;if(o.upi)T(o.upi,Math.round(16*big),"c")}
-  HR();T("🙏 धन्यवाद! फिर पधारें",Math.round(20*big),"c",true);
-  if(b.byName)T("बिलर: "+b.byName,Math.round(16*big),"c");
-  y+=30;
-  const out=document.createElement("canvas");out.width=W;out.height=y;out.getContext("2d").drawImage(c,0,0);return out;
+  let y=fs(8);
+  const T=(t,sz,al,bold,fam)=>{x.font=`${bold?"800 ":"500 "}${sz}px ${fam||F}`;for(const ln of wrapLines(x,t,W-2*P)){const w=x.measureText(ln).width;x.fillText(ln,al==="c"?(W-w)/2:al==="r"?W-P-w:P,y);y+=Math.round(sz*1.3)}};
+  const LR=(l,r,sz,bold)=>{x.font=`${bold?"800 ":"500 "}${sz}px ${F}`;const rw=x.measureText(r).width;x.fillText(l,P,y);x.fillText(r,W-P-rw,y);y+=Math.round(sz*1.35)};
+  const DASH=()=>{y+=fs(3);for(let i=P;i<W-P;i+=fs(10))x.fillRect(i,y,fs(6),Math.max(1,fs(1.6)));y+=fs(7)};
+  const LINE=()=>{y+=fs(3);x.fillRect(P,y,W-2*P,Math.max(2,fs(2)));y+=fs(7)};
+  T("🥬 "+(o.shop||"सब्ज़ी एक्सप्रेस"),fs(30),"c",true,FB);
+  if(o.tag)T(o.tag,fs(15),"c");
+  if(o.addr)T(o.addr,fs(16),"c");
+  if(o.phone)T("📞 ऑर्डर: "+o.phone,fs(16),"c");
+  LINE();
+  LR("बिल नं: "+b.no,"",fs(19),true);
+  LR("तारीख: "+(o.date||""),"",fs(17));
+  if(b.partyName||b.custPhone)LR("ग्राहक: "+(b.partyName||"")+(b.custPhone?" · "+b.custPhone:""),"",fs(17));
+  DASH();
+  // टेबल: क्र. | सामान | मात्रा | भाव | रकम
+  const cS=P,cN=P+W*0.07,cQ=W*0.62,cR=W*0.79,cA=W-P,sz=fs(17);
+  const row=(a,bn,q,r,am,bold)=>{x.font=`${bold?"800 ":"500 "}${sz}px ${F}`;const lines=wrapLines(x,bn,cQ-cN-fs(30));const h=Math.round(sz*1.32);
+    x.fillText(a,cS,y);lines.forEach((ln,i)=>x.fillText(ln,cN,y+i*h));
+    const rt=(t,xr)=>{const w=x.measureText(t).width;x.fillText(t,xr-w,y)};rt(q,cQ+fs(18));rt(r,cR+fs(14));rt(am,cA);y+=h*lines.length+fs(3)};
+  row("क्र.","सामान","मात्रा","भाव","रकम",true);DASH();
+  (b.lines||[]).forEach((l,i)=>row(String(i+1),l.name,o.fq(l.qty,l.unit).replace(" कि.ग्रा"," kg"),l.free?"मुफ्त":"₹"+l.rate,"₹"+l.amt));
+  DASH();
+  const sub=r2(b.sub!=null?b.sub:(b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
+  if(b.disc){LR("जोड़",`₹${sub}`,fs(18));LR("छूट",`−₹${b.disc}`,fs(18))}
+  LR("कुल रकम",`₹${b.total}`,fs(30),true);
+  if(b.pay&&o.paid!==false){const p=b.pay;const parts=[p.cash?"नकद ₹"+p.cash:"",p.upi?"UPI ₹"+p.upi:"",p.udhar?"उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T("भुगतान: "+parts.join(" · "),fs(16),"l")}
+  if(o.balance!=null)LR("खाते में कुल बाकी",`₹${o.balance}`,fs(18),true);
+  if(o.qr){DASH();T("स्कैन करके भुगतान करें",fs(17),"c",true);const q=o.qr,s=Math.min(W*0.55,q.width*3);x.imageSmoothingEnabled=false;x.drawImage(q,(W-s)/2,y,s,s);y+=s+fs(4);if(o.upi)T(o.upi+(o.payee?" · "+o.payee:""),fs(14),"c")}
+  DASH();T("🙏 धन्यवाद! फिर पधारें",fs(19),"c",true);
+  if(b.byName)T("बिलर: "+b.byName,fs(14),"c");
+  y+=fs(24);
+  const out=document.createElement("canvas");out.width=W;out.height=Math.ceil(y);out.getContext("2d").drawImage(c,0,0);return out;
 };
+const r2=n=>Math.round((+n||0)*100)/100;
 function canvasToEscPos(cv){
   const W=cv.width,H=cv.height,bw=W>>3;const d=cv.getContext("2d").getImageData(0,0,W,H).data;
   const parts=[[0x1b,0x40]];
@@ -274,19 +288,46 @@ function canvasToEscPos(cv){
     parts.push(blk);
   }
   parts.push([0x1b,0x64,0x04],[0x1d,0x56,0x42,0x00]);
-  let n=0;parts.forEach(p=>n+=p.length);const all=new Uint8Array(n);let o=0;parts.forEach(p=>{all.set(p,o);o+=p.length});
-  let s="";for(let i=0;i<all.length;i+=0x8000)s+=String.fromCharCode.apply(null,all.subarray(i,i+0x8000));return btoa(s);
+  return toB64(parts);
 }
+function toB64(parts){let n=0;parts.forEach(p=>n+=p.length);const all=new Uint8Array(n);let o=0;parts.forEach(p=>{all.set(p,o);o+=p.length});
+  let s="";for(let i=0;i<all.length;i+=0x8000)s+=String.fromCharCode.apply(null,all.subarray(i,i+0x8000));return btoa(s)}
+/* TSPL (लेबल प्रिंटर, जैसे Xprinter XP-D4601B) — कोई भी तस्वीर छापो */
+SE.tspl=function(cv,opt){
+  opt=opt||{};const W=cv.width,H=cv.height,wb=Math.ceil(W/8);const d=cv.getContext("2d").getImageData(0,0,W,H).data;
+  const inv=ls.get("se_linv")==="1";const bmp=new Uint8Array(wb*H);
+  for(let y=0;y<H;y++)for(let xb=0;xb<wb;xb++){let v=0;for(let b=0;b<8;b++){const px=xb*8+b;let black=false;if(px<W){const i=(y*W+px)*4;black=(d[i]*.3+d[i+1]*.59+d[i+2]*.11)<150}
+      const bit=inv?black:!black;if(bit)v|=0x80>>b}bmp[y*wb+xb]=v} // TSPL में 0 = काला डॉट
+  const wmm=opt.wmm||Math.round(W/8),hmm=opt.hmm||Math.ceil(H/8);
+  const enc=s=>new TextEncoder().encode(s);
+  const head=enc(`SIZE ${wmm} mm,${hmm} mm\r\nGAP ${opt.gap!=null?opt.gap:(ls.get("se_lgap")||"2")} mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nDENSITY 10\r\nCLS\r\nBITMAP 0,0,${wb},${H},0,`);
+  const tail=enc(`\r\nPRINT ${opt.copies||1},1\r\nEND\r\n`);
+  return toB64([head,bmp,tail]);
+};
 SE.escpos=canvasToEscPos;
 SE.printReceipt=async function(b,o){
   const cv=SE.receiptCanvas(b,o);
   if(SE.isNative){
     if(!SE.printer.addr)throw {code:"noprinter",msg:"पहले \"रेट व सेटिंग\" में प्रिंटर चुनें"};
-    await N.BtPrinter.print({address:SE.printer.addr,data:canvasToEscPos(cv)});return "bt"}
-  // वेब: फोन/कंप्यूटर का प्रिंट (RawBT या कोई भी प्रिंटर)
+    const data=SE.printer.type==="tspl"?SE.tspl(cv,{gap:0}):canvasToEscPos(cv);
+    await N.BtPrinter.print({address:SE.printer.addr,data});return "bt"}
   const url=cv.toDataURL("image/png");
-  printHTMLWeb(`<!doctype html><html><head><meta charset="utf-8"><style>@page{size:${SE.printer.width>400?"80mm":"58mm"} auto;margin:0}body{margin:0}img{width:100%;display:block}</style></head><body><img src="${url}"></body></html>`);
+  printHTMLWeb(`<!doctype html><html><head><meta charset="utf-8"><style>@page{size:${SE.printer.mm}mm auto;margin:0}body{margin:0}img{width:100%;display:block}</style></head><body><img src="${url}"></body></html>`);
   return "web";
+};
+/* बिल PDF बनाकर ग्राहक के WhatsApp पर */
+SE.shareReceipt=async function(b,o,phone,text){
+  const cv=SE.receiptCanvas(b,o,768);const png=cv.toDataURL("image/png").split(",")[1];
+  const name="SabjiExpress_"+String(b.no||"bill").replace(/[^A-Za-z0-9]/g,"");
+  if(SE.isNative){
+    try{await N.BtPrinter.shareFile({data:png,name,pdf:true,phone:phone||"",text:text||""});return "pdf"}
+    catch(e){const m=String(e&&e.message||"");if(/not implemented|UNIMPLEMENTED/i.test(m))throw {code:"oldapk",msg:"PDF शेयर के लिए नई APK इंस्टॉल करें (लिंक वही है)"};throw e}
+  }
+  // वेब: फोन का शेयर (WhatsApp चुनें) — न चले तो फोटो डाउनलोड
+  const blob=await new Promise(r=>cv.toBlob(r,"image/png"));const file=new File([blob],name+".png",{type:"image/png"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text:text||""});return "share"}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name+".png";document.body.appendChild(a);a.click();a.remove();
+  return "download";
 };
 function printHTMLWeb(html){
   const f=document.createElement("iframe");f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0";document.body.appendChild(f);

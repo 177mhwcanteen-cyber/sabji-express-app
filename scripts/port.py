@@ -71,8 +71,8 @@ rx(r'<div class="card2"><h3>🔐 स्टाफ और PIN</h3>.*?data-staffadd
     <div class="row2" style="margin:0"><input class="inp" id="stPhone" inputmode="tel" maxlength="20" placeholder="मोबाइल नंबर" aria-label="मोबाइल नंबर"><input class="inp" id="stPin" inputmode="numeric" maxlength="4" placeholder="4 अंक PIN" aria-label="4 अंक का PIN"></div>
     <button class="big ghost" data-staffadd>+ कर्मचारी जोड़ें / PIN बदलें</button></div>
   <div class="card2"><h3>🖨️ ब्लूटूथ प्रिंटर</h3>
-    <p class="note" style="margin:0">${SE.isNative?(SE.printer.addr?"चुना हुआ: <b>"+esc(SE.printer.name)+"</b> · "+(SE.printer.width>400?"80mm":"58mm"):"पहले फोन की Bluetooth सेटिंग में प्रिंटर को pair करें, फिर यहाँ चुनें।"):"प्रिंटर Android ऐप में चुना जाता है। वेब में बिल फोन के प्रिंट से छपेगा।"}</p>
-    ${SE.isNative?'<div class="row2" style="margin:0"><button class="big ghost" data-prnpick="58">58mm प्रिंटर चुनें</button><button class="big ghost" data-prnpick="80">80mm प्रिंटर चुनें</button></div><div id="prnList"></div><button class="big ghost" data-prntest>टेस्ट प्रिंट</button>':""}</div>
+    <p class="note" style="margin:0">${SE.isNative?(SE.printer.addr?"चुना हुआ: <b>"+esc(SE.printer.name)+"</b> · "+(SE.printer.mm==="100"?"4 इंच · लेबल-भाषा (TSPL)":SE.printer.mm+"mm"):"पहले फोन की Bluetooth सेटिंग में प्रिंटर को pair करें, फिर यहाँ चुनें।"):"प्रिंटर Android ऐप में चुना जाता है। वेब में बिल फोन के प्रिंट से छपेगा।"}</p>
+    ${SE.isNative?'<div class="row2" style="margin:0"><button class="big ghost" data-prnpick="58">58mm प्रिंटर चुनें</button><button class="big ghost" data-prnpick="80">80mm प्रिंटर चुनें</button></div><button class="big ghost" data-prnpick="100">4 इंच प्रिंटर (Xprinter XP-D4601B जैसा) चुनें</button><div id="prnList"></div><button class="big ghost" data-prntest>टेस्ट प्रिंट</button>':""}</div>
   <div class="card2"><h3>📦 पुराने ऐप का डेटा</h3><p class="note" style="margin:0">पुराने (आर्टिफ़ैक्ट) ऐप की सब्ज़ियाँ, भाव, खरीद इतिहास, उधार खाते और संस्थाएँ यहाँ लाएँ। जो पहले से है वह नहीं बदलेगा।</p><button class="big ghost" data-migrate>पुराना डेटा लाएँ</button></div>''')
 rx(r'if\(e\.target\.closest\("\[data-staffadd\]"\)\)\{.*?\n  const sd=e\.target\.closest\("\[data-staffdel\]"\);if\(sd\)\{[^\n]*\n',
    '''if(e.target.closest("[data-staffadd]")){const name=$("#stName").value.trim(),ph=$("#stPhone").value.replace(/\\D/g,"").slice(-10),pin=$("#stPin").value.trim();
@@ -144,12 +144,8 @@ EXTRA = r'''
 /* ---------- प्रिंट ---------- */
 async function printBill(b){
   try{
-    let qr=null;const due=b.pay&&b.pay.udhar?b.pay.udhar:0;
-    if(window.QRCode&&upiId()){const box=document.createElement("div");const am=due||0;
-      const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${am?"&am="+(+am).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Bill "+b.no)}`;
-      new QRCode(box,{text:upi,width:240,height:240,correctLevel:QRCode.CorrectLevel.M});qr=box.querySelector("canvas")}
-    const how=await SE.printReceipt(b,{shop:"सब्ज़ी एक्सप्रेस",tag:"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:S.settings.shopPh||"",
-      date:fdate(b.date)+" "+ftime(b.ts),fq,qr,upi:upiId(),balance:b.partyId?r2(bal(b.partyId)):null});
+    const o=window.SF?SF.rcptOpts(b,!b.pay||(b.pay.udhar>0)):{shop:"सब्ज़ी एक्सप्रेस",date:fdate(b.date)+" "+ftime(b.ts),fq};
+    const how=await SE.printReceipt(b,o);
     toast(how==="bt"?"🖨️ रसीद छप रही है":"प्रिंट खुल गया");
   }catch(err){toast(err.msg||("प्रिंट नहीं हुआ: "+(err.message||err.code||"")))}
 }

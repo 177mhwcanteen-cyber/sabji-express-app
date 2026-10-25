@@ -6,7 +6,17 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.pdf.PdfDocument;
+import android.net.Uri;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.io.FileOutputStream;
 import android.os.Build;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
@@ -155,5 +165,65 @@ public class BtPrinterPlugin extends Plugin {
                 call.reject("प्रिंट नहीं खुला: " + e.getMessage());
             }
         });
+    }
+
+    /** बिल PDF/फोटो बनाकर WhatsApp (या कोई भी ऐप) से भेजना। phone 10 अंक हो तो सीधे उसी नंबर की चैट खुलती है। */
+    @PluginMethod
+    public void shareFile(PluginCall call) {
+        try {
+            String b64 = call.getString("data");
+            String name = call.getString("name", "bill").replaceAll("[^A-Za-z0-9_-]", "_");
+            boolean pdf = Boolean.TRUE.equals(call.getBoolean("pdf", true));
+            String phone = call.getString("phone", "");
+            String text = call.getString("text", "");
+            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+            File dir = new File(getContext().getCacheDir(), "share");
+            dir.mkdirs();
+            File f;
+            if (pdf) {
+                Bitmap bm = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                PdfDocument doc = new PdfDocument();
+                PdfDocument.PageInfo pi = new PdfDocument.PageInfo.Builder(bm.getWidth(), bm.getHeight(), 1).create();
+                PdfDocument.Page pg = doc.startPage(pi);
+                pg.getCanvas().drawColor(Color.WHITE);
+                pg.getCanvas().drawBitmap(bm, 0, 0, null);
+                doc.finishPage(pg);
+                f = new File(dir, name + ".pdf");
+                FileOutputStream os = new FileOutputStream(f);
+                doc.writeTo(os);
+                os.close();
+                doc.close();
+            } else {
+                f = new File(dir, name + ".png");
+                FileOutputStream os = new FileOutputStream(f);
+                os.write(bytes);
+                os.close();
+            }
+            Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
+            Intent it = new Intent(Intent.ACTION_SEND);
+            it.setType(pdf ? "application/pdf" : "image/png");
+            it.putExtra(Intent.EXTRA_STREAM, uri);
+            if (text != null && !text.isEmpty()) it.putExtra(Intent.EXTRA_TEXT, text);
+            it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (phone != null && phone.length() == 10) {
+                it.putExtra("jid", "91" + phone + "@s.whatsapp.net");
+                for (String pkg : new String[] { "com.whatsapp", "com.whatsapp.w4b" }) {
+                    try {
+                        it.setPackage(pkg);
+                        getActivity().startActivity(it);
+                        call.resolve();
+                        return;
+                    } catch (ActivityNotFoundException ignore) { }
+                }
+                it.setPackage(null);
+                it.removeExtra("jid");
+            }
+            Intent ch = Intent.createChooser(it, "बिल भेजें");
+            ch.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            getActivity().startActivity(ch);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("शेयर नहीं हुआ: " + e.getMessage());
+        }
     }
 }

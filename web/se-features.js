@@ -336,7 +336,7 @@ async function ensurePLU(){
   }finally{ensurePLU.busy=false}
 }
 SF.ensurePLU=ensurePLU;
-const SIZES={"50x25":[50,25],"40x30":[40,30],"38x25":[38,25],"60x40":[60,40]};
+const SIZES={"50x25":[50,25],"40x30":[40,30],"38x25":[38,25],"60x40":[60,40],"75x50":[75,50],"100x50":[100,50],"100x75":[100,75]};
 /* दो तरह के लेबल:
    🥬 सब्ज़ी — टोकरी/लोरी के खाने पर एक बार चिपकाओ: नाम + भाव/किलो + बारकोड (स्कैन पर वज़न पूछेगा)
    🛒 किराना — हर पैकेट पर पक्का: दुकान का नाम, सामान, पैकेट की मात्रा, कीमत, एक्सपायरी, बारकोड */
@@ -381,17 +381,7 @@ SF.labelCanvas=function(sp,sizeKey){
   return c;
 };
 /* TSPL लेबल प्रिंटर के लिए बाइट */
-function tspl(cv,sizeKey,copies){
-  const [wmm,hmm]=SIZES[sizeKey]||SIZES["50x25"];const W=cv.width,H=cv.height,wb=Math.ceil(W/8);const d=cv.getContext("2d").getImageData(0,0,W,H).data;
-  const inv=LS.get("se_linv")==="1";const bmp=new Uint8Array(wb*H);
-  for(let y=0;y<H;y++)for(let xb=0;xb<wb;xb++){let v=0;for(let b=0;b<8;b++){const px=xb*8+b;let black=false;if(px<W){const i=(y*W+px)*4;black=(d[i]*.3+d[i+1]*.59+d[i+2]*.11)<150}
-      const bit=inv?black:!black;if(bit)v|=0x80>>b}bmp[y*wb+xb]=v} // TSPL में 0 = काला डॉट
-  const enc=s=>new TextEncoder().encode(s);
-  const head=enc(`SIZE ${wmm} mm,${hmm} mm\r\nGAP ${LS.get("se_lgap")||"2"} mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nDENSITY 10\r\nCLS\r\nBITMAP 0,0,${wb},${H},0,`);
-  const tail=enc(`\r\nPRINT ${copies},1\r\nEND\r\n`);
-  const all=new Uint8Array(head.length+bmp.length+tail.length);all.set(head,0);all.set(bmp,head.length);all.set(tail,head.length+bmp.length);
-  let s="";for(let i=0;i<all.length;i+=0x8000)s+=String.fromCharCode.apply(null,all.subarray(i,i+0x8000));return btoa(s);
-}
+function tspl(cv,sizeKey,copies){const [w,h]=SIZES[sizeKey]||SIZES["50x25"];return SE.tspl(cv,{wmm:w,hmm:h,copies})}
 SF.labelPrinter={get addr(){return LS.get("se_lbl")},get name(){return LS.get("se_lbl_n")},get type(){return LS.get("se_lbl_t")||"tspl"}};
 async function printLabels(){
   const sp=labelSpec();if(!sp){toast("पहले सामान चुनें");return}
@@ -559,6 +549,119 @@ SF.reserveBillNo=async function(){
   // बिना नेट: आगे का क्रम इसी फोन से; फोन-निशान अलग ताकि दो फोन का कोड कभी न टकराए। नेट आने पर सर्वर का क्रम इससे आगे बढ़ेगा।
   const n=loc+1;LS.set(k,String(n));
   return SF.encodeBill(d,Math.min(n,999),devSlot());
+};
+
+/* =============== 🧾 कागज़ जैसी रसीद + सेटल + शेयर =============== */
+SF.qrCanvas=function(amount,no){
+  if(!window.QRCode||!upiId())return null;const box=document.createElement("div");
+  const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${amount>0?"&am="+(+amount).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`;
+  try{new QRCode(box,{text:upi,width:240,height:240,correctLevel:QRCode.CorrectLevel.M})}catch(e){return null}
+  return box.querySelector("canvas");
+};
+SF.rcptOpts=function(b,withQr){
+  const due=b.pay?(b.pay.udhar||0):b.total;
+  return {shop:"सब्ज़ी एक्सप्रेस",tag:"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:S.settings.shopPh||"",
+    date:fdate(b.date||today())+"  "+ftime(b.ts||Date.now()),fq,qr:withQr&&b.mode!=="inst"?SF.qrCanvas(due,b.no):null,upi:upiId(),payee:UPI_FIXED.payee,
+    balance:b.partyId?r2(bal(b.partyId)+(b.pay?0:0)):null,paid:!!b.pay};
+};
+SF.paperHTML=function(b,o){
+  o=o||{};const ed=!!o.editable;const sub=r2((b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
+  const pay=b.pay;const stamp=pay?[pay.cash?"नकद "+rs(pay.cash):"",pay.upi?"UPI "+rs(pay.upi):"",pay.udhar?"उधार "+rs(pay.udhar):"",b.mode==="inst"?"संस्था · खरीद भाव":""].filter(Boolean).join(" · "):"";
+  return `<div class="paper${o.anim?" pp-anim":""}">
+  <div class="pp-head"><div class="pp-logo">🥬</div><b>सब्ज़ी एक्सप्रेस</b><small>ताज़ी सब्ज़ी, आपके दरवाज़े पर · जालीपा कैंट, बाड़मेर${S.settings.shopPh?" · 📞 "+esc(S.settings.shopPh):""}</small></div>
+  <div class="pp-rule"></div>
+  <div class="pp-meta"><span>बिल नं <b>${esc(b.no||"…")}</b></span><span>${fdate(b.date||today())} · ${ftime(b.ts||Date.now())}</span></div>
+  <div class="pp-meta"><span>ग्राहक: <b>${esc(b.partyName||"आम ग्राहक")}</b>${b.custPhone?" · "+esc(b.custPhone):""}</span><span>बिलर: ${esc(b.byName||"")}</span></div>
+  <div class="pp-dash"></div>
+  <table class="pp-t"><thead><tr><th>क्र.</th><th>सामान</th><th class="r">मात्रा</th><th class="r">भाव</th><th class="r">रकम</th>${ed?"<th></th>":""}</tr></thead><tbody>
+  ${(b.lines||[]).map((l,i)=>`<tr${ed?` data-edit="${i}"`:""}><td>${i+1}</td><td>${esc(l.name)}${l.changed?' <span class="pp-chg">भाव बदला</span>':""}${l.free?' <span class="pp-chg">मुफ्त</span>':""}</td><td class="r">${fq(l.qty,l.unit).replace(" कि.ग्रा"," kg")}</td><td class="r">${l.free?"—":"₹"+l.rate}</td><td class="r"><b>₹${l.amt}</b></td>${ed?`<td><button class="pp-x" data-del="${i}" aria-label="${esc(l.name)} हटाएँ">✕</button></td>`:""}</tr>`).join("")}
+  </tbody></table>
+  <div class="pp-dash"></div>
+  ${b.disc?`<div class="pp-row"><span>जोड़</span><span>₹${sub}</span></div><div class="pp-row"><span>छूट</span><span>−₹${b.disc}</span></div>`:""}
+  <div class="pp-total"><span>कुल रकम</span><b>₹${b.total}</b></div>
+  <div class="pp-row note"><span>${(b.lines||[]).length} सामान</span><span>${b.partyId&&!ed?"खाते में कुल बाकी ₹"+r2(bal(b.partyId)):""}</span></div>
+  ${stamp?`<div class="pp-stamp${b.cancelled?" red":""}">${b.cancelled?"रद्द · "+esc(b.cancelReason||""):"✓ "+esc(stamp)}</div>`:""}
+  ${o.qr&&b.mode!=="inst"&&upiId()?`<div class="pp-qr"><div id="${o.qrId||"ppqr"}"></div><b>स्कैन करके भुगतान करें · ₹${o.qrAmt!=null?o.qrAmt:b.total}</b><span>${esc(UPI_FIXED.payee)} · ${esc(upiId())}</span></div>`:""}
+  <div class="pp-dash"></div>
+  <div class="pp-thanks">🙏 धन्यवाद! फिर पधारें</div>
+  </div>`;
+};
+function drawQR(id,amt,no){const el=document.getElementById(id);if(!el||!window.QRCode||!upiId())return;el.innerHTML="";
+  try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${(+amt).toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`,width:190,height:190,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+function draftBill(){
+  const c=S.chk,party=S.parties.find(p=>p.id===S.partyId);
+  const custName=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:""):(S.cust.name||(S.cust.phone?"ग्राहक "+S.cust.phone:"आम ग्राहक"));
+  return {no:c.no,date:today(),ts:c.ts||(c.ts=Date.now()),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:custName,custPhone:S.cust.phone||(party&&party.phone)||"",
+    byName:biller(),lines:S.cart,sub:cartTotal(),disc:+c.disc||0,total:chkTotal()};
+}
+SF.shareBill=async function(b,phone,saved){
+  try{toast("📄 बिल का PDF बन रहा है…");
+    const how=await SE.shareReceipt(b,SF.rcptOpts(b,!saved||(b.pay&&b.pay.udhar>0)),phone,receiptText(b));
+    if(how==="download")toast("बिल की फोटो डाउनलोड हुई — WhatsApp में भेज दें")}
+  catch(e){if(e&&e.code==="oldapk"){toast(e.msg);location.href=waLink(receiptText(b),phone);return}toast(e.msg||("शेयर नहीं हुआ: "+(e.message||"")))}
+};
+SF.drawCheckout=function(){
+  const c=S.chk,tot=chkTotal(),party=S.parties.find(p=>p.id===S.partyId),b=draftBill();
+  const anyChg=S.cart.some(l=>l.changed);
+  const overLim=S.mode==="udhar"&&party&&(+party.limit>0)&&(bal(party.id)+tot>+party.limit);
+  const st=c.stage||"bill";
+  let body="";
+  if(st==="bill"){
+    body=`${anyChg?`<div class="warn">⚠ इस बिल में किसी सब्ज़ी का भाव बदला गया है। मालिक को रिपोर्ट में दिखेगा।</div>`:""}
+    ${overLim?`<div class="warn">⚠ ${esc(party.name)} की उधार सीमा ${rs(party.limit)} है। इस बिल के बाद बाकी ${rs(bal(party.id)+tot)} हो जाएगा।</div>`:""}
+    <div class="pp-slot"><div class="pp-printer"></div>${SF.paperHTML(b,{editable:true,qr:S.mode!=="inst",anim:!c.shown})}</div>
+    <p class="note" style="text-align:center;margin:6px 0 10px">किसी सामान पर टैप करके मात्रा बदलें · ✕ से हटाएँ</p>
+    ${S.mode==="inst"?"":`<label class="fld" style="margin-bottom:10px">छूट (₹) — ज़रूरी हो तभी<input class="inp ${(+c.disc)>0?"bad":""}" id="discIn" inputmode="decimal" value="${c.disc||""}" placeholder="0"></label>`}
+    <div class="pp-actions"><button data-ckedit>✏️<span>एडिट</span></button><button data-ckshare>📤<span>शेयर (PDF)</span></button><button data-ckprint>🖨️<span>प्रिंट</span></button></div>
+    <button class="big" data-settle ${tot<=0&&S.mode!=="inst"?"disabled":""}>✓ बिल सेटल करें · ${rs(tot)}</button>
+    <button class="big ghost" data-hold style="margin-top:8px">+ दूसरा ग्राहक (यह बिल ऊपर टैब में खुला रहेगा)</button>`;
+  }else{
+    const pays=S.mode==="inst"?[["inst","🏠 संस्था खाते में"]]:[["upi","📱 UPI / QR"],["cash","💵 नकद"],["udhar","📒 पूरा उधार"],["split","🔀 नकद + बाकी उधार"]];
+    let payUI="";
+    if(c.pay==="cash"){const g=parseFloat(c.given)||0;payUI=`<label class="fld">ग्राहक ने कितने दिए? (बाकी लौटाने का हिसाब)<input class="inp" id="givenIn" inputmode="decimal" value="${esc(c.given)}" placeholder="जैसे 500"></label>${g>0?`<p style="font-size:18px;margin:8px 0 12px">लौटाने हैं: <b style="color:${g>=tot?"var(--leaf)":"var(--chili)"}">${g>=tot?rs(g-tot):"₹"+(tot-g)+" कम दिए"}</b></p>`:"<div style='height:12px'></div>"}`}
+    if(c.pay==="upi")payUI=upiId()?`<div class="qrbox"><div class="qr" id="qr"></div><b>${rs(tot)}</b><span class="note">${esc(UPI_FIXED.payee)} · ${esc(upiId())}</span><span class="note">पैसा आने का मैसेज देखकर ही नीचे बटन दबाएँ।</span></div>`:`<div class="warn">UPI ID नहीं है।</div>`;
+    if(c.pay==="split"){const cp=parseFloat(c.cashPart)||0;payUI=`<label class="fld">अभी कितना नकद मिला?<input class="inp" id="cashIn" inputmode="decimal" value="${esc(c.cashPart)}"></label><p style="margin:8px 0 12px">उधार में जाएगा: <b style="color:var(--chili)">${rs(Math.max(0,tot-cp))}</b></p>`}
+    if(c.pay==="udhar")payUI=`<p style="margin:0 0 12px">पूरे <b style="color:var(--chili)">${rs(tot)}</b> ${esc(b.partyName)} के खाते में उधार चढ़ेंगे।</p>`;
+    if(c.pay==="inst")payUI=`<p style="margin:0 0 12px" class="note">${esc(b.partyName)} को खरीद भाव पर माल। पैसा नहीं लिया जाएगा।</p>`;
+    body=`<div class="settle-sum"><span>बिल ${esc(c.no)} · ${(b.lines||[]).length} सामान</span><b>${rs(tot)}</b></div>
+    <h3 style="margin:4px 0 8px">पैसा कैसे मिला?</h3>
+    <div class="paym">${pays.map(([k,v])=>`<button data-pay="${k}" aria-pressed="${c.pay===k||c.udPick===k}">${v}</button>`).join("")}</div>
+    ${c.udPick?udBoxHTML():""}
+    ${payUI}
+    <button class="big ${c.pay==="upi"?"haldi":""}" data-save ${c.udPick||S.saving||(c.pay==="upi"&&!upiId())||tot<=0&&S.mode!=="inst"||c.no==="…"?"disabled":""}>${S.saving?"सेव हो रहा है…":c.pay==="upi"?"✓ पैसा आ गया · बिल सेव करें":"✓ बिल सेव करें"}</button>
+    <button class="big ghost" data-unsettle style="margin-top:8px">← बिल पर वापस</button>`;
+  }
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिल"><div class="grab"></div>
+    <div class="sh-head"><div><h3>${st==="bill"?"🧾 आपका बिल":"💰 बिल सेटल करें"}</h3><span class="note">बिलर: ${esc(biller())}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    ${body}</div></div>`;
+  c.shown=true;
+  if(st==="bill"&&S.mode!=="inst")drawQR("ppqr",tot,c.no);
+  if(st==="settle"&&c.pay==="upi")drawQR("qr",tot,c.no);
+  const sh=$("#sheet");
+  sh.oninput=e=>{if(e.target.id==="udQ"){c.udQ=e.target.value;const l=$("#udList");if(l)l.innerHTML=udListHTML(c.udQ)}};
+  sh.onclick=async e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    if(e.target.closest("[data-settle]")){c.stage="settle";if(!c.payPicked)c.pay=S.mode==="inst"?"inst":"upi";SF.drawCheckout();return}
+    if(e.target.closest("[data-unsettle]")){c.stage="bill";c.udPick=null;SF.drawCheckout();return}
+    if(e.target.closest("[data-ckedit]")){closeSheet();toast("✏️ सामान जोड़ें/बदलें, फिर नीचे 'बिल देखें' दबाएँ");return}
+    if(e.target.closest("[data-ckshare]")){if(c.no==="…"){toast("बिल नंबर बन रहा है, एक पल…");return}SF.shareBill(draftBill(),b.custPhone,false);return}
+    if(e.target.closest("[data-ckprint]")){if(c.no==="…"){toast("बिल नंबर बन रहा है, एक पल…");return}printBill(draftBill());return}
+    const p=e.target.closest("[data-pay]");if(p&&!p.disabled){const k=p.dataset.pay;c.payPicked=true;if((k==="udhar"||k==="split")&&S.mode==="walk"){c.udPick=k;c.udQ=S.cust.phone||S.cust.name||"";SF.drawCheckout();const f=$("#udQ");if(f)f.focus();return}c.udPick=null;c.pay=k;SF.drawCheckout();return}
+    const up=e.target.closest("[data-udp]");if(up){pickUdhar(up.dataset.udp);return}
+    if(e.target.closest("[data-udnew]")){const name=$("#udName").value.trim(),phone=$("#udPh").value.replace(/\D/g,"").slice(-10),qtr=$("#udQtr").value.trim();
+      if(!name){toast("नाम लिखें");return}if(phone&&phone.length!==10){toast("मोबाइल नंबर 10 अंक का होना चाहिए");return}
+      const id="p"+Date.now().toString(36);
+      try{if(S.demo)S.parties.push({id,name,phone,qtr});else{await S.db.collection("parties").doc(id).set({name,phone,qtr,ts:Date.now(),by:S.uid||"",byName:biller()});if(!S.parties.find(x=>x.id===id))S.parties.push({id,name,phone,qtr})}toast(name+" का उधार खाता बना");pickUdhar(id)}catch(err){toast("खाता नहीं बना, दोबारा कोशिश करें")}return}
+    const d=e.target.closest("[data-del]");if(d){e.stopPropagation();S.cart.splice(+d.dataset.del,1);refreshAfterCart();if(!S.cart.length)closeSheet();else SF.drawCheckout();return}
+    const edr=e.target.closest("[data-edit]");if(edr){const l=S.cart[+edr.dataset.edit];const it=item(l.id);if(it)openQty(it,+edr.dataset.edit);return}
+    if(e.target.closest("[data-hold]")){holdCurrent();return}
+    if(e.target.closest("[data-save]"))saveBill();
+  };
+  sh.onchange=e=>{
+    if(e.target.id==="discIn"){c.disc=Math.max(0,parseFloat(e.target.value)||0);SF.drawCheckout()}
+    if(e.target.id==="givenIn"){c.given=e.target.value;SF.drawCheckout()}
+    if(e.target.id==="cashIn"){c.cashPart=e.target.value;SF.drawCheckout()}
+  };
 };
 
 /* A4 रिपोर्ट में खरीद */

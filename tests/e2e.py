@@ -89,7 +89,7 @@ async def main():
         await pg.screenshot(path=f"{SHOTS}/4-staff-billing.png")
         await pg.click('[data-item="tamatar"]'); await pg.fill("#qIn", "1.5"); await pg.click("[data-add]")
         await pg.click('[data-item="aloo"]'); await pg.fill("#aIn", "40"); await pg.click("[data-add]")
-        await pg.click("#cartbtn"); await pg.wait_for_timeout(300)
+        await pg.click("#cartbtn"); await pg.wait_for_timeout(300); await pg.screenshot(path=f"{SHOTS}/paper.png"); await pg.click("[data-settle]"); await pg.wait_for_timeout(200)
         await pg.click('[data-pay="cash"]') if await pg.query_selector('[data-pay="cash"]') else None
         await pg.click("[data-save]"); await pg.wait_for_timeout(1200)
         await pg.screenshot(path=f"{SHOTS}/5-receipt.png")
