@@ -28,7 +28,7 @@ SB.settleSheet=function(b,offline){
     const party=S.parties.find(p=>p.id===st.partyId);
     const needParty=st.pay==="udhar"||st.pay==="split";
     let ui="";
-    if(st.pay==="upi")ui=upiId()?`<div class="sb-qr"><div id="sbqr"></div><div><b>${rs(tot)}</b><span>${esc(UPI_FIXED.payee)}</span><span class="note">${esc(upiId())}</span><span class="note">पैसा आने का मैसेज देखकर ही "सेटल" दबाएँ</span></div></div>`:`<div class="warn">UPI ID सेटिंग में नहीं है</div>`;
+    if(st.pay==="upi")ui=upiId()?`<p class="note sb-upin">📱 ऊपर बिल के QR से स्कैन करवाएँ · पैसा आने का मैसेज देखकर ही "सेटल" दबाएँ</p>`:`<div class="warn">UPI ID सेटिंग में नहीं है</div>`;
     if(st.pay==="cash"){const g=num(st.given);ui=`<label class="fld">ग्राहक ने कितने दिए? (ज़रूरी नहीं)<input class="inp big-in" id="sbGiven" inputmode="decimal" value="${esc(st.given)}" placeholder="जैसे 500"></label>${g>0?`<p class="sb-change">लौटाने हैं: <b>${rs(Math.max(0,r2(g-tot)))}</b></p>`:""}`}
     if(st.pay==="split")ui=`<label class="fld">अभी कितना नकद मिला?<input class="inp big-in" id="sbCash" inputmode="decimal" value="${esc(st.cashPart)}"></label><p class="note">उधार में जाएगा: <b style="color:var(--chili)">${rs(Math.max(0,r2(tot-num(st.cashPart))))}</b></p>`;
     if(needParty){
@@ -42,13 +42,14 @@ SB.settleSheet=function(b,offline){
     $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="भुगतान"><div class="grab"></div>
     <div class="sh-head ppc-sh"><h3>💰 भुगतान <small class="note">· बिल ${esc(b.no)}</small></h3><button class="x" data-close aria-label="बंद करें">✕</button></div>
     ${offline||b.pending?'<p class="note" style="color:var(--chili);font-weight:700;margin:0 0 6px">📴 बिल फोन में सेव है — नेट आते ही सर्वर पर जाएगा</p>':""}
-    <div class="settle-sum"><span>✓ बिल सेव हो गया · ${(b.lines||[]).length} सामान</span><b>${rs(tot)}</b></div>
+    <div class="sb-saved">✓ बिल सेव हो गया — अब भुगतान लें</div>
+    ${SF.compactPaperHTML(b,{qr:st.pay==="upi",qrId:"sbqr"})}
     <div class="paym">${[["upi","📱 UPI / QR"],["cash","💵 नकद"],["udhar","📒 पूरा उधार"],["split","🔀 नकद + बाकी उधार"]].map(([k,v])=>`<button data-sbpay="${k}" aria-pressed="${st.pay===k}">${v}</button>`).join("")}</div>
     ${ui}
     <button class="big ${st.pay==="upi"?"haldi":""}" data-sbok ${ok?"":"disabled"}>${st.pay==="upi"?"✓ पैसा आ गया · सेटल करें":"✓ सेटल करें · "+rs(tot)}</button>
     <div class="sb-row"><button class="big ghost" data-sbedit2>✏️ बिल बदलें</button><button class="big ghost" data-sblater>⏳ बाद में</button></div>
     </div></div>`;
-    if(st.pay==="upi"&&upiId()&&window.QRCode){const el=$("#sbqr");try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${tot.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+b.no)}`,width:150,height:150,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+    if(st.pay==="upi"&&upiId()&&window.QRCode){const el=$("#sbqr");try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${tot.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+b.no)}`,width:124,height:124,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
   };
   draw();
   const sh=$("#sheet");
@@ -146,6 +147,7 @@ SB.pendingHTML=function(){
 };
 SB.receiptActionsHTML=function(b){
   if(b.cancelled)return "";
+  if(b.mode==="inst")return `<div data-icb="${esc(b.no)}">${SB.instContactsHTML(b)}</div>`;
   if(b.settled===false)return `<div class="sb-ract"><span class="pill blue">⏳ भुगतान बाकी</span><div class="sb-row"><button class="big" data-sbopen="${esc(b.no)}">💰 सेटल करें</button><button class="big ghost" data-sbeditno="${esc(b.no)}">✏️ बिल बदलें</button></div></div>`;
   return (b.edits&&b.edits.length&&S.isOwner)?`<div class="sb-ract"><p class="note" style="margin:0">✏️ सेव के बाद ${b.edits.length} बार बदला: ${b.edits.map(x=>esc(x.byName)+" "+ftime(x.ts)+" · "+esc(x.diff)+" ("+rs(x.totalBefore)+" → "+rs(x.totalAfter)+")").join(" | ")}</p></div>`:"";
 };
@@ -159,6 +161,144 @@ document.addEventListener("click",e=>{
   const o=e.target.closest("[data-sbopen]");if(o){const b=findBill(o.dataset.sbopen);if(b)SB.settleSheet(b);return}
   const ed=e.target.closest("[data-sbeditno]");if(ed){const b=findBill(ed.dataset.sbeditno);if(b)SB.editSheet(b);return}
 });
+/* ================= 💾 "बिल देखें" = बिल पक्का सेव ================= */
+SB.autoSave=function(){
+  if(S.saving)return;
+  if(!(S.cart||[]).length){toast("पहले सब्ज़ी चुनें");return}
+  if(S.mode!=="inst"&&!(cartTotal()>0)){toast("बिल ₹0 का है — मात्रा देखें");return}
+  saveBill();
+};
+/* सेव होते समय (या सेव न हो पाए तो) दिखने वाली खिड़की — इसमें कुछ हटाने/बदलने का बटन नहीं */
+SB.savingHTML=function(b){
+  const fail=!S.saving;
+  return `${SF.compactPaperHTML(b,{qr:false})}
+  ${fail?`<div class="warn">⚠ बिल अभी सेव नहीं हुआ — दोबारा दबाएँ</div><button class="big" data-billsave>💾 बिल सेव करें · ${rs(b.total)}</button>`:`<div class="sb-saving"><span class="sb-spin"></span><b>बिल सेव हो रहा है…</b></div>`}`;
+};
+
+/* ================= 🏢 संस्था: खरीद भाव पर चालान ================= */
+/* चुनते समय बिक्री भाव दिखता है; सेव होते ही हर लाइन खरीद भाव पर (आज की मंडी खरीद का औसत → पिछली खरीद → सामान का खरीद भाव) */
+SB.instReprice=function(bill){
+  (bill.lines||[]).forEach(l=>{
+    const it=item(l.id);const sale=r2(num(it&&it.sale)||num(l.board)||num(l.rate));
+    let pr=it&&window.SF?num(SF.costOf(it)):0;if(!(pr>0))pr=num(l.cost);
+    l.saleRate=sale;
+    if(pr>0)l.rate=r2(pr);else{l.rate=sale;l.noCost=true}
+    l.board=l.rate;l.cost=l.rate;l.changed=false;l.amt=l.free?0:r2(num(l.qty)*l.rate);
+  });
+  const L=bill.lines||[];
+  bill.sub=bill.total=r2(L.reduce((a,l)=>a+num(l.amt),0));bill.cost=bill.total;bill.disc=0;
+  bill.saleTotal=r2(L.reduce((a,l)=>a+(l.free?0:num(l.qty)*num(l.saleRate)),0));
+  bill.rateChanged=false;bill.instRate="purchase";
+};
+const saleOf=l=>num(l.saleRate)||num((item(l.id)||{}).sale);
+const qtxt=l=>fq(l.qty,l.unit).replace(" कि.ग्रा"," kg");
+SB.challanHTML=function(b,o){
+  o=o||{};const L=b.lines||[];const miss=L.filter(l=>l.noCost);
+  return `<div class="paper pp-ch${o.anim?" pp-anim":""}">
+  <div class="pp-head"><div class="pp-logo">🥬</div><b>सब्ज़ी एक्सप्रेस</b><small>माल चालान · जालीपा कैंट, बाड़मेर</small></div>
+  <div class="pp-rule"></div>
+  <div class="ch-to">🏢 ${esc(b.partyName||"संस्था")}</div>
+  <div class="pp-meta"><span>चालान नं <b>${esc(b.no||"…")}</b></span><span>${fdate(b.date||today())} · ${ftime(b.ts||Date.now())}</span></div>
+  <div class="pp-meta"><span>माल लाए: <b>${esc(b.byName||"")}</b></span><span>${L.length} सामान</span></div>
+  <div class="pp-dash"></div>
+  <table class="pp-t"><thead><tr><th>क्र.</th><th>सामान</th><th class="r">मात्रा</th><th class="r">खरीद भाव</th><th class="r">रकम</th></tr></thead><tbody>
+  ${L.map((l,i)=>`<tr><td>${i+1}</td><td>${esc(l.name)}${l.noCost?' <span class="pp-chg">⚠ खरीद भाव नहीं मिला</span>':""}</td><td class="r">${qtxt(l)}</td><td class="r">₹${l.rate}</td><td class="r"><b>₹${l.amt}</b></td></tr>`).join("")}
+  </tbody></table>
+  <div class="pp-dash"></div>
+  <div class="ch-tot"><span>${esc(b.partyName||"संस्था")} — कुल सब्ज़ी</span><b>₹${b.total}</b><small>(खरीद भाव पर · कोई मुनाफ़ा नहीं)</small></div>
+  ${miss.length?`<p class="ch-warn">⚠ ${miss.map(l=>esc(l.name)).join(", ")} — ऐप में खरीद भाव नहीं मिला, इसलिए बिक्री भाव लगा। विक्रम जी जाँच लें।</p>`:""}
+  ${SB.editNoteHTML(b)}
+  ${b.cancelled?`<div class="pp-stamp red">रद्द · ${esc(b.cancelReason||"")}</div>`:""}
+  <div class="ch-sign"><span>माल देने वाले</span><span>माल लेने वाले ✍️</span></div>
+  </div>`;
+};
+SB.editNoteHTML=function(b){
+  const E=b.edits||[];if(!E.length)return "";const x=E[E.length-1];
+  return `<div class="pp-edit">✏️ सेव के बाद ${E.length} बार बदला · आख़िरी: ${esc(x.byName||"")} ${ftime(x.ts)} · ${esc(x.diff||"")} (₹${x.totalBefore} → ₹${x.totalAfter})</div>`;
+};
+
+/* ---- 📇 संस्था के लोग: किसे कौन-सी रिपोर्ट ---- */
+/* kind: chef = सिर्फ़ सब्ज़ी+मात्रा · manager = मात्रा × खरीद भाव · resale = खरीद भाव + बेचने का भाव + पूरा बिकने पर मुनाफ़ा */
+const KINDS={chef:"हलवाई/रसोइया — सिर्फ़ मात्रा",manager:"मैनेजर — मात्रा, भाव, रकम",resale:"आगे बेचने वाले — खरीद, बिक्री भाव, मुनाफ़ा"};
+const DEF_PEOPLE=[
+  [/मारवाड़|marwar/i,[{n:"गणेश भाई",role:"मुख्य हलवाई (शेफ)",ph:"",kind:"chef"},{n:"स्वरूप जी",role:"मैनेजर",ph:"9166753417",kind:"manager"}]],
+  [/177|\bMH\b|एमएच/i,[{n:"मनोज सुमालिया जी",role:"मैनेजर, 177 MH कैंटीन",ph:"8619845800",kind:"resale",place:"177 MH कैंटीन"}]],
+  [/डोसा|dosa/i,[{n:"रामू जी",role:"डोसा पॉइंट",ph:"8528629338",kind:"manager"}]],
+  [/भैरव|bhairav/i,[{n:"दिनेश जी",role:"मैनेजर, 15 भैरव कैंटीन",ph:"8209593527",kind:"resale",place:"भैरव बटालियन"}]]
+];
+SB.peopleFor=function(inst){
+  const cfg=S.settings&&S.settings.instPeople;
+  if(cfg&&Array.isArray(cfg[inst]))return cfg[inst];
+  const d=DEF_PEOPLE.find(x=>x[0].test(inst||""));return d?d[1].map(p=>({...p})):[];
+};
+SB.instText=function(b,p){
+  const L=b.lines||[],LN="━━━━━━━━━━━━━━";const kind=p?p.kind:"manager";
+  let t=`🙏 नमस्ते${p?" "+p.n:""},\n🥬 *सब्ज़ी एक्सप्रेस* से *${b.partyName}* के लिए सब्ज़ी भेजी गई है।\n🧾 चालान: ${b.no}\n📅 ${fdate(b.date)} · ${ftime(b.ts)}\n🚚 माल लाए: ${b.byName||""}\n${LN}\n`;
+  if(kind==="chef"){
+    L.forEach((l,i)=>t+=`${i+1}. ${l.name} — *${qtxt(l)}*\n`);
+    t+=`${LN}\nकुल ${L.length} सब्ज़ी\n\n✅ कृपया तौलकर/गिनकर मिलान करें और *"मिल गई ✓"* लिखकर जवाब दें।\nकुछ कम, ज़्यादा या खराब हो तो अभी फोटो के साथ बताएँ।\n`;
+  }else if(kind==="resale"){
+    let st=0,pf=0;
+    L.forEach((l,i)=>{const s=saleOf(l),m=r2((s-num(l.rate))*num(l.qty));st+=num(l.qty)*s;pf+=m;
+      t+=`${i+1}. ${l.name} — *${qtxt(l)}*\n    खरीद ₹${l.rate} → बेचना *₹${s}*${m>0?" · मुनाफ़ा ₹"+m:" ⚠ मुनाफ़ा नहीं"}\n`});
+    st=r2(st);pf=r2(pf);
+    t+=`${LN}\n📦 माल की कीमत (खरीद भाव): *₹${b.total}*\n🏷️ सब्ज़ी एक्सप्रेस के भाव से पूरी बिक्री: *₹${st}*\n💚 *${p?p.n+", ":""}यह सब्ज़ी ${(p&&p.place)||b.partyName} में इन्हीं भाव पर पूरी बिक गई तो ₹${pf} का मुनाफ़ा होगा।*\n\n📌 बिक्री भाव वही रखें जो ऊपर लिखा है (सब्ज़ी एक्सप्रेस का भाव) — न कम, न ज़्यादा।\n🌙 रोज़ शाम बिकी और बची सब्ज़ी की जानकारी भेजें।\n✅ माल मिलान करके *"मिल गई ✓"* लिखकर जवाब दें।\n`;
+  }else{
+    L.forEach((l,i)=>t+=`${i+1}. ${l.name}\n    ${qtxt(l)} × ₹${l.rate} = *₹${l.amt}*\n`);
+    t+=`${LN}\n💰 *कुल: ₹${b.total}* (खरीद भाव पर)\n\n✅ कृपया मिलान करके *"मिल गई ✓"* लिखकर जवाब दें। कुछ फर्क हो तो अभी बताएँ।\n`;
+  }
+  if((b.edits||[]).length)t+=`✏️ यह चालान सेव के बाद ${b.edits.length} बार बदला गया।\n`;
+  return t+`— विक्रम चारण, सब्ज़ी एक्सप्रेस 🙏`;
+};
+const sentKey=b=>"se_isent_"+b.no;
+const sentGet=b=>{try{return JSON.parse(localStorage.getItem(sentKey(b))||"{}")}catch(e){return {}}};
+SB.instContactsHTML=function(b){
+  if(b.mode!=="inst"||b.cancelled)return "";
+  const P=SB.peopleFor(b.partyName),sent=sentGet(b);
+  const own=S.isOwner?`<p class="note" style="margin:6px 0 0">🔐 बिक्री भाव से यही माल ₹${r2((b.lines||[]).reduce((a,l)=>a+num(l.qty)*saleOf(l),0))} का होता — संस्था को ₹${r2((b.lines||[]).reduce((a,l)=>a+num(l.qty)*saleOf(l),0)-num(b.total))} का फायदा (सिर्फ़ आपको दिखता है)</p>`:"";
+  return `<div class="ic-box"><b>📤 ${esc(b.partyName)} के लोगों को रिपोर्ट भेजें</b>
+  ${P.length?P.map((p,i)=>{const ph=String(p.ph||"").replace(/\D/g,"").slice(-10);
+    return ph.length===10?`<a class="ic-btn" target="_blank" rel="noopener" data-icsent="${i}" href="${waLink(SB.instText(b,p),ph)}"><span>🟢 ${esc(p.n)}<small>${esc(p.role||"")} · ${esc((KINDS[p.kind]||"").split(" — ")[1]||"")}</small></span><i>${sent[i]?"✓ भेजा "+ftime(sent[i]):"भेजें"}</i></a>`
+      :`<button class="ic-btn off" data-icnoph="1"><span>⚪ ${esc(p.n)}<small>${esc(p.role||"")} · नंबर नहीं है</small></span><i>नंबर डालें</i></button>`}).join(""):`<p class="note" style="margin:4px 0">इस संस्था के लोग अभी नहीं जुड़े</p>`}
+  ${own}</div>`;
+};
+document.addEventListener("click",e=>{
+  const a=e.target.closest("[data-icsent]");if(a){const bno=a.closest("[data-icb]")?.dataset.icb;if(!bno)return;const b={no:bno};const m=sentGet(b);m[a.dataset.icsent]=Date.now();try{localStorage.setItem(sentKey(b),JSON.stringify(m))}catch(x){}setTimeout(()=>{const i=a.querySelector("i");if(i)i.textContent="✓ भेजा "+ftime(Date.now())},300);return}
+  if(e.target.closest("[data-icnoph]")){if(S.isOwner)SB.peopleSheet();else toast("इस व्यक्ति का नंबर विक्रम जी सेटिंग में डालेंगे");return}
+  if(e.target.closest("[data-icpeople]")){SB.peopleSheet();return}
+});
+SB.peopleBtnHTML=function(){return S.isOwner?`<button class="big ghost" data-icpeople style="margin:6px 0 10px">📇 संस्था के लोग (किसे रिपोर्ट जाए) — नाम, नंबर</button>`:""};
+SB.peopleSheet=function(){
+  if(!S.isOwner)return;
+  const IN=insts();const D={};IN.forEach(n=>D[n]=SB.peopleFor(n).map(p=>({...p})));
+  const draw=()=>{
+    $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="संस्था के लोग"><div class="grab"></div>
+    <div class="sh-head"><div><h3>📇 संस्था के लोग</h3><span class="note">संस्था का चालान बनते ही इन्हें WhatsApp रिपोर्ट का बटन मिलेगा</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    ${IN.map((n,gi)=>`<div class="ic-grp"><b>🏢 ${esc(n)}</b>${D[n].map((p,i)=>`<div class="ic-row">
+      <input class="inp" data-icf="n" data-g="${gi}" data-i="${i}" value="${esc(p.n||"")}" placeholder="नाम" aria-label="नाम">
+      <input class="inp" data-icf="ph" data-g="${gi}" data-i="${i}" value="${esc(p.ph||"")}" inputmode="tel" placeholder="मोबाइल 10 अंक" aria-label="मोबाइल">
+      <input class="inp" data-icf="role" data-g="${gi}" data-i="${i}" value="${esc(p.role||"")}" placeholder="पद (जैसे मैनेजर)" aria-label="पद">
+      <select class="inp" data-icf="kind" data-g="${gi}" data-i="${i}" aria-label="रिपोर्ट किस तरह की">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}" ${p.kind===k?"selected":""}>${v}</option>`).join("")}</select>
+      ${p.kind==="resale"?`<input class="inp" data-icf="place" data-g="${gi}" data-i="${i}" value="${esc(p.place||"")}" placeholder="कहाँ बेचेंगे (जैसे भैरव बटालियन)" aria-label="कहाँ बेचेंगे">`:""}
+      <button class="lnk" data-icdel="${gi}:${i}" style="color:var(--chili)">हटाएँ</button></div>`).join("")}
+      <button class="lnk" data-icadd="${gi}">+ व्यक्ति जोड़ें</button></div>`).join("")}
+    <button class="big" data-icsave>💾 सेव करें</button></div></div>`;
+  };
+  draw();const sh=$("#sheet");
+  const set=e=>{const f=e.target.closest("[data-icf]");if(!f)return;const p=D[IN[+f.dataset.g]][+f.dataset.i];p[f.dataset.icf]=f.dataset.icf==="ph"?f.value.replace(/\D/g,"").slice(-10):f.value;return f.dataset.icf};
+  sh.oninput=set;sh.onchange=e=>{if(set(e)==="kind"){const y=$("#sheet .sheet").scrollTop;draw();$("#sheet .sheet").scrollTop=y}};
+  sh.onclick=async e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    const a=e.target.closest("[data-icadd]");if(a){D[IN[+a.dataset.icadd]].push({n:"",role:"",ph:"",kind:"manager"});draw();return}
+    const d=e.target.closest("[data-icdel]");if(d){const [g,i]=d.dataset.icdel.split(":").map(Number);D[IN[g]].splice(i,1);draw();return}
+    if(e.target.closest("[data-icsave]")){
+      const bad=Object.values(D).flat().find(p=>p.ph&&p.ph.length!==10);if(bad){toast(bad.n+" का नंबर 10 अंक का नहीं");return}
+      const out={};IN.forEach(n=>out[n]=D[n].filter(p=>p.n.trim()).map(p=>({n:p.n.trim(),role:(p.role||"").trim(),ph:p.ph||"",kind:p.kind||"manager",...(p.place?{place:p.place.trim()}:{})})));
+      await saveSetting({instPeople:out});S.settings.instPeople=out;closeSheet();
+    }
+  };
+};
+
 /* मालिक को सूचना: कोई बिल सेव के बाद बदला */
 const seenEd={};let edInit=false;
 setInterval(()=>{if(!S.isOwner)return;(S.dayBills||[]).forEach(b=>{const n=(b.edits||[]).length;if(edInit&&n>(seenEd[b.no]||0)){const x=b.edits[n-1];toast("✏️ "+x.byName+" ने बिल "+b.no+" बदला: "+rs(x.totalBefore)+" → "+rs(x.totalAfter)+" ("+x.diff+")")}seenEd[b.no]=n});edInit=true},15000);

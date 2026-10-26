@@ -2,7 +2,7 @@
 (()=>{const D=window.__MOCK__||{};window.__MOCK__=D;const subs=[];
 const clone=x=>JSON.parse(JSON.stringify(x));
 function coll(p){D[p]=D[p]||{};return D[p]}
-const notify=()=>setTimeout(()=>subs.forEach(s=>s()),0);
+let quiet=0;const notify=()=>{if(!quiet)setTimeout(()=>subs.forEach(s=>s()),0)};
 function snapDoc(p,id){const c=D[p]||{};const ex=id in c;return {exists:ex,id,ref:docRef(p+"/"+id),data:()=>ex?clone(c[id]):undefined}}
 function applyInc(old,d){const o={...(old||{})};for(const [k,v] of Object.entries(d)){if(v&&v.__inc!=null)o[k]=(+o[k]||0)+v.__inc;else if(v&&v.__union)o[k]=(o[k]||[]).concat(v.__union);else o[k]=v}return o}
 function docRef(full){const p=full.split("/");const id=p.pop();const cp=p.join("/");return {id,
@@ -15,7 +15,7 @@ const OPS={"==":(a,b)=>a===b,">=":(a,b)=>a>=b,"<=":(a,b)=>a<=b,">":(a,b)=>a>b,"<
 function q(path,filt){const ok=id=>!filt||OPS[filt[1]]((D[path][id]||{})[filt[0]],filt[2]);const o={where:(f,op,v)=>q(path,[f,op,v]),orderBy:()=>o,limit:()=>o,doc:id=>docRef(path+"/"+id),add:async d=>{const id="a"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);await docRef(path+"/"+id).set(d);return docRef(path+"/"+id)},
  get:async()=>({docs:Object.keys(D[path]||{}).filter(ok).map(id=>snapDoc(path,id))}),
  onSnapshot:(fn)=>{const s=()=>fn({docs:Object.keys(D[path]||{}).filter(ok).map(id=>snapDoc(path,id))});subs.push(s);setTimeout(s,5);return ()=>{}}};return o}
-const db={collection:q,doc:docRef,settings(){},enablePersistence:async()=>{},runTransaction:async fn=>fn({get:r=>r.get(),set:(r,d,o)=>r.set(d,o),update:(r,d)=>r.update(d)})};
+const db={collection:q,doc:docRef,settings(){},batch(){const ops=[];const w={set:(r,d,o)=>{ops.push(()=>r.set(d,o));return w},update:(r,d)=>{ops.push(()=>r.update(d));return w},delete:r=>{ops.push(()=>r.delete());return w},commit:async()=>{quiet++;try{for(const f of ops)await f()}finally{quiet--}notify()}};return w},enablePersistence:async()=>{},runTransaction:async fn=>fn({get:r=>r.get(),set:(r,d,o)=>r.set(d,o),update:(r,d)=>r.update(d)})};
 const U=window.__USERS__||{};window.__USERS__=U;
 function mkAuth(){const ls=[];const a={currentUser:null,
  onAuthStateChanged(cb){ls.push(cb);setTimeout(()=>cb(a.currentUser),5);return ()=>{const i=ls.indexOf(cb);if(i>-1)ls.splice(i,1)}},

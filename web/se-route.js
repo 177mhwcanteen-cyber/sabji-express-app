@@ -223,6 +223,7 @@ document.addEventListener("click",async e=>{
 const R={date:null,map:null,live:[],day:null,agg:null,loading:false,custQ:"",custAll:false,liveLayer:null};
 SR.onDb=function(db){
   db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.day){R.day=analyze(R.day.date,R.day.docs,R.day.bills);SR.renderRoute()}},()=>{});
+  if(S.isOwner)setTimeout(()=>SR.autoOldUdhar(db),2500);
   if(S.isOwner)db.collection("live").onSnapshot(s=>{R.live=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route")SR.updateLive()},()=>{});
   else{setTimeout(SR.start,1500);setTimeout(SR.lockCheck,1200)}
 };
@@ -646,14 +647,18 @@ document.addEventListener("click",async e=>{const b=e.target.closest("[data-pinc
 /* ======================= 📥 कॉपी वाली पुरानी उधारी (26-10-2026 तक, विक्रम जी की कॉपी से) ======================= */
 const OLD_UDHAR=(()=>{const D=(m,a,b)=>{const r=[];for(let d=a;d<=b;d++)r.push(["2026-"+m+"-"+String(d).padStart(2,"0"),140]);return r};
   return [
-  {pid:"samosa-shop",name:"समोसा शॉप",total:4638,rows:[["2026-10-06",460],["2026-10-07",300],["2026-10-10",168],["2026-10-11",525],["2026-10-13",160],["2026-10-15",697],["2026-10-16",300],["2026-10-17",420],["2026-10-18",435],["2026-10-19",148],["2026-10-21",650],["2026-10-22",375]]},
-  {pid:"co",name:"CO साहब",note:"नारियल ₹140 रोज़",total:7340,rows:[["2026-08-31",140],...D("09",1,22),...D("09",24,30),...D("10",1,20),["2026-10-21",340]]},
-  {pid:"officers-mess",name:"अफसर मेस",total:2383,rows:[["2026-10-23",1388],["2026-10-24",315],["2026-10-26",680]]},
-  {pid:"jco-mess",name:"JCO मेस",total:15625,rows:[["2026-10-09",490],["2026-10-10",1600],["2026-10-11",1200],["2026-10-12",700],["2026-10-13",910],["2026-10-15",1135],["2026-10-17",3430],["2026-10-20",1625],["2026-10-22",615],["2026-10-23",410],["2026-10-24",3510]]},
-  {pid:"ajay-sir",name:"अजय सर",total:3319,rows:[["2026-08-21",250],["2026-08-22",80],["2026-08-26",375],["2026-08-31",160],["2026-09-01",145],["2026-09-06",187],["2026-09-11",110],["2026-09-15",125],["2026-09-16",226],["2026-09-19",125],["2026-09-20",80],["2026-09-21",140],["2026-09-22",115],["2026-09-26",176],["2026-09-28",145],["2026-09-30",140],["2026-10-05",260],["2026-10-06",70],["2026-10-07",200],["2026-10-21",210]]}
+  {pid:"samosa-shop",name:"समोसा शॉप",al:["समोसा","samosa"],total:4638,rows:[["2026-10-06",460],["2026-10-07",300],["2026-10-10",168],["2026-10-11",525],["2026-10-13",160],["2026-10-15",697],["2026-10-16",300],["2026-10-17",420],["2026-10-18",435],["2026-10-19",148],["2026-10-21",650],["2026-10-22",375]]},
+  {pid:"co",name:"CO साहब",eq:["coसाहब","सीओसाहब","co","cosahab","coसाब"],note:"नारियल ₹140 रोज़",total:7340,rows:[["2026-08-31",140],...D("09",1,22),...D("09",24,30),...D("10",1,20),["2026-10-21",340]]},
+  {pid:"officers-mess",name:"अफसर मेस",al:["अफसरमेस","अफ़सरमेस","ऑफिसरमेस","ऑफिसर्समेस","officersmess","officermess"],total:2383,rows:[["2026-10-23",1388],["2026-10-24",315],["2026-10-26",680]]},
+  {pid:"jco-mess",name:"JCO मेस",al:["jcoमेस","jcomess","जेसीओमेस"],total:15625,rows:[["2026-10-09",490],["2026-10-10",1600],["2026-10-11",1200],["2026-10-12",700],["2026-10-13",910],["2026-10-15",1135],["2026-10-17",3430],["2026-10-20",1625],["2026-10-22",615],["2026-10-23",410],["2026-10-24",3510]]},
+  {pid:"ajay-sir",name:"अजय सर",al:["अजयसर","ajaysir","अजय"],total:3319,rows:[["2026-08-21",250],["2026-08-22",80],["2026-08-26",375],["2026-08-31",160],["2026-09-01",145],["2026-09-06",187],["2026-09-11",110],["2026-09-15",125],["2026-09-16",226],["2026-09-19",125],["2026-09-20",80],["2026-09-21",140],["2026-09-22",115],["2026-09-26",176],["2026-09-28",145],["2026-09-30",140],["2026-10-05",260],["2026-10-06",70],["2026-10-07",200],["2026-10-21",210]]}
   ]})();
 SR.OLD_UDHAR=OLD_UDHAR;
 const opId=(g,r,i)=>"op_"+g.pid+"_"+r[0]+"_"+i;
+const nrm=x=>String(x||"").toLowerCase().replace(/[\s.\-_()]/g,"");
+/* ऐप में पहले से बना खाता नाम से पहचानो (अलग id वाला भी) */
+const findP=(list,g)=>list.find(x=>x.id===g.pid)||list.find(x=>{const n=nrm(x.name);return (g.eq||[]).includes(n)||(g.al||[]).some(a=>n.includes(nrm(a)))});
+SR.findOldParty=findP;
 const opDone=g=>g.rows.every((r,i)=>(S.ledger||[]).some(l=>l.id===opId(g,r,i)));
 SR.oldUdharBtnHTML=function(){if(!S.isOwner)return "";const left=OLD_UDHAR.filter(g=>!opDone(g));if(!left.length)return "";
   return `<button class="big ghost" data-oldud style="margin-bottom:10px;border:2px dashed #7c3aed;color:#6d28d9">📥 कॉपी की पुरानी उधारी ऐप में डालें (${left.length} खाते · ${rs(left.reduce((a,g)=>a+g.total,0))})</button>`};
@@ -662,7 +667,7 @@ SR.oldUdharSheet=function(){
   const draw=()=>{
     $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="पुरानी उधारी"><div class="grab"></div>
     <div class="sh-head"><div><h3>📥 कॉपी की पुरानी उधारी</h3><span class="note">तारीख के हिसाब से हर एंट्री अलग · जो पहले डल चुकी है वह दोबारा नहीं डलेगी</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
-    ${OLD_UDHAR.map(g=>{const p=S.parties.find(x=>x.id===g.pid);const done=opDone(g);const sel=g.rows.reduce((a,r,i)=>a+(pick[g.pid][i]?r[1]:0),0);
+    ${OLD_UDHAR.map(g=>{const p=findP(S.parties,g);const done=opDone(g);const sel=g.rows.reduce((a,r,i)=>a+(pick[g.pid][i]?r[1]:0),0);
       return `<details class="oldud" ${done?"":"open"}><summary><b>${esc(g.name)}</b>${g.note?` <span class="note">(${esc(g.note)})</span>`:""} · ${g.rows.length} एंट्री · कॉपी में कुल <b>${rs(g.total)}</b>${done?' <span class="pill green">✓ डल चुकी</span>':""}<br><span class="note">ऐप में अभी बाकी: ${p?rs(bal(p.id)):"खाता नया बनेगा"} · चुनी हुई: ${rs(sel)}</span></summary>
       <div class="oldud-g">${g.rows.map((r,i)=>`<label class="${r[0]===today()?"today":""}"><input type="checkbox" data-odp="${g.pid}" data-odi="${i}" ${pick[g.pid][i]?"checked":""} ${done?"disabled":""}><span>${fdate(r[0]).slice(0,5)}</span><b>${rs(r[1])}</b>${r[0]===today()?'<small>⚠ आज का — ऐप में बिल बना हो तो हटा दें</small>':""}</label>`).join("")}</div></details>`}).join("")}
     <p class="note" style="margin:8px 0">कॉपी के हिसाब से कुल: ${rs(OLD_UDHAR.reduce((a,g)=>a+g.total,0))}</p>
@@ -676,7 +681,7 @@ SR.oldUdharSheet=function(){
     let n=0,amt=0;
     try{
       for(const g of OLD_UDHAR){
-        let p=S.parties.find(x=>x.id===g.pid);
+        let p=findP(S.parties,g);
         if(!p){const d={name:g.name,phone:"",qtr:"",ts:Date.now()};if(!S.demo)await S.db.collection("parties").doc(g.pid).set(d,{merge:true});p={id:g.pid,...d};S.parties.push(p)}
         for(const [i,r] of g.rows.entries()){
           if(!pick[g.pid][i])continue;const id=opId(g,r,i);if((S.ledger||[]).some(l=>l.id===id))continue;
@@ -690,6 +695,59 @@ SR.oldUdharSheet=function(){
   };
 };
 document.addEventListener("click",e=>{if(e.target.closest("[data-oldud]"))SR.oldUdharSheet()});
+/* नया वर्ज़न: मालिक के फोन पर एक बार अपने-आप सारी पुरानी उधारी तारीख-वार जुड़ जाए।
+   जिस दिन का उसी खाते में ऐप-बिल का उधार पहले से है, वह दिन दोबारा नहीं जुड़ता (दोहरा न हो)। */
+SR.autoOldUdhar=async function(db){
+  if(!S.isOwner||S.demo||!db||SR._oldAuto)return;SR._oldAuto=1;
+  try{
+    const fr=db.doc("ownerCfg/flags");const f=await fr.get();if(f.exists&&f.data().oldUdhar1)return;
+    const [ps,ls]=await Promise.all([db.collection("parties").get(),db.collection("ledger").get()]);
+    const parties=ps.docs.map(d=>({id:d.id,...d.data()})),led=ls.docs.map(d=>({id:d.id,...d.data()}));
+    let n=0,amt=0;const skip=[];
+    /* एक ही बार में (batch) लिखो — फोन पर 97 बार स्क्रीन दोबारा न बने */
+    const W=db.batch?db.batch():null;const put=(ref,d,o)=>W?W.set(ref,d,o):ref.set(d,o);const newLed=[];
+    for(const g of OLD_UDHAR){
+      let p=findP(parties,g);
+      if(!p){const d={name:g.name,phone:"",qtr:"",ts:Date.now(),by:S.uid||"",byName:biller()};await put(db.collection("parties").doc(g.pid),d,{merge:true});p={id:g.pid,...d};parties.push(p)}
+      for(const [i,r] of g.rows.entries()){
+        const id=opId(g,r,i);if(led.some(l=>l.id===id))continue;
+        if(led.some(l=>l.partyId===p.id&&l.date===r[0]&&l.type==="udhar"&&!l.opening)){skip.push(g.name+" "+fdate(r[0]).slice(0,5)+" ₹"+r[1]);continue}
+        const ent={ts:new Date(r[0]+"T12:00:00").getTime(),date:r[0],partyId:p.id,partyName:p.name,type:"udhar",opening:true,note:"कॉपी से"+(g.note?" · "+g.note:""),amt:r[1],billNo:"",by:S.uid||"",byName:biller()};
+        await put(db.collection("ledger").doc(id),ent);led.push({id,...ent});newLed.push({id,...ent});n++;amt+=r[1];
+      }
+    }
+    await put(fr,{oldUdhar1:Date.now(),oldUdharN:n,oldUdharAmt:r2(amt),oldUdharSkip:skip},{merge:true});
+    if(W)await W.commit();
+    if(n)toast("📥 कॉपी की पुरानी उधारी जुड़ गई: "+n+" एंट्री · "+rs(amt)+(skip.length?" ("+skip.length+" दिन पहले से ऐप में थे)":""));
+    try{renderPane()}catch(x){}
+  }catch(e){SR._oldAuto=0}
+};
+/* ✏️ पुरानी (कॉपी वाली) उधार एंट्री बदलें/मिटाएँ — सिर्फ़ मालिक */
+SR.opEditBtn=function(l){return S.isOwner?` · <button class="lnk" data-opedit="${esc(l.id)}">✏️ बदलें</button>`:""};
+SR.opEditSheet=function(id){
+  const l=(S.ledger||[]).find(x=>x.id===id);if(!l||!S.isOwner)return;const pid=l.partyId;let sure=false;
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="पुरानी एंट्री बदलें"><div class="grab"></div>
+  <div class="sh-head"><div><h3>✏️ पुरानी उधार एंट्री</h3><span class="note">${esc(l.partyName||"")} · अभी ${fdate(l.date)} · ${rs(l.amt)}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="row2"><label class="fld">तारीख<input class="inp" type="date" id="oeD" value="${esc(l.date)}"></label><label class="fld">रकम ₹<input class="inp" id="oeA" inputmode="decimal" value="${l.amt}"></label></div>
+  <label class="fld">नोट<input class="inp" id="oeN" value="${esc(l.note||"")}"></label>
+  <button class="big" data-oesave style="margin-top:8px">💾 बदलाव सेव करें</button>
+  <div class="sb-row"><button class="big ghost" data-oeback>← वापस</button><button class="big ghost" data-oedel style="color:var(--chili)">🗑️ एंट्री मिटाएँ</button></div></div></div>`;
+  $("#sheet").onclick=async e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    if(e.target.closest("[data-oeback]")){openParty(pid);return}
+    const del=e.target.closest("[data-oedel]");
+    if(del){if(!sure){sure=true;del.textContent="पक्का मिटाएँ? दोबारा दबाएँ";return}
+      try{try{G.okdel.add(id)}catch(x){}if(!S.demo)await S.db.collection("ledger").doc(id).delete();S.ledger=S.ledger.filter(x=>x.id!==id);toast("🗑️ एंट्री मिटाई");openParty(pid);try{renderPane()}catch(x){}}catch(err){toast("नहीं मिटी: "+(err.code||""))}return}
+    if(e.target.closest("[data-oesave]")){
+      const d=$("#oeD").value,a=r2(parseFloat(String($("#oeA").value).replace(",","."))||0),n=$("#oeN").value.trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){toast("तारीख सही चुनें");return}if(!(a>0)){toast("रकम लिखें");return}
+      const ch={date:d,ts:new Date(d+"T12:00:00").getTime(),amt:a,note:n||"पुराना बाकी",editTs:Date.now(),editBy:biller(),prevAmt:l.amt,prevDate:l.date};
+      try{if(!S.demo)await S.db.collection("ledger").doc(id).update(ch);Object.assign(l,ch);
+        try{if(G.led&&G.led.m[id])Object.assign(G.led.m[id],{fp:fpLed(l),amt:l.amt})}catch(x){}
+        toast("✓ एंट्री बदली: "+rs(ch.prevAmt)+" → "+rs(a));openParty(pid);try{renderPane()}catch(x){}}catch(err){toast("नहीं बदली: "+(err.code||""))}}
+  };
+};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-opedit]");if(b){e.stopPropagation();SR.opEditSheet(b.dataset.opedit)}},true);
 /* SF के साथ जोड़ */
 if(window.SF){const _o=SF.onDb;SF.onDb=function(db){_o(db);try{SR.onDb(db)}catch(e){}}}
 })();

@@ -437,6 +437,16 @@ main{padding-block:10px 120px}
 .paper.pp-c .ppc-foot{margin:8px 12px 0}.ppc-qr{border:2px solid #14532d;border-radius:10px;position:relative;padding:3px}.ppc-qr::after{content:'UPI';position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:#14532d;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:0 6px}
 .oldud{background:var(--surface);border-radius:14px;padding:8px 12px;margin:0 0 8px;box-shadow:var(--shadow)}.oldud summary{cursor:pointer;line-height:1.5}
 .oldud-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px;margin-top:6px}.oldud-g label{display:flex;align-items:center;gap:6px;background:var(--bg);border-radius:8px;padding:4px 8px;font-size:14px;flex-wrap:wrap}.oldud-g label b{margin-left:auto}.oldud-g label.today{outline:2px solid #f59e0b}.oldud-g small{width:100%;color:#b45309;font-size:11px}
+.sb-saving{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;font-size:18px}.sb-spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--leaf);border-top-color:transparent;animation:sbspin .8s linear infinite}@keyframes sbspin{to{transform:rotate(360deg)}}
+.sb-saved{background:#e7f6ec;color:#11502b;border-radius:12px;padding:6px 10px;font-weight:800;margin:0 0 6px;text-align:center}.sb-upin{margin:0 0 8px;text-align:center}
+.pp-edit{margin:6px 0 2px;padding:5px 8px;border:1.5px dashed #7c3aed;border-radius:8px;color:#5b21b6;font-size:12.5px;line-height:1.4}
+.ch-to{font-family:'Baloo 2',sans-serif;font-size:22px;font-weight:800;text-align:center;margin:4px 0 2px}
+.ch-tot{display:grid;justify-items:center;gap:0;margin:6px 0 4px;text-align:center}.ch-tot span{font-weight:700}.ch-tot b{font-family:'Baloo 2',sans-serif;font-size:30px;line-height:1.1}.ch-tot small{color:#555}
+.ch-warn{color:#b42318;font-size:12.5px;margin:4px 0}.ch-sign{display:flex;justify-content:space-between;gap:12px;margin-top:22px;font-size:12px;color:#555}.ch-sign span{flex:1;border-top:1px solid #999;padding-top:3px;text-align:center}
+.ic-box{background:var(--surface);border-radius:14px;padding:10px 12px;margin:8px 0;box-shadow:var(--shadow);display:grid;gap:6px}
+.ic-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:inherit;background:#e9f9ee;border:1.5px solid #25d366;border-radius:12px;padding:8px 10px;font:inherit;text-align:left;width:100%;cursor:pointer}.ic-btn span{display:grid;font-weight:800}.ic-btn small{font-weight:500;color:#4b5563}.ic-btn i{font-style:normal;font-weight:800;color:#0b7a35;white-space:nowrap}
+.ic-btn.off{background:transparent;border-style:dashed;border-color:#bbb}.ic-btn.off i{color:#888}
+.ic-grp{background:var(--surface);border-radius:14px;padding:8px 10px;margin:0 0 8px;box-shadow:var(--shadow)}.ic-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0;border-bottom:1px dashed #ccc}.ic-row select{grid-column:1/-1}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -561,7 +571,7 @@ function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2200)}
 function insts(){return (S.settings.insts&&S.settings.insts.length)?S.settings.insts:["मारवाड़ रसोई (होटल)","177 MH कैंटीन","रामविनायक डोसा पॉइंट","15 भैरव कैंटीन (जसाई)"]}
 function item(id){return S.items.find(i=>i.id===id)}
-function priceOf(it){return S.mode==="inst"?(window.SF?SF.costOf(it):(+it.cost||0)):(+it.sale||0)}
+function priceOf(it){return +it.sale||0} /* संस्था: चुनते समय बिक्री भाव, सेव होते ही खरीद भाव (SB.instReprice) */
 function tileHTML(it,cls=""){
   const h=it.hue??120;
   const em=`<span class="em" aria-hidden="true">${esc(it.emoji||"🥬")}</span>`;
@@ -785,9 +795,10 @@ function openCheckout(){
   if(S.mode==="inst"&&!S.inst){toast("पहले ऊपर संस्था चुनें");return}
   if(!biller()){openBiller(openCheckout);return}
   const _t=S.bt[S.ai];const _keep=_t&&_t.no&&_t.noDate===today()?_t.no:"";
-  S.chk={no:_keep||(window.SF?"…":newBillNo()),disc:0,pay:S.mode==="inst"?"inst":"cash",given:"",cashPart:"",upiOk:false};
+  if(S.saving)return;
+  S.chk={no:_keep||(window.SF?"…":newBillNo()),disc:0,pay:S.mode==="inst"?"inst":"pending",given:"",cashPart:"",upiOk:false};
+  if(window.SB&&SB.autoSave){SB.autoSave();return}
   drawCheckout();
-  if(!_keep&&window.SF){const c0=S.chk;SF.reserveBillNo().then(n=>{if(_t){_t.no=n;_t.noDate=today();lsSet("se_tabs",JSON.stringify(S.bt))}if(S.chk===c0){c0.no=n;if($("#sheet .sh-head"))drawCheckout()}})}
 }
 function chkTotal(){return Math.max(0,Math.round(cartTotal()-(+S.chk.disc||0)))}
 function drawCheckout(){if(window.SF&&SF.drawCheckout)return SF.drawCheckout();
@@ -859,10 +870,10 @@ async function saveBill(){
   const lines=S.cart.map(l=>({id:l.id,name:l.name,emoji:l.emoji||"",unit:l.unit,qty:l.qty,rate:l.rate,board:l.board,cost:l.cost,amt:l.amt,changed:!!l.changed,free:!!l.free,...(l.note?{note:l.note}:{})}));
   const cph=S.mode==="walk"?S.cust.phone:"",cnm=S.mode==="walk"?S.cust.name:"";
   const cost=r2(lines.reduce((a,l)=>a+l.cost*l.qty,0));
-  if(c.no==="…"&&window.SF)c.no=await SF.reserveBillNo();
+  if(c.no==="…"&&window.SF){S.saving=true;drawCheckout();try{c.no=await SF.reserveBillNo()}finally{S.saving=false}}
   const bill={no:c.no,ts:now,date,by:S.uid||"",byName:biller(),mode:S.mode,partyId:S.mode==="udhar"?S.partyId:"",partyName:S.mode==="udhar"?(party?.name||""):S.mode==="inst"?S.inst:(cnm||"VIP ग्राहक"),custPhone:cph,custName:cnm,
     lines,sub:cartTotal(),disc:+c.disc||0,total:S.mode==="inst"?cartTotal():tot,pay,payMode:c.pay,cost,
-    rateChanged:lines.some(l=>l.changed),cancelled:false,settled:c.pay!=="pending"};if(window.SR)SR.stamp(bill);
+    rateChanged:lines.some(l=>l.changed),cancelled:false,settled:c.pay!=="pending"};if(window.SR)SR.stamp(bill);if(bill.mode==="inst"&&window.SB)SB.instReprice(bill);
   S.saving=true;drawCheckout();
   if(S.demo){S.dayBills=[bill,...S.dayBills];if(pay.udhar>0)S.ledger.push({id:c.no,ts:now,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:pay.udhar,billNo:c.no,byName:biller()});await adjStock(trackedPairs(lines,-1),"बिल "+c.no);S.saving=false;closeCurTab();refreshAfterCart();if(bill.settled===false&&window.SB)SB.settleSheet(bill);else showReceipt(bill,true);return}
   const item={bill,done:{}};let offline=false;
@@ -878,6 +889,7 @@ async function saveBill(){
   if(window.SR&&bill.custPhone)SR.custHist(bill,bill.custPhone);S.saving=false;closeCurTab();refreshAfterCart();if(bill.settled===false&&window.SB)SB.settleSheet(bill,offline);else showReceipt(bill,true,offline);netbar();beat();
 }
 function receiptText(b){
+  if(b.mode==="inst"&&window.SB)return SB.instText(b,null);
   b={...b,pay:b.pay||{}};
   const L="━━━━━━━━━━━━━━━";
   let t=`🥬 *सब्ज़ी एक्सप्रेस*\n_ताज़ी सब्ज़ी, आपके दरवाज़े पर_\nजालीपा कैंट, बाड़मेर\n${L}\n*${SF.custTag(b)}*\n🧾 बिल नं: ${b.no}\n📅 ${fdate(b.date)} · ${ftime(b.ts)}\n👤 ${b.partyName}${b.custPhone?" ("+b.custPhone+")":""}\n${L}\n`;
@@ -979,7 +991,7 @@ function openParty(pid){
     ${window.SR?SR.openingHTML(p):""}
     ${S.isOwner&&!S.demo?`<label class="fld" style="margin-top:12px">उधार सीमा ₹ (इससे ज़्यादा होने पर बिलर को चेतावनी)<input class="inp" id="pLimit" inputmode="decimal" value="${+p.limit||""}" placeholder="जैसे 5000"></label>`:""}
     <h4 style="margin:16px 0 6px">पूरा हिसाब</h4>
-    <div class="list">${ents.length?ents.map(l=>`<div class="li"><div class="mid"><b>${l.type==="udhar"?(l.opening?"📜 पुराना बाकी"+(l.note?" · "+esc(l.note):""):"उधार · बिल "+esc(l.billNo||"")):"जमा · "+(l.mode==="upi"?"UPI":"नकद")}</b><span>${fdate(l.date)} ${ftime(l.ts)} · ${esc(l.byName||"")}</span></div><div class="rt" style="color:${l.type==="udhar"?"var(--chili)":"var(--leaf)"}">${l.type==="udhar"?"+":"−"}${rs(l.amt)}</div></div>`).join(""):`<div class="empty">अभी कोई एंट्री नहीं</div>`}</div>
+    <div class="list">${ents.length?ents.map(l=>`<div class="li"><div class="mid"><b>${l.type==="udhar"?(l.opening?"📜 पुराना बाकी"+(l.note?" · "+esc(l.note):""):"उधार · बिल "+esc(l.billNo||"")):"जमा · "+(l.mode==="upi"?"UPI":"नकद")}</b><span>${fdate(l.date)} ${ftime(l.ts)} · ${esc(l.byName||"")}${l.opening&&window.SR?SR.opEditBtn(l):""}</span></div><div class="rt" style="color:${l.type==="udhar"?"var(--chili)":"var(--leaf)"}">${l.type==="udhar"?"+":"−"}${rs(l.amt)}</div></div>`).join(""):`<div class="empty">अभी कोई एंट्री नहीं</div>`}</div>
     </div></div>`;
   };
   draw();
@@ -1426,7 +1438,7 @@ function renderSettings(){
     <label class="fld">आपका WhatsApp नंबर (बिल रद्द की अर्ज़ी इसी पर आएगी)<input class="inp" id="s-ownerPh" data-sf="ownerPh" inputmode="tel" value="${esc(s.ownerPh||"")}" placeholder="10 अंक"></label>
     <label class="fld">दुकान/गाड़ी का ऑर्डर नंबर (बिल पर छपेगा)<input class="inp" id="s-shopPh" data-sf="shopPh" inputmode="tel" value="${esc(s.shopPh||"")}" placeholder="10 अंक"></label>
     <label class="fld">सुबह गल्ले में रोज़ कितना खुला पैसा रखते हैं (₹)<input class="inp" id="s-float" data-sf="float" inputmode="decimal" value="${esc(s.float||"")}" placeholder="जैसे 500"></label>
-    <label class="fld">अपनी संस्थाएँ (हर लाइन में एक)<textarea class="inp" id="s-insts" data-sf="insts" rows="4">${esc(insts().join("\n"))}</textarea></label>
+    <label class="fld">अपनी संस्थाएँ (हर लाइन में एक)<textarea class="inp" id="s-insts" data-sf="insts" rows="4">${esc(insts().join("\n"))}</textarea></label>${window.SB?SB.peopleBtnHTML():""}
   </div>
   <div class="card2"><h3>🔐 कर्मचारी (लॉगिन खाते)</h3>
     <p class="note" style="margin:0">हर व्यक्ति अपने मोबाइल नंबर + 4 अंक के PIN से लॉगिन करेगा। बिल उसी के नाम से बनेंगे। किसी को हटाना हो तो "बंद करें" — उसका पुराना हिसाब कभी नहीं मिटेगा।</p>

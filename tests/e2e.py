@@ -99,20 +99,16 @@ async def main():
         await pg.click('[data-item="tamatar"]'); await pg.fill("#qIn", "1.5"); await pg.click("[data-add]")
         await pg.click('[data-item="aloo"]'); await pg.fill("#aIn", "40"); await pg.click("[data-add]")
         await pg.evaluate("S.settings.ownerPh='9509553600'")
-        await pg.click("#cartbtn"); await pg.wait_for_timeout(300); await pg.screenshot(path=f"{SHOTS}/paper.png", full_page=True)
-
-        rc = await pg.evaluate("(()=>{S.settings.ownerPh=`9509553600`;const b={no:`SE-K7Q2MX`,date:today(),ts:Date.now(),mode:S.mode,partyName:`VIP ग्राहक`,byName:`कमल भाई`,lines:S.cart,total:cartTotal()};window.__tb=b;return SE.receiptCanvas(b,SF.rcptOpts(b,true),576).toDataURL()})()")
+        rc = await pg.evaluate("(()=>{S.settings.ownerPh=`9509553600`;const b={no:`SE-K7Q2MX`,date:today(),ts:Date.now(),mode:S.mode,partyName:`VIP ग्राहक`,byName:`कमल भाई`,lines:S.cart.map(l=>({...l})),total:cartTotal()};window.__tb=b;return SE.receiptCanvas(b,SF.rcptOpts(b,true),576).toDataURL()})()")
         import base64; open(f"{SHOTS}/rcpt-canvas.png","wb").write(base64.b64decode(rc.split(",")[1]))
         txt = await pg.evaluate("receiptText(window.__tb)"); assert "VIP" in txt and "95095 53600" in txt and "Potato" in txt and "सेहत" in txt, txt; print(txt)
         errs=[]; pg.on("pageerror", lambda e: errs.append(str(e)))
-        await pg.wait_for_timeout(600); await pg.click("[data-ckshare]"); await pg.wait_for_selector("#shPh")
-        await pg.screenshot(path=f"{SHOTS}/14-share-ask.png")
-        await pg.fill("#shPh", "+91 98290 12345"); await pg.click("[data-shwa]"); await pg.wait_for_timeout(1500)
-        assert await pg.evaluate("S.cust.phone") == "9829012345", "phone not kept"
-        tst = await pg.evaluate("(document.querySelector('.toast')||{}).innerText||''")
-        assert "नहीं हुआ" not in tst and not errs, ("share before settle", tst, errs)
-        print("share before settle ok:", tst[:60])
-        await pg.click("[data-billsave]"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(800)
+        # "बिल देखें" = बिल तुरंत पक्का सेव, सीधे भुगतान वाली खिड़की (कोई ✕ नहीं)
+        await pg.click("#cartbtn"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(800)
+        await pg.screenshot(path=f"{SHOTS}/paper.png", full_page=True)
+        assert not await pg.query_selector("#sheet [data-del]") and not await pg.query_selector("#sheet [data-edit]"), "no remove/edit on saved bill"
+        assert await pg.query_selector("#sheet .pp-c") and await pg.query_selector("#sheet #sbqr canvas, #sheet #sbqr img"), "saved bill + QR shown in settle"
+        assert await pg.evaluate("S.cart.length") == 0, "cart should be cleared after auto-save"
         b0 = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")
         assert b0 and b0[0]["settled"] is False and b0[0]["pay"]["cash"] == 0, b0
         await pg.screenshot(path=f"{SHOTS}/20-settle.png")
@@ -127,6 +123,14 @@ async def main():
         print("edit after save ok:", b0["edits"][0]["diff"], b0["edits"][0]["totalBefore"], "->", b0["total"])
         await pg.click('[data-sbpay="cash"]'); await pg.wait_for_timeout(150); await pg.click("[data-sbok]"); await pg.wait_for_timeout(1000)
         await pg.screenshot(path=f"{SHOTS}/5-receipt.png")
+        await pg.click("[data-sharepdf]"); await pg.wait_for_selector("#shPh")
+        await pg.screenshot(path=f"{SHOTS}/14-share-ask.png")
+        await pg.fill("#shPh", "+91 98290 12345"); await pg.click("[data-shwa]"); await pg.wait_for_timeout(1500)
+        cp = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).map(b=>b.custPhone)")
+        assert "9829012345" in cp, ("phone not kept", cp)
+        tst = await pg.evaluate("(document.querySelector('.toast')||{}).innerText||''")
+        assert "नहीं हुआ" not in tst and not errs, ("share after settle", tst, errs)
+        await pg.click("[data-close]") if await pg.query_selector("#sheet [data-close]") else None
         nut = await pg.query_selector(".pp-nut"); assert nut, "nutrition box missing on receipt"; await nut.screenshot(path=f"{SHOTS}/nutri.png")
         bills = await pg.evaluate("Object.values(window.__MOCK__).length&&Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).map(([k,v])=>Object.values(v))")
         flat = [x for arr in bills for x in arr]
@@ -175,8 +179,7 @@ async def main():
         ni = [v for v in (await pg.evaluate("Object.values(window.__MOCK__.items)")) if v["name"] == "शकरकंद"]
         assert ni and ni[0]["pending"] and ni[0]["addedByName"] == "कमल भाई" and ni[0]["sale"] == 40, ni
         await pg.fill("#qIn", "2"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
-        await pg.click("#cartbtn"); await pg.wait_for_timeout(500)
-        await pg.click("[data-billsave]"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(400)
+        await pg.click("#cartbtn"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(400)
         await pg.click("[data-sbok]"); await pg.wait_for_timeout(1000)
         xb = [b for b in (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")) if any(l["id"] == "xyz" for l in b["lines"])]
         assert xb and [l for l in xb[0]["lines"] if l["id"] == "xyz"][0]["note"] == "थैली" and xb[0]["total"] == 130, xb
@@ -221,8 +224,24 @@ async def main():
         await pg.screenshot(path=f"{SHOTS}/9-kharid-saved.png", full_page=True)
         # संस्था को प्याज — आज के खरीद भाव ₹52 पर
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(200)
-        inst_rate = await pg.evaluate("(()=>{S.mode='inst';const r=priceOf(item('pyaj'));S.mode='walk';return r})()")
-        assert inst_rate == 51.34, inst_rate
+        inst_rate = await pg.evaluate("(()=>{const b={lines:[{id:'pyaj',name:'प्याज',unit:'kg',qty:5,rate:60,board:60,cost:0,amt:300}]};SB.instReprice(b);return [b.lines[0].rate,b.lines[0].saleRate,b.total,b.saleTotal]})()")
+        assert inst_rate == [51.34, 60, 256.7, 300], inst_rate
+        rt = await pg.evaluate("(()=>{const b={no:'SE-TEST01',date:today(),ts:Date.now(),mode:'inst',partyName:'177 MH कैंटीन',byName:'कमल भाई',lines:[{id:'pyaj',name:'प्याज',unit:'kg',qty:5,rate:60,board:60,cost:0,amt:300}]};SB.instReprice(b);return SB.instText(b,SB.peopleFor('177 MH कैंटीन')[0])})()")
+        assert "मनोज" in rt and "₹43.3" in rt and "बेचना *₹60*" in rt, rt
+        print(rt)
+        # पूरा संस्था बिल: चुनते समय ₹60, चालान पर खरीद भाव ₹51.34, QR नहीं, लोगों को रिपोर्ट बटन
+        await pg.evaluate("setMode('inst');S.inst='मारवाड़ रसोई (होटल)';renderBill();renderCart()")
+        await pg.click('[data-item="aloo"]'); await pg.fill("#qIn", "2"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
+        assert await pg.evaluate("S.cart[0].rate") == 21
+        await pg.click("#cartbtn"); await pg.wait_for_selector("#sheet .pp-ch"); await pg.wait_for_timeout(500)
+        await pg.screenshot(path=f"{SHOTS}/23-inst-challan.png", full_page=True)
+        assert not await pg.query_selector("#sheet #ppqr") and not await pg.query_selector("#sheet .pp-nut"), "no QR / nutrition on challan"
+        ic = await pg.eval_on_selector_all("#sheet .ic-btn", "e=>e.map(x=>x.innerText)")
+        assert len(ic) == 2 and "गणेश" in ic[0] and "स्वरूप" in ic[1], ic
+        ib = [b for b in (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")) if b["mode"] == "inst"]
+        assert ib and ib[0]["lines"][0]["rate"] == (await pg.evaluate("SF.costOf(item('aloo'))")) and ib[0]["total"] == 2*ib[0]["lines"][0]["rate"] and ib[0]["saleTotal"] == 42 and ib[0]["lines"][0]["rate"] < 21, ib
+        print("inst challan ok", ic)
+        await pg.evaluate("closeSheet();setMode('walk')")
         # लेबल: सब्ज़ी की टोकरी — टमाटर (नाम + भाव + बारकोड) → स्कैन → वज़न पूछे
         await pg.click('[data-tab="label"]'); await pg.wait_for_timeout(200)
         await pg.click('[data-ltype="sabzi"]'); await pg.wait_for_timeout(150)
@@ -293,7 +312,7 @@ async def main():
         await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300)
         await pg.click('#p-udhar [data-party="jco-mess"]'); await pg.wait_for_selector(".nsbox summary"); await pg.click(".nsbox summary")
         await pg.fill("#obAmt", "1500"); await pg.fill("#obNote", "सितंबर तक का"); await pg.click("[data-opbal]"); await pg.wait_for_timeout(900)
-        led = await pg.evaluate("Object.values(window.__MOCK__.ledger||{}).filter(l=>l.opening)")
+        led = await pg.evaluate("Object.values(window.__MOCK__.ledger||{}).filter(l=>l.opening&&l.note==='सितंबर तक का')")
         assert led and led[0]["amt"] == 1500 and led[0]["partyId"] == "jco-mess", led
         assert "पुराना बाकी" in await pg.inner_text("#sheet")
         await pg.evaluate("closeSheet()")
@@ -305,13 +324,26 @@ async def main():
         sums = await pg.evaluate("SR.OLD_UDHAR.map(g=>[g.name,g.rows.reduce((a,r)=>a+r[1],0),g.total,g.rows.length])")
         print("old udhar", sums)
         assert all(x[1] == x[2] for x in sums), sums
-        await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300); await pg.click("[data-oldud]"); await pg.wait_for_selector("[data-odsave]")
-        await pg.screenshot(path=f"{SHOTS}/22-old-udhar.png")
-        await pg.click("[data-odsave]"); await pg.wait_for_timeout(2500)
+        # नया वर्ज़न: मालिक के फोन पर अपने-आप जुड़ी
+        await pg.wait_for_function("Object.keys(window.__MOCK__.ledger||{}).filter(k=>k.startsWith('op_')).length>=97", timeout=15000)
         led = await pg.evaluate("Object.keys(window.__MOCK__.ledger||{}).filter(k=>k.startsWith('op_')).length")
         tot = await pg.evaluate("Object.entries(window.__MOCK__.ledger||{}).filter(([k])=>k.startsWith('op_')).reduce((a,[k,v])=>a+v.amt,0)")
-        print("imported", led, tot)
-        assert led >= 96 and tot >= 32625, (led, tot)
+        print("auto imported", led, tot)
+        assert led == 97 and tot == 33305, (led, tot)
+        assert (await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar1")) > 0
+        await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(500)
+        assert not await pg.query_selector("[data-oldud]"), "manual import button should vanish"
+        sid = await pg.evaluate("SR.findOldParty(S.parties,SR.OLD_UDHAR[0]).id")
+        await pg.click(f'[data-party="{sid}"]'); await pg.wait_for_selector("[data-opedit]")
+        await pg.screenshot(path=f"{SHOTS}/22-old-udhar.png")
+        await pg.click("[data-opedit]"); await pg.wait_for_selector("#oeA")
+        await pg.fill("#oeA", "460"); await pg.click("[data-oesave]"); await pg.wait_for_timeout(600)
+        await pg.click("[data-opedit]"); await pg.wait_for_selector("#oeA")
+        await pg.fill("#oeA", "450"); await pg.click("[data-oesave]"); await pg.wait_for_timeout(600)
+        ed = await pg.evaluate("Object.values(window.__MOCK__.ledger).filter(v=>v.prevAmt!=null)")
+        assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
+        print("opening edit ok")
+        await pg.evaluate("closeSheet()")
         assert not await pg.query_selector("[data-oldud]") or True
         # 📈 मालिक: टाइल पर मुनाफ़ा
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(400)

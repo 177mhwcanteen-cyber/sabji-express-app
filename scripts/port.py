@@ -303,6 +303,36 @@ rep(".toast{position:fixed;", ".sb-qr{display:flex;gap:12px;align-items:center;b
 # v28: कॉपी की पुरानी उधारी
 rep(".toast{position:fixed;", ".oldud{background:var(--surface);border-radius:14px;padding:8px 12px;margin:0 0 8px;box-shadow:var(--shadow)}.oldud summary{cursor:pointer;line-height:1.5}\n.oldud-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px;margin-top:6px}.oldud-g label{display:flex;align-items:center;gap:6px;background:var(--bg);border-radius:8px;padding:4px 8px;font-size:14px;flex-wrap:wrap}.oldud-g label b{margin-left:auto}.oldud-g label.today{outline:2px solid #f59e0b}.oldud-g small{width:100%;color:#b45309;font-size:11px}\n.toast{position:fixed;")
 
+# v29: "बिल देखें" = पक्का सेव; संस्था को खरीद भाव का चालान + लोगों को रिपोर्ट; पुरानी उधारी अपने-आप + एंट्री बदलना
+rep('function priceOf(it){return S.mode==="inst"?(window.SF?SF.costOf(it):(+it.cost||0)):(+it.sale||0)}',
+    'function priceOf(it){return +it.sale||0} /* संस्था: चुनते समय बिक्री भाव, सेव होते ही खरीद भाव (SB.instReprice) */')
+rep('''  S.chk={no:_keep||(window.SF?"…":newBillNo()),disc:0,pay:S.mode==="inst"?"inst":"cash",given:"",cashPart:"",upiOk:false};
+  drawCheckout();
+  if(!_keep&&window.SF){const c0=S.chk;SF.reserveBillNo().then(n=>{if(_t){_t.no=n;_t.noDate=today();lsSet("se_tabs",JSON.stringify(S.bt))}if(S.chk===c0){c0.no=n;if($("#sheet .sh-head"))drawCheckout()}})}''',
+'''  if(S.saving)return;
+  S.chk={no:_keep||(window.SF?"…":newBillNo()),disc:0,pay:S.mode==="inst"?"inst":"pending",given:"",cashPart:"",upiOk:false};
+  if(window.SB&&SB.autoSave){SB.autoSave();return}
+  drawCheckout();''')
+rep('  if(c.no==="…"&&window.SF)c.no=await SF.reserveBillNo();',
+    '  if(c.no==="…"&&window.SF){S.saving=true;drawCheckout();try{c.no=await SF.reserveBillNo()}finally{S.saving=false}}')
+rep('settled:c.pay!=="pending"};if(window.SR)SR.stamp(bill);', 'settled:c.pay!=="pending"};if(window.SR)SR.stamp(bill);if(bill.mode==="inst"&&window.SB)SB.instReprice(bill);')
+rep('function receiptText(b){\n  b={...b,pay:b.pay||{}};', 'function receiptText(b){\n  if(b.mode==="inst"&&window.SB)return SB.instText(b,null);\n  b={...b,pay:b.pay||{}};')
+rep('<span>${fdate(l.date)} ${ftime(l.ts)} · ${esc(l.byName||"")}</span></div><div class="rt"',
+    '<span>${fdate(l.date)} ${ftime(l.ts)} · ${esc(l.byName||"")}${l.opening&&window.SR?SR.opEditBtn(l):""}</span></div><div class="rt"')
+rep(r'''<textarea class="inp" id="s-insts" data-sf="insts" rows="4">${esc(insts().join("\n"))}</textarea></label>''',
+    r'''<textarea class="inp" id="s-insts" data-sf="insts" rows="4">${esc(insts().join("\n"))}</textarea></label>${window.SB?SB.peopleBtnHTML():""}''')
+rep(".toast{position:fixed;", """.sb-saving{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;font-size:18px}.sb-spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--leaf);border-top-color:transparent;animation:sbspin .8s linear infinite}@keyframes sbspin{to{transform:rotate(360deg)}}
+.sb-saved{background:#e7f6ec;color:#11502b;border-radius:12px;padding:6px 10px;font-weight:800;margin:0 0 6px;text-align:center}.sb-upin{margin:0 0 8px;text-align:center}
+.pp-edit{margin:6px 0 2px;padding:5px 8px;border:1.5px dashed #7c3aed;border-radius:8px;color:#5b21b6;font-size:12.5px;line-height:1.4}
+.ch-to{font-family:'Baloo 2',sans-serif;font-size:22px;font-weight:800;text-align:center;margin:4px 0 2px}
+.ch-tot{display:grid;justify-items:center;gap:0;margin:6px 0 4px;text-align:center}.ch-tot span{font-weight:700}.ch-tot b{font-family:'Baloo 2',sans-serif;font-size:30px;line-height:1.1}.ch-tot small{color:#555}
+.ch-warn{color:#b42318;font-size:12.5px;margin:4px 0}.ch-sign{display:flex;justify-content:space-between;gap:12px;margin-top:22px;font-size:12px;color:#555}.ch-sign span{flex:1;border-top:1px solid #999;padding-top:3px;text-align:center}
+.ic-box{background:var(--surface);border-radius:14px;padding:10px 12px;margin:8px 0;box-shadow:var(--shadow);display:grid;gap:6px}
+.ic-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:inherit;background:#e9f9ee;border:1.5px solid #25d366;border-radius:12px;padding:8px 10px;font:inherit;text-align:left;width:100%;cursor:pointer}.ic-btn span{display:grid;font-weight:800}.ic-btn small{font-weight:500;color:#4b5563}.ic-btn i{font-style:normal;font-weight:800;color:#0b7a35;white-space:nowrap}
+.ic-btn.off{background:transparent;border-style:dashed;border-color:#bbb}.ic-btn.off i{color:#888}
+.ic-grp{background:var(--surface);border-radius:14px;padding:8px 10px;margin:0 0 8px;box-shadow:var(--shadow)}.ic-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0;border-bottom:1px dashed #ccc}.ic-row select{grid-column:1/-1}
+.toast{position:fixed;""")
+
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")
