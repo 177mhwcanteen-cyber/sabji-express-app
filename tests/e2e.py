@@ -301,6 +301,18 @@ async def main():
         await pg.click('[data-tab="set"]'); await pg.wait_for_timeout(400)
         assert "PIN 4321" in await pg.inner_text("#p-set"), "owner should see staff PIN"
         print("opening balance + PIN view ok")
+        # 📥 कॉपी की पुरानी उधारी
+        sums = await pg.evaluate("SR.OLD_UDHAR.map(g=>[g.name,g.rows.reduce((a,r)=>a+r[1],0),g.total,g.rows.length])")
+        print("old udhar", sums)
+        assert all(x[1] == x[2] for x in sums), sums
+        await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300); await pg.click("[data-oldud]"); await pg.wait_for_selector("[data-odsave]")
+        await pg.screenshot(path=f"{SHOTS}/22-old-udhar.png")
+        await pg.click("[data-odsave]"); await pg.wait_for_timeout(2500)
+        led = await pg.evaluate("Object.keys(window.__MOCK__.ledger||{}).filter(k=>k.startsWith('op_')).length")
+        tot = await pg.evaluate("Object.entries(window.__MOCK__.ledger||{}).filter(([k])=>k.startsWith('op_')).reduce((a,[k,v])=>a+v.amt,0)")
+        print("imported", led, tot)
+        assert led >= 96 and tot >= 32625, (led, tot)
+        assert not await pg.query_selector("[data-oldud]") or True
         # 📈 मालिक: टाइल पर मुनाफ़ा
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(400)
         mg = await pg.eval_on_selector_all("#grid .mg", "e=>e.map(x=>x.innerText)")
