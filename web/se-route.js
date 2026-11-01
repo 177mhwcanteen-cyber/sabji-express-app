@@ -224,6 +224,7 @@ const R={date:null,map:null,live:[],day:null,agg:null,loading:false,custQ:"",cus
 SR.onDb=function(db){
   db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.day){R.day=analyze(R.day.date,R.day.docs,R.day.bills);SR.renderRoute()}},()=>{});
   if(S.isOwner)setTimeout(()=>SR.autoOldUdhar(db),2500);
+  if(S.isOwner)setTimeout(()=>SR.applyBoard(db),4500);
   if(S.isOwner)db.collection("live").onSnapshot(s=>{R.live=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route")SR.updateLive()},()=>{});
   else{setTimeout(SR.start,1500);setTimeout(SR.lockCheck,1200)}
 };
@@ -748,6 +749,38 @@ SR.opEditSheet=function(id){
   };
 };
 document.addEventListener("click",e=>{const b=e.target.closest("[data-opedit]");if(b){e.stopPropagation();SR.opEditSheet(b.dataset.opedit)}},true);
+/* ======================= 🪧 बोर्ड के भाव (01-11-2026) = पक्के बिक्री भाव + नई सब्ज़ियाँ ======================= */
+/* मालिक के फोन पर एक बार अपने-आप: जिस सामान का भाव बोर्ड से अलग है वह बदलेगा (priceLog में पुराना→नया दर्ज), नई सब्ज़ियाँ जुड़ेंगी */
+const BOARD={date:"2026-11-01",flag:"board1",
+  sale:{aloo:20,pyaj:60,tamatar:20,kheera:50,adrak:140,shimla:80,bhindi:80,gajar:70,lauki:30,palak:80,phoolgobhi:60,pattagobhi:50,karela:60,harimirch:120,dhaniya:180,beans:140,mushroom:65,chukandar:70,kundru:40,toroi:80,lahsun:240,baingan:60,sahjan:140,podina:100,karipatta:200,
+    kela:50,seb:140,kiwi:100,anar:240,papita:80,tarbooj:50,ananas:100,amrood:110,nariyal:70,gilki:60,makka:60,motimirch:80,mooli:40,kaddu:40,nimbu:200,bhartabaingan:60,kinnu:180,amla:100,chandaliya:80,matar:200},
+  add:[{id:"parwal",name:"परवल",unit:"kg",cat:"sabzi",emoji:"🥒",hue:110,sale:90},
+    {id:"safalmatar",name:"सफल मटर (पैकेट)",unit:"kg",cat:"sabzi",emoji:"🫛",hue:120,sale:100},
+    {id:"harapyaj",name:"हरा प्याज",unit:"kg",cat:"patta",emoji:"🧅",hue:100,sale:0,cost:60},
+    {id:"moongfali",name:"मूंगफली",unit:"kg",cat:"sabzi",emoji:"🥜",hue:35,sale:0},
+    {id:"shakarkand",name:"शकरकंद",unit:"kg",cat:"sabzi",emoji:"🍠",hue:20,sale:0},
+    {id:"malta",name:"माल्टा",unit:"kg",cat:"fal",emoji:"🍊",hue:30,sale:0}]};
+SR.BOARD=BOARD;
+SR.applyBoard=async function(db){
+  if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
+  try{
+    const fr=db.doc("ownerCfg/flags");const f=await fr.get();if(f.exists&&f.data()[BOARD.flag])return;
+    const q=await db.collection("items").get();const items=q.docs.map(d=>({id:d.id,...d.data()}));
+    const W=db.batch?db.batch():null;const put=(ref,d,o)=>W?W.set(ref,d,o):ref.set(d,o);const upd=(ref,d)=>W?W.update(ref,d):ref.update(d);
+    const now=Date.now(),src="बोर्ड के भाव 01-11-2026";const ch=[];let add=0;
+    for(const [id,sale] of Object.entries(BOARD.sale)){const it=items.find(x=>x.id===id);if(!it||+it.sale===sale)continue;
+      ch.push(it.name+" ₹"+(+it.sale||0)+"→₹"+sale);
+      await upd(db.collection("items").doc(id),{sale,ratePrev:+it.sale||0,rateTs:now,rateBy:S.uid||"",rateByName:"विक्रम जी (बोर्ड)",saleSet:{date:BOARD.date,src}});
+      await put(db.collection("priceLog").doc("rb"+id+now.toString(36)),{itemId:id,name:it.name,field:"sale",old:+it.sale||0,new:sale,ts:now,by:S.uid||"",byName:"विक्रम जी (बोर्ड)",note:src})}
+    let ord=Math.max(0,...items.map(i=>+i.order||0));
+    for(const a of BOARD.add){if(items.some(x=>x.id===a.id||String(x.name||"").replace(/\s*\(.*\)/,"").trim()===a.name.replace(/\s*\(.*\)/,"").trim()))continue;
+      const d={active:true,name:a.name,unit:a.unit,cat:a.cat,emoji:a.emoji,hue:a.hue,sale:a.sale,cost:a.cost||0,order:++ord,photo:"",buyHist:a.cost?[{date:"2026-10-31",rate:a.cost,src:"कमल भाई की कॉपी 31-10"}]:[],saleSet:{date:BOARD.date,src:a.sale?src:"भाव बाकी — विक्रम जी बताएँगे"}};
+      await put(db.collection("items").doc(a.id),d);add++}
+    await put(fr,{[BOARD.flag]:now,boardChanged:ch,boardAdded:add},{merge:true});
+    if(W)await W.commit();
+    if(ch.length||add)toast("🪧 बोर्ड के भाव लगे: "+ch.length+" भाव बदले · "+add+" नई सब्ज़ी जुड़ी");
+  }catch(e){SR._board=0}
+};
 /* SF के साथ जोड़ */
 if(window.SF){const _o=SF.onDb;SF.onDb=function(db){_o(db);try{SR.onDb(db)}catch(e){}}}
 })();
