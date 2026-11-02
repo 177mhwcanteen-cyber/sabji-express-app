@@ -452,6 +452,27 @@ async def main():
         agg = await pg.inner_text("#rAgg")
         assert "सरल लाइन" in agg, agg[:400]
         assert "9829012345" in await pg.inner_text("#rcl")
+        # 🛰️ जगह फोन के असली GPS से: अंदाज़े वाली "सरल लाइन" को यहीं पक्का करें + नई जगह "मैं यहाँ हूँ"
+        assert "अंदाज़े से" in await pg.inner_text("#p-route")
+        await pg.click('#p-route [data-plfix="सरल लाइन"]'); await pg.wait_for_selector("#sheet .pl-fix.ok", timeout=30000)
+        await pg.screenshot(path=f"{SHOTS}/26-place-lock.png")
+        await pg.click("[data-pllock]"); await pg.wait_for_timeout(800)
+        pl = [p for p in (await pg.evaluate("Object.values(window.__MOCK__.places||{})")) if p["name"] == "सरल लाइन"]
+        assert len(pl) == 1 and pl[0]["src"] == "gps" and pl[0]["acc"] == 12 and abs(pl[0]["lat"] - 25.7712) < 1e-5 and abs(pl[0]["lng"] - 71.3521) < 1e-5 and pl[0].get("old"), pl
+        await pg.context.set_geolocation({"latitude": 25.7841, "longitude": 71.3655, "accuracy": 8})
+        await pg.click('#p-route [data-plhere]'); await pg.wait_for_selector("#sheet .pl-fix.ok", timeout=30000)
+        await pg.fill("#plName", "सर"); await pg.wait_for_timeout(150)
+        assert "सरल लाइन" in await pg.inner_text("#plChips")
+        await pg.fill("#plName", "गरुड़ लाइन"); await pg.click("[data-pllock]"); await pg.wait_for_timeout(800)
+        g = [p for p in (await pg.evaluate("Object.values(window.__MOCK__.places||{})")) if p["name"] == "गरुड़ लाइन"]
+        assert g and g[0]["src"] == "gps" and abs(g[0]["lat"] - 25.7841) < 1e-5 and g[0]["acc"] == 8, g
+        await pg.context.set_geolocation({"latitude": 25.7712, "longitude": 71.3521, "accuracy": 12})
+        # दाएँ-बाएँ उछाल: पक्की GPS के बीच नेटवर्क की ±120 मी. वाली जगह और अकेली उछाल हटे
+        cl = await pg.evaluate("""(()=>{const t0=Date.now()-3600e3;const pts=[];for(let i=0;i<10;i++)pts.push((t0+i*60000)+',25.771200,71.352100,10');
+          pts.splice(4,0,(t0+3.5*60000)+',25.771200,71.358000,120');pts.splice(8,0,(t0+6.5*60000)+',25.775000,71.352100,15');
+          const a=SR.analyze(today(),[{uid:'x',name:'t',pts}],[]);return [a.pts[0].P.length,a.stops.length,+a.stops[0].lng.toFixed(4)]})()""")
+        assert cl == [10, 1, 71.3521], cl
+        print("gps place lock ok", pl[0]["acc"], g[0]["lat"], cl)
         await pg.screenshot(path=f"{SHOTS}/16-route.png", full_page=True)
         print("route stops", len(stops), "|", stops[0].replace("\n", " ")[:80])
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(500)

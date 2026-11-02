@@ -22,13 +22,14 @@ SR.placeAt=placeAt;
 
 /* ======================= 📍 कर्मचारी के फोन से लोकेशन ======================= */
 SR.st={native:!!NAT.isNative,unsupported:false,perm:null,gps:null,running:null,err:""};
-SR.last=null;
+SR.last=null;SR.lastGood=null;
+const GOOD=60;/* मीटर — इससे ज़्यादा "±" वाली जगह (नेटवर्क/टावर से) अंदाज़ा है, पक्की नहीं */
 let tickBusy=false,started=false;
 function queue(){try{return JSON.parse(LSx.get("se_trkq")||"[]")}catch(e){return []}}
 function setQueue(q){LSx.set("se_trkq",JSON.stringify(q.slice(-6000)))}
 function addPts(lines){
   if(!lines.length)return;const q=queue();
-  lines.forEach(l=>{q.push(l);const a=l.split(",");if(a.length>=3){const p={ts:+a[0],lat:+a[1],lng:+a[2],acc:+a[3]||0};if(isFinite(p.lat)&&(!SR.last||p.ts>=SR.last.ts))SR.last=p}});
+  lines.forEach(l=>{q.push(l);const a=l.split(",");if(a.length>=3){const p={ts:+a[0],lat:+a[1],lng:+a[2],acc:+a[3]||0};if(isFinite(p.lat)&&(!SR.last||p.ts>=SR.last.ts))SR.last=p;if(isFinite(p.lat)&&p.acc>0&&p.acc<=GOOD&&(!SR.lastGood||p.ts>=SR.lastGood.ts))SR.lastGood=p}});
   setQueue(q);
 }
 async function upload(){
@@ -64,7 +65,7 @@ SR.start=async function(){
   if(started||S.demo||S.isOwner||!S.uid)return;started=true;
   if(SR.st.native){try{apply(await BP().trackStart({name:biller()}))}catch(e){if(isUnimpl(e))SR.st.unsupported=true}}
   else if(navigator.geolocation){
-    try{navigator.geolocation.watchPosition(p=>{SR.st.perm=true;SR.st.gps=true;SR.st.running=true;const now=Date.now();if(SR._wl&&now-SR._wl<45000)return;SR._wl=now;
+    try{navigator.geolocation.watchPosition(p=>{SR.st.perm=true;SR.st.gps=true;SR.st.running=true;const now=Date.now();if(p.coords.accuracy>150)return;if(SR._wl&&now-SR._wl<45000)return;SR._wl=now;
         addPts([now+","+p.coords.latitude.toFixed(6)+","+p.coords.longitude.toFixed(6)+","+Math.round(p.coords.accuracy)])},
       e=>{if(e.code===1)SR.st.perm=false;else if(e.code===2)SR.st.gps=false;SR.st.running=false;SR.banner()},{enableHighAccuracy:true,maximumAge:30000,timeout:60000})}catch(e){}
   }
@@ -94,7 +95,7 @@ SR.fixLoc=async function(){
 };
 /* हर बिल पर जगह का ठप्पा */
 SR.stamp=function(bill){
-  const l=SR.last;
+  const g=SR.lastGood,l=g&&Date.now()-g.ts<15*60000?g:SR.last;
   if(l&&Date.now()-l.ts<15*60000){bill.loc={lat:l.lat,lng:l.lng,acc:l.acc||0,ts:l.ts};const pl=placeAt(l);if(pl)bill.place=pl.name}
   setTimeout(SR.tick,300);
 };
@@ -233,13 +234,23 @@ function parse(docs){
   docs.forEach(d=>{const u=by[d.uid]||(by[d.uid]={uid:d.uid,name:d.name||"",P:[],E:[]});if(d.name)u.name=d.name;
     (d.pts||[]).forEach(s=>{const a=String(s).split(",");const ts=+a[0];if(!ts)return;
       if(a.length>=3){const p={ts,lat:+a[1],lng:+a[2],acc:+a[3]||0};if(isFinite(p.lat)&&isFinite(p.lng)&&p.acc<=250)u.P.push(p)}else u.E.push({ts,ev:a[1]})})});
-  return Object.values(by).map(u=>{u.P.sort((a,b)=>a.ts-b.ts);u.P=u.P.filter((p,i,a)=>!i||p.ts!==a[i-1].ts);u.E.sort((a,b)=>a.ts-b.ts);return u});
+  return Object.values(by).map(u=>{u.P.sort((a,b)=>a.ts-b.ts);u.P=cleanPts(u.P.filter((p,i,a)=>!i||p.ts!==a[i-1].ts));u.E.sort((a,b)=>a.ts-b.ts);return u});
+}
+/* दाएँ-बाएँ उछलती जगहें हटाओ: (1) पक्की GPS (±60 मी. तक) हो तो उसके 5 मिनट आसपास की अंदाज़े वाली (नेटवर्क) जगह नहीं लेंगे
+   (2) अकेली उछाल — जो 2 मिनट में 300 मी. दूर जाकर लौट आए — हटाओ */
+function cleanPts(P){
+  const goodTs=P.filter(p=>p.acc>0&&p.acc<=GOOD).map(p=>p.ts);
+  const nearGood=ts=>{let lo=0,hi=goodTs.length-1;while(lo<=hi){const m=(lo+hi)>>1;if(Math.abs(goodTs[m]-ts)<=5*60000)return true;if(goodTs[m]<ts)lo=m+1;else hi=m-1}return false};
+  let Q=P.filter(p=>!(p.acc>GOOD||!p.acc)||!nearGood(p.ts));
+  Q=Q.filter((p,i,a)=>{if(!i||i===a.length-1)return true;const x=a[i-1],y=a[i+1];return !(dist(x,p)>300&&dist(p,y)>300&&dist(x,y)<150&&y.ts-x.ts<=4*60000)});
+  return Q;
 }
 function findStops(P){
   const out=[];let c=null;const close=()=>{if(c&&c.end-c.start>=4*60000)out.push(c)};
   for(const p of P){
-    if(c&&dist(c,p)<=100&&p.ts-c.end<=25*60000){const n=c.n+1;c.lat=(c.lat*c.n+p.lat)/n;c.lng=(c.lng*c.n+p.lng)/n;c.n=n;c.end=p.ts}
-    else{close();c={lat:p.lat,lng:p.lng,n:1,start:p.ts,end:p.ts}}
+    const w=1/Math.max(5,p.acc||GOOD)**2;
+    if(c&&dist(c,p)<=100&&p.ts-c.end<=25*60000){const W=c.w+w;c.lat=(c.lat*c.w+p.lat*w)/W;c.lng=(c.lng*c.w+p.lng*w)/W;c.w=W;c.n++;c.end=p.ts;c.acc=Math.min(c.acc,p.acc||999)}
+    else{close();c={lat:p.lat,lng:p.lng,w,n:1,start:p.ts,end:p.ts,acc:p.acc||999}}
   }
   close();return out;
 }
@@ -370,8 +381,9 @@ function custHTML(){
 }
 function placesHTML(){
   const by={};SR.places.forEach(p=>(by[p.name]||(by[p.name]=[])).push(p));const names=Object.keys(by).sort((a,b)=>a.localeCompare(b,"hi"));
-  return `<div class="card2"><h3>🏷️ जगहों के नाम (${names.length})</h3><p class="note" style="margin:0 0 6px">रुकने वाली जगह पर "नाम दें" दबाकर नाम रखें (जैसे सरल लाइन, गरुड़ लाइन)। एक नाम की कई जगहें हों तो कमाई एक साथ जुड़ती है।</p>
-  ${names.map(n=>`<div class="stkmeta"><span>📍 <b style="color:var(--ink)">${esc(n)}</b> <span class="note">(${by[n].length} जगह)</span></span><span><button class="lnk" data-pren="${esc(n)}">नाम बदलें</button> · <button class="lnk" data-pdel="${esc(n)}" style="color:var(--chili)">हटाएँ</button></span></div>`).join("")||'<p class="note">अभी कोई नाम नहीं रखा।</p>'}</div>`;
+  const sure=p=>p.src==="gps"&&+p.acc>0&&+p.acc<=GOOD;
+  return `<div class="card2"><h3>🏷️ जगहों के नाम (${names.length})</h3><p class="note" style="margin:0 0 6px">सबसे सही तरीका: उस जगह पर खड़े होकर <b>"📍 मैं यहाँ हूँ"</b> दबाएँ — फोन का असली GPS दर्ज होगा। ⚠ वाली जगहें रूट के अंदाज़े से बनी हैं — वहाँ पहुँचकर "यहीं पक्का करें" दबा दें।</p>
+  ${names.map(n=>{const ok=by[n].filter(sure).length;return `<div class="stkmeta"><span>📍 <b style="color:var(--ink)">${esc(n)}</b> <span class="note">(${by[n].length} जगह · ${ok?`✅ ${ok} फोन GPS से पक्की`:"⚠ अंदाज़े से"})</span></span><span><button class="lnk" data-plfix="${esc(n)}">📍 यहीं पक्का करें</button> · <button class="lnk" data-pren="${esc(n)}">नाम बदलें</button> · <button class="lnk" data-pdel="${esc(n)}" style="color:var(--chili)">हटाएँ</button></span></div>`}).join("")||'<p class="note">अभी कोई नाम नहीं रखा।</p>'}</div>`;
 }
 SR.renderRoute=function(){
   const el=document.getElementById("p-route");if(!el)return;bindRoute(el);if(!R.date)R.date=today();
@@ -380,6 +392,7 @@ SR.renderRoute=function(){
   el.innerHTML=`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">📍 गाड़ी का रूट</h2><button class="chip" data-rref aria-label="ताज़ा करें">🔄</button><input class="inp" type="date" id="rDate" value="${R.date}" aria-label="तारीख"></div>
   <div class="card2 rlive" id="rLive">${liveHTML()}</div>
   <div id="rmap" class="rmap" role="img" aria-label="गाड़ी का रास्ता नक्शे पर"></div>
+  <button class="big" data-plhere style="margin:8px 0">📍 मैं यहाँ हूँ — फोन की असली जगह से जगह जोड़ें</button>
   ${d?dayHTML(d):'<div class="empty">⏳ रूट लोड हो रहा है…</div>'}
   <div class="card2"><h3>🏆 जगह की कमाई</h3><p class="note" style="margin:0">कहाँ कितना समय, कितने बिल, कितनी बिक्री। ₹ प्रति घंटा से पता चलेगा कि कहाँ ज़्यादा रुकना है।</p>
     <div class="ragg"><button class="big ghost" data-ragg="1">इस दिन</button><button class="big ghost" data-ragg="7">7 दिन</button><button class="big ghost" data-ragg="30">30 दिन</button></div>
@@ -393,12 +406,13 @@ function loadLeaflet(){return new Promise((res,rej)=>{if(window.L)return res();i
 SR.drawMap=async function(){
   const el=document.getElementById("rmap");if(!el)return;
   if(!window.L){try{await loadLeaflet()}catch(e){el.innerHTML='<p class="note" style="padding:12px">नक्शा लोड नहीं हुआ (इंटरनेट देखें)</p>';return}}
-  if(R.map){try{R.map.remove()}catch(e){}R.map=null;R.liveLayer=null}
+  if(R.map){try{R.map.remove()}catch(e){}R.map=null;R.liveLayer=null;R.meLayer=null}
   if(!document.body.contains(el))return;
   const m=R.map=L.map(el,{zoomControl:true,attributionControl:true});
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);
   const B=[];
-  SR.places.forEach(p=>{L.circle([p.lat,p.lng],{radius:+p.r||150,color:"#2f6fdb",weight:1,fillOpacity:.07}).addTo(m).bindTooltip(p.name)});
+  SR.places.forEach(p=>{const ok=p.src==="gps";L.circle([p.lat,p.lng],{radius:+p.r||150,color:ok?"#2f6fdb":"#d97706",weight:ok?1:2,dashArray:ok?null:"6 5",fillOpacity:.07}).addTo(m).bindTooltip(p.name+(ok?" ✅":" ⚠ अंदाज़े से"))});
+  const Me=L.control({position:"topright"});Me.onAdd=()=>{const b=L.DomUtil.create("button","rme");b.type="button";b.textContent="📍 मेरी जगह";b.setAttribute("aria-label","नक्शे पर मेरी असली जगह");L.DomEvent.disableClickPropagation(b);b.onclick=()=>SR.showMe();return b};Me.addTo(m);
   const d=R.day&&R.day.date===R.date?R.day:null;
   if(d){
     d.pts.forEach((u,ui)=>{const ll=u.P.map(p=>[p.lat,p.lng]);if(ll.length>1)L.polyline(ll,{color:["#1f8a4c","#d97706","#7c3aed"][ui%3],weight:4,opacity:.75}).addTo(m);ll.forEach(x=>B.push(x))});
@@ -411,6 +425,71 @@ SR.drawMap=async function(){
   if(B.length)m.fitBounds(B,{padding:[28,28],maxZoom:17});else m.setView([25.75,71.39],13);
   setTimeout(()=>{try{m.invalidateSize()}catch(e){}},250);
 };
+/* 🛰️ फोन का असली GPS: कई रीडिंग लेकर सबसे सटीक (±मीटर सबसे कम) — नेटवर्क/पुरानी जगह नहीं */
+SR.preciseFix=function(onProgress,maxMs){
+  maxMs=maxMs||25000;
+  return new Promise(res=>{
+    if(!navigator.geolocation){res({err:"यह फोन GPS नहीं देता"});return}
+    const R_=[];let id=null,done=false;const t0=Date.now();
+    const fin=err=>{if(done)return;done=true;try{navigator.geolocation.clearWatch(id)}catch(e){}clearTimeout(tm);
+      if(!R_.length){res({err:err||"GPS नहीं मिला — खुले में आकर फिर दबाएँ"});return}
+      const best=Math.min(...R_.map(r=>r.acc));const B=R_.filter(r=>r.acc<=best*1.5);const W=B.reduce((a,r)=>a+1/r.acc**2,0);
+      res({lat:+(B.reduce((a,r)=>a+r.lat/r.acc**2,0)/W).toFixed(6),lng:+(B.reduce((a,r)=>a+r.lng/r.acc**2,0)/W).toFixed(6),acc:Math.round(best),n:R_.length,ts:Date.now()})};
+    const tm=setTimeout(()=>fin(),maxMs);
+    const chk=setInterval(()=>{if(done){clearInterval(chk);return}const el=Date.now()-t0;const best=R_.length?Math.min(...R_.map(r=>r.acc)):1e9;if((el>=8000&&best<=20)||(el>=14000&&best<=GOOD))fin()},1000);
+    try{id=navigator.geolocation.watchPosition(p=>{const c=p.coords;if(!(c.accuracy>0))return;R_.push({lat:c.latitude,lng:c.longitude,acc:c.accuracy});
+        const best=Math.min(...R_.map(r=>r.acc));if(onProgress)onProgress({acc:Math.round(best),n:R_.length,ms:Date.now()-t0});
+        if((best<=10&&R_.length>=3)||(best<=20&&R_.length>=6))fin()},
+      e=>{if(e.code===1)fin("लोकेशन की अनुमति नहीं — फोन की सेटिंग → ऐप → सब्ज़ी एक्सप्रेस → लोकेशन → 'सटीक लोकेशन' चालू करें");else if(e.code===2)fin("फोन की लोकेशन (GPS) बंद है — चालू करें")},
+      {enableHighAccuracy:true,maximumAge:0,timeout:maxMs})}catch(e){fin("GPS नहीं मिला")}
+  });
+};
+SR.showMe=async function(){
+  if(!R.map||!window.L)return;toast("🛰️ आपकी असली जगह ढूँढ रहे हैं…");
+  const f=await SR.preciseFix(null,15000);if(f.err){toast(f.err);return}
+  if(!R.meLayer)R.meLayer=L.layerGroup().addTo(R.map);R.meLayer.clearLayers();
+  L.circle([f.lat,f.lng],{radius:f.acc,color:"#2563eb",weight:1,fillOpacity:.15}).addTo(R.meLayer);
+  L.circleMarker([f.lat,f.lng],{radius:7,color:"#fff",weight:2,fillColor:"#2563eb",fillOpacity:1}).addTo(R.meLayer).bindTooltip("आप यहाँ हैं · ±"+f.acc+" मी.",{permanent:true,direction:"top",offset:[0,-8]});
+  R.map.setView([f.lat,f.lng],Math.max(R.map.getZoom(),17));
+};
+/* 📍 जगह जोड़ें / पक्की करें — जगह हमेशा फोन के असली GPS से, नक्शे से नहीं */
+SR.lockSheet=function(preName){
+  const names=[...new Set(SR.places.map(p=>p.name))].sort((a,b)=>a.localeCompare(b,"hi"));
+  const st={fix:null,q:preName||"",busy:true,sure:false};
+  const chips=()=>{const q=st.q.trim().toLowerCase();const L=names.filter(n=>!q||n.toLowerCase().includes(q));return L.length?L.map(n=>`<button class="chip" data-plpick="${esc(n)}">${esc(n)}</button>`).join(""):`<span class="note">"${esc(st.q)}" नया नाम होगा</span>`};
+  const fixHTML=()=>{const f=st.fix;if(st.busy)return `<div class="pl-fix busy">🛰️ GPS पकड़ रहा है…${f&&f.acc?` अभी ±${f.acc} मी. (${f.n} रीडिंग)`:""}<br><span class="note">खुले आसमान के नीचे, गाड़ी से 2-3 कदम दूर खड़े रहें</span></div>`;
+    if(!f||f.err)return `<div class="pl-fix bad">⚠ ${esc(f&&f.err||"GPS नहीं मिला")}<br><button class="lnk" data-plretry>🔄 फिर कोशिश करें</button></div>`;
+    return `<div class="pl-fix ${f.acc<=GOOD?"ok":"bad"}">${f.acc<=GOOD?"✅":"⚠"} जगह मिली: <b>±${f.acc} मीटर</b> (${f.n} रीडिंग)<br><span class="note">${f.lat}, ${f.lng}</span> · <a class="lnk" href="https://maps.google.com/?q=${f.lat},${f.lng}" target="_blank" rel="noopener">Google Map पर देखें ↗</a>${f.acc>GOOD?`<br><b>सटीकता कम है</b> — खुले में आकर <button class="lnk" data-plretry>🔄 फिर लें</button>`:""}</div>`};
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="जगह जोड़ें"><div class="grab"></div>
+  <div class="sh-head"><div><h3>📍 ${preName?esc(preName)+" — यहीं पक्का करें":"मैं यहाँ हूँ — जगह जोड़ें"}</h3><span class="note">जगह फोन के असली GPS से दर्ज होगी, नक्शे से नहीं — इसलिए नक्शा थोड़ा खिसका दिखे तो भी हिसाब सही रहेगा</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div id="plFix">${fixHTML()}</div>
+  <label class="fld">नाम (खोजें या नया लिखें)<input class="inp" id="plName" value="${esc(st.q)}" placeholder="जैसे सरल लाइन, गरुड़ लाइन" autocomplete="off"></label>
+  <div class="lsws" id="plChips" style="margin:6px 0">${chips()}</div>
+  <label class="fld">दायरा<select class="inp" id="plR">${[[100,"छोटा — 100 मीटर"],[150,"सामान्य — 150 मीटर"],[250,"बड़ा — 250 मीटर"]].map(([v,t])=>`<option value="${v}" ${v===150?"selected":""}>${t}</option>`).join("")}</select></label>
+  <button class="big" data-pllock style="margin-top:10px">✓ इस जगह को सेव करें</button></div></div>`;
+  const redraw=()=>{const x=$("#plFix");if(x)x.innerHTML=fixHTML()};
+  const go=async()=>{st.busy=true;st.fix=null;st.sure=false;redraw();const f=await SR.preciseFix(pr=>{st.fix=pr;redraw()});st.busy=false;st.fix=f;redraw()};
+  $("#sheet").oninput=e=>{if(e.target.id==="plName"){st.q=e.target.value;const c=$("#plChips");if(c)c.innerHTML=chips()}};
+  $("#sheet").onclick=async e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    const pk=e.target.closest("[data-plpick]");if(pk){st.q=pk.dataset.plpick;$("#plName").value=st.q;$("#plChips").innerHTML=chips();return}
+    if(e.target.closest("[data-plretry]")){go();return}
+    const btn=e.target.closest("[data-pllock]");if(!btn)return;
+    const name=st.q.trim(),r=+$("#plR").value||150,f=st.fix;
+    if(!name){toast("नाम लिखें");$("#plName").focus();return}
+    if(st.busy){toast("🛰️ GPS पकड़ने दें — कुछ सेकंड");return}
+    if(!f||f.err){toast("GPS नहीं मिला — फिर कोशिश करें");return}
+    if(f.acc>GOOD&&!st.sure){st.sure=true;btn.textContent="⚠ ±"+f.acc+" मी. — फिर भी सेव करें?";return}
+    const rec={name,lat:f.lat,lng:f.lng,r,acc:f.acc,src:"gps",ts:Date.now(),by:S.uid||"",byName:biller()};
+    try{
+      const same=SR.places.filter(p=>p.name===name).map(p=>({p,d:dist(p,f)})).sort((a,b)=>a.d-b.d)[0];
+      if(same&&same.d<=500){await S.db.collection("places").doc(same.p.id).update({...rec,old:{lat:same.p.lat,lng:same.p.lng}});toast("📍 "+name+" पक्की हुई · "+Math.round(same.d)+" मी. खिसकी")}
+      else{await S.db.collection("places").add(rec);toast("📍 "+name+" सेव हुई · ±"+f.acc+" मी.")}
+      closeSheet();
+    }catch(err){toast("सेव नहीं हुआ: "+(err.code||""))}
+  };
+  go();
+};
 function nameSheet(lat,lng,cur){
   const names=[...new Set(SR.places.map(p=>p.name))].sort((a,b)=>a.localeCompare(b,"hi"));
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="जगह का नाम"><div class="grab"></div>
@@ -419,10 +498,13 @@ function nameSheet(lat,lng,cur){
   ${names.length?`<div class="lsws" style="margin:6px 0">${names.map(n=>`<button class="chip" data-plpick="${esc(n)}">${esc(n)}</button>`).join("")}</div>`:""}
   <label class="fld">दायरा<select class="inp" id="plR">${[[100,"छोटा — 100 मीटर"],[150,"सामान्य — 150 मीटर"],[250,"बड़ा — 250 मीटर"]].map(([v,t])=>`<option value="${v}" ${(cur?+cur.r:150)===v?"selected":""}>${t}</option>`).join("")}</select></label>
   <a class="lnk" href="https://maps.google.com/?q=${lat},${lng}" target="_blank" rel="noopener">Google Map पर देखें ↗</a>
-  <button class="big" data-plsave style="margin-top:10px">✓ नाम सेव करें</button></div></div>`;
+  <p class="note" style="margin:6px 0 0">⚠ यह जगह रूट के अंदाज़े से है। आप अभी वहीं हैं तो नीचे वाला बटन दबाएँ — फोन का असली GPS लगेगा।</p>
+  <button class="big" data-plsave style="margin-top:10px">✓ नाम सेव करें</button>
+  <button class="big ghost" data-plnow style="margin-top:8px">📍 मैं अभी यहीं हूँ — फोन का असली GPS लें</button></div></div>`;
   $("#sheet").onclick=async e=>{
     if(e.target.matches("[data-close]")){closeSheet();return}
     const pk=e.target.closest("[data-plpick]");if(pk){$("#plName").value=pk.dataset.plpick;return}
+    if(e.target.closest("[data-plnow]")){SR.lockSheet($("#plName").value.trim()||(cur?cur.name:""));return}
     if(!e.target.closest("[data-plsave]"))return;
     const name=$("#plName").value.trim(),r=+$("#plR").value||150;if(!name){toast("नाम लिखें");return}
     try{if(cur)await S.db.collection("places").doc(cur.id).update({name,r});else await S.db.collection("places").add({name,lat:+(+lat).toFixed(6),lng:+(+lng).toFixed(6),r,ts:Date.now()});closeSheet();toast("📍 "+name+" सेव हुआ")}
@@ -461,7 +543,9 @@ function bindRoute(el){
   el.addEventListener("change",e=>{if(e.target.id==="rDate"){R.date=e.target.value||today();R.agg=null;R.day=null;SR.renderRoute()}});
   el.addEventListener("input",e=>{if(e.target.id==="rcq"){R.custQ=e.target.value;const l=document.getElementById("rcl");if(l)l.innerHTML=custListHTML()}});
   el.addEventListener("click",e=>{
-    const t=e.target.closest("[data-ragg],[data-rname],[data-pren],[data-pdel],[data-chist],[data-ccsv],[data-callc],[data-rref],[data-aggname]");if(!t)return;
+    const t=e.target.closest("[data-plhere],[data-plfix],[data-ragg],[data-rname],[data-pren],[data-pdel],[data-chist],[data-ccsv],[data-callc],[data-rref],[data-aggname]");if(!t)return;
+    if(t.dataset.plhere!==undefined){SR.lockSheet("");return}
+    if(t.dataset.plfix){SR.lockSheet(t.dataset.plfix);return}
     if(t.dataset.ragg){SR.loadAgg(+t.dataset.ragg);return}
     if(t.dataset.rref!==undefined){R.day=null;R.agg=null;SR.renderRoute();return}
     if(t.dataset.rname!==undefined){const s=R.day&&R.day.stops[+t.dataset.rname];if(s)nameSheet(s.lat,s.lng,s.place);return}

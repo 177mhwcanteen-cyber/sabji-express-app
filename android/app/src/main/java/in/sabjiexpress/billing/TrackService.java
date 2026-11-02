@@ -32,6 +32,7 @@ public class TrackService extends Service implements LocationListener {
     static volatile long lastFix = 0;
     private LocationManager lm;
     private long lastSaved = 0;
+    private Location best = null; // 45 सेकंड में मिली सबसे सटीक जगह
 
     static File file(Context c) { return new File(c.getFilesDir(), "trk.txt"); }
 
@@ -87,7 +88,7 @@ public class TrackService extends Service implements LocationListener {
             lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
             try {
                 if (lm.getAllProviders().contains(LocationManager.GPS_PROVIDER))
-                    lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 60000L, 0f, this, Looper.getMainLooper());
+                    lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 15000L, 0f, this, Looper.getMainLooper());
                 if (lm.getAllProviders().contains(LocationManager.NETWORK_PROVIDER))
                     lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 60000L, 0f, this, Looper.getMainLooper());
                 running = true;
@@ -103,12 +104,15 @@ public class TrackService extends Service implements LocationListener {
     public void onLocationChanged(Location l) {
         long now = System.currentTimeMillis();
         boolean gps = LocationManager.GPS_PROVIDER.equals(l.getProvider());
-        // नेटवर्क वाली जगह सिर्फ़ तब, जब 3 मिनट से GPS न मिला हो
-        if (!gps && now - lastFix < 180000L) return;
+        // नेटवर्क (टावर) वाली जगह सिर्फ़ तब, जब 3 मिनट से GPS न मिला हो — और ±150 मी. से खराब हो तो बिल्कुल नहीं
+        if (!gps && (now - lastFix < 180000L || !l.hasAccuracy() || l.getAccuracy() > 150f)) return;
         if (gps) lastFix = now;
+        // 45 सेकंड की खिड़की में सबसे सटीक रीडिंग ही दर्ज (दाएँ-बाएँ उछाल कम)
+        if (best == null || (l.hasAccuracy() && l.getAccuracy() < best.getAccuracy())) best = l;
         if (now - lastSaved < 45000L) return;
         lastSaved = now;
-        append(this, now + "," + String.format(java.util.Locale.US, "%.6f,%.6f,%d", l.getLatitude(), l.getLongitude(), Math.round(l.getAccuracy())));
+        Location b = best; best = null;
+        append(this, now + "," + String.format(java.util.Locale.US, "%.6f,%.6f,%d", b.getLatitude(), b.getLongitude(), Math.round(b.getAccuracy())));
     }
 
     @Override
