@@ -10,6 +10,8 @@ const findBill=no=>(S.dayBills||[]).find(b=>b.no===no);
 const unpaid=()=>(S.dayBills||[]).filter(b=>b.settled===false&&!b.cancelled&&b.date===today());
 SB.unpaid=unpaid;
 /* सर्वर पर या फोन (बिना नेट) में बिल बदलो */
+SB.patchBill=(b,ch)=>patchBill(b,ch);
+SB.waNotice=(txt,ph)=>{try{location.href=waLink(txt,ph)}catch(e){}};
 async function patchBill(b,ch){
   Object.assign(b,ch);
   const o=outboxGet();const i=o.findIndex(x=>x.bill.no===b.no);
@@ -154,10 +156,10 @@ async function doSettle(b,st){
 SB.cancelSheet=function(b){
   const own=S.isOwner&&!S.demo;
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिल रद्द"><div class="grab"></div>
-  <div class="sh-head"><div><h3>🚫 बिल ${esc(b.no)} रद्द ${own?"करें":"करने की अर्ज़ी"}</h3><span class="note">${rs(b.total)} · ${(b.lines||[]).map(l=>esc(l.name)).join(", ")}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
-  <p class="note" style="margin:0 0 6px">${own?"रद्द होते ही माल स्टॉक में वापस जुड़ेगा, उधार हो तो खाते से हटेगा। बिल मिटेगा नहीं — \"रद्द\" का निशान रहेगा।":"अर्ज़ी विक्रम जी के पास जाएगी — उनकी हाँ पर बिल रद्द होगा और माल स्टॉक में वापस जुड़ेगा।"}</p>
+  <div class="sh-head"><div><h3>🚫 बिल ${esc(b.no)} रद्द करें</h3><span class="note">${rs(b.total)} · ${(b.lines||[]).map(l=>esc(l.name)).join(", ")}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <p class="note" style="margin:0 0 6px">${own?"रद्द होते ही माल स्टॉक में वापस जुड़ेगा, उधार हो तो खाते से हटेगा। बिल मिटेगा नहीं — \"रद्द\" का निशान रहेगा।":"बिल अभी रद्द होगा, माल स्टॉक में वापस जुड़ेगा और विक्रम जी को सूचना जाएगी (वजह के साथ)।"}</p>
   <label class="fld">रद्द करने की वजह (ज़रूरी)<input class="inp" id="crWhy" placeholder="जैसे ग्राहक ने सामान नहीं लिया / गलत बिल बना" autocomplete="off"></label>
-  <button class="big" data-cxgo style="margin-top:8px;background:var(--chili);color:#fff">${own?"🚫 बिल रद्द करें":"📩 अर्ज़ी विक्रम जी को भेजें"}</button>
+  <button class="big" data-cxgo style="margin-top:8px;background:var(--chili);color:#fff">🚫 बिल रद्द करें</button>
   <button class="big ghost" data-cxback style="margin-top:8px">← वापस बिल पर</button></div></div>`;
   setTimeout(()=>{const f=$("#crWhy");if(f)f.focus()},100);
   $("#sheet").oninput=null;$("#sheet").onchange=null;
@@ -166,12 +168,9 @@ SB.cancelSheet=function(b){
     if(e.target.closest("[data-cxback]")){SB.settleSheet(b);return}
     const go=e.target.closest("[data-cxgo]");if(!go)return;
     const why=($("#crWhy").value||"").trim();if(why.length<3){toast("पहले रद्द करने की वजह लिखें");$("#crWhy").focus();return}
-    if(!own){if(window.SF)SF.sendCancelReq(b);return}
     if(go.dataset.sure!=="1"){go.dataset.sure="1";go.textContent="पक्का रद्द करें? दोबारा दबाएँ";return}
-    try{const ch={cancelled:true,cancelledBy:S.uid||"",cancelReason:why,cancelTs:Date.now()};
-      if(b.pay&&b.pay.udhar>0){try{G.okdel.add(b.no)}catch(x){}await S.db.doc("ledger/"+b.no).delete().catch(()=>{})}
-      await patchBill(b,ch);try{await adjStock(trackedPairs(b.lines||[],1),"रद्द बिल "+b.no)}catch(x){}
-      closeSheet();try{renderPane()}catch(x){}toast("🚫 बिल "+b.no+" रद्द — माल स्टॉक में वापस")}catch(err){toast("रद्द नहीं हुआ: "+(err.code||err.message||""))}
+    if(!own){if(window.SF)SF.sendCancelReq(b);return}
+    try{await SF.doCancel(b,why);closeSheet();try{renderPane()}catch(x){}toast("🚫 बिल "+b.no+" रद्द — माल स्टॉक में वापस")}catch(err){toast("रद्द नहीं हुआ: "+(err.code||err.message||""))}
   };
 };
 /* ================= ✏️ सेव के बाद बिल बदलें ================= */

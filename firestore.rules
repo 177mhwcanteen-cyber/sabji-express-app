@@ -43,11 +43,15 @@ service cloud.firestore {
     match /days/{date}/bills/{no} {
       allow read: if active();
       allow create: if active() && request.resource.data.by == request.auth.uid;
-      // कर्मचारी सिर्फ़ ग्राहक का नंबर जोड़ सकते हैं; रद्द सिर्फ़ मालिक
+      // कर्मचारी सिर्फ़ ग्राहक का नंबर / उधार पर्ची भेजने का समय जोड़ सकते हैं
       // सेटल होने से पहले बनाने वाला खुद बदल/सेटल कर सकता है (हर बदलाव edits में दर्ज); सेटल के बाद ताला
-      allow update: if isOwner() || (active() && (noChange() || onlyKeys(['custPhone'])))
+      allow update: if isOwner() || (active() && (noChange() || onlyKeys(['custPhone', 'udSent'])))
         || (active() && resource.data.get('settled', true) == false && resource.data.by == request.auth.uid
-            && onlyKeys(['lines', 'sub', 'total', 'cost', 'rateChanged', 'edits', 'editCount', 'pay', 'payMode', 'settled', 'settleTs', 'mode', 'partyId', 'partyName', 'custPhone']));
+            && onlyKeys(['lines', 'sub', 'total', 'cost', 'rateChanged', 'edits', 'editCount', 'pay', 'payMode', 'settled', 'settleTs', 'mode', 'partyId', 'partyName', 'custPhone', 'udChk']))
+        // कर्मचारी वजह लिखकर बिल रद्द कर सकते हैं (सिर्फ़ रद्द — मालिक को सूचना जाती है, मालिक वापस चालू कर सकते हैं)
+        || (active() && resource.data.get('cancelled', false) == false && request.resource.data.cancelled == true
+            && request.resource.data.cancelledBy == request.auth.uid && request.resource.data.cancelReason is string && request.resource.data.cancelReason.size() >= 3
+            && onlyKeys(['cancelled', 'cancelledBy', 'cancelByName', 'cancelReason', 'cancelTs']));
       allow delete: if false;
     }
     match /days/{date}/meta/{doc}    { allow read, create, update: if active(); allow delete: if isOwner(); }
@@ -56,7 +60,9 @@ service cloud.firestore {
     match /ledger/{id} {
       allow read, create: if active();
       allow update: if isOwner() || (active() && noChange());
-      allow delete: if isOwner();
+      // रद्द हुए बिल की उधार एंट्री ही कर्मचारी हटा सकते हैं
+      allow delete: if isOwner() || (active() && resource.data.get('billNo', '') != ''
+        && get(/databases/$(database)/documents/days/$(resource.data.date)/bills/$(resource.data.billNo)).data.get('cancelled', false) == true);
     }
     match /parties/{id} {
       allow read, create: if active();

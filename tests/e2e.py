@@ -307,14 +307,14 @@ async def main():
         await pg.evaluate("closeSheet();setMode('walk');S.cart=[];renderBill();renderCart();window.__oph=S.settings.ownerPh;S.settings.ownerPh=''")
         await pg.click('[data-item="tamatar"]'); await pg.fill("#qIn", "1"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
         await pg.click("#cartbtn"); await pg.wait_for_selector("[data-sbcancel]"); cxno = await pg.evaluate("SB.unpaid().slice(-1)[0].no")
-        await pg.click("[data-sbcancel]"); await pg.wait_for_selector("#crWhy"); await pg.click("[data-cxgo]"); await pg.wait_for_timeout(200)
+        await pg.click("[data-sbcancel]"); await pg.wait_for_selector("#crWhy"); await pg.click("[data-cxgo]"); await pg.click("[data-cxgo]"); await pg.wait_for_timeout(200)
         assert await pg.query_selector("#crWhy"), "reason required"
-        await pg.fill("#crWhy", "ग्राहक ने सामान नहीं लिया"); await pg.click("[data-cxgo]"); await pg.wait_for_timeout(600)
+        await pg.fill("#crWhy", "ग्राहक ने सामान नहीं लिया"); await pg.screenshot(path=f"{SHOTS}/30-cancel.png"); await pg.click("[data-cxgo]"); await pg.click("[data-cxgo]"); await pg.wait_for_timeout(800)
         cr = await pg.evaluate(f"(window.__MOCK__.cancelReq||{{}})['{cxno}']")
-        assert cr and cr["status"] == "pending" and cr.get("loc") and cr["settled"] is False, cr
-        await pg.evaluate(f"SB.settleSheet(SB.unpaid().find(b=>b.no==='{cxno}'))"); await pg.wait_for_timeout(200)
-        assert "रद्द अर्ज़ी गई" in await pg.inner_text("#sheet .sh-head")
-        await pg.screenshot(path=f"{SHOTS}/30-cancel-pending.png")
+        assert cr and cr["status"] == "pending" and cr.get("loc") and cr["settled"] is False and cr["done"] is True, cr
+        cxb = await pg.evaluate(f"Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).find(b=>b.no==='{cxno}')")
+        assert cxb["cancelled"] and cxb["cancelReason"] == "ग्राहक ने सामान नहीं लिया" and cxb["cancelByName"] == "कमल भाई", cxb
+        assert not await pg.evaluate(f"SB.unpaid().some(b=>b.no==='{cxno}')"), "cancelled bill must leave pending list"
         await pg.evaluate("closeSheet();S.settings.ownerPh=window.__oph")
         mb = await pg.evaluate("SF.missingBuy().map(x=>x.it.id+':'+x.need)")
         print("cancel request ok", cxno, "missing buy:", mb)
@@ -545,14 +545,21 @@ async def main():
         assert await pg.is_visible("[data-npok]"), "pending new item card missing"
         await pg.click("[data-npok]"); await pg.wait_for_timeout(500)
         assert not [v for v in (await pg.evaluate("Object.values(window.__MOCK__.items)")) if v.get("pending")], "approve failed"
+        ctx = await pg.inner_text("#p-report")
+        assert "रद्द हुए बिल" in ctx and "रद्द हो गया" in ctx and "वापस चालू" in ctx, ctx[:300]
+        # ↩ मालिक: उधार वाला बिल वापस चालू — बिल फिर चालू, उधार खाते में वापस
+        await pg.click('[data-crno="SE-BJZG1W"]'); await pg.wait_for_timeout(900)
+        rb = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).find(b=>b.no==='SE-BJZG1W')")
+        assert rb["cancelled"] is False and rb.get("restoredTs") and (await pg.evaluate("!!(window.__MOCK__.ledger||{})['SE-BJZG1W']")), rb
+        print("owner restored cancelled bill ok")
         for _ in range(4):
             if not await pg.query_selector('[data-crok]'): break
             await pg.click('[data-crok]'); await pg.wait_for_timeout(100)
             if await pg.query_selector('[data-crok]'): await pg.click('[data-crok]')
             await pg.wait_for_timeout(800)
         cancelled = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).filter(b=>b.cancelled).length")
-        assert cancelled == 2, cancelled
-        assert all(x["status"] == "approved" for x in await pg.evaluate("Object.values(window.__MOCK__.cancelReq)"))
+        assert cancelled == 1, cancelled
+        assert sorted(x["status"] for x in await pg.evaluate("Object.values(window.__MOCK__.cancelReq)")) == ["approved", "rejected"]
         print("owner approved cancel")
         await pg.click("[data-a4]"); await pg.wait_for_timeout(800)
         html = await pg.evaluate("(()=>{const f=[...document.querySelectorAll('iframe')].pop();return f?f.contentDocument.documentElement.outerHTML:''})()")
