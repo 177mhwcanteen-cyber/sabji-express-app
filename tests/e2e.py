@@ -345,13 +345,22 @@ async def main():
         # रात का स्टॉक
         await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300)
         await pg.click("[data-night]"); await pg.wait_for_timeout(200)
-        await pg.fill('[data-nclose="pyaj"]', "88"); await pg.fill('[data-nclose="tamatar"]', "26")
-        assert "होना चाहिए" not in await pg.inner_text("#sheet"), "staff must not see expected stock"
-        await pg.click("[data-nsave]"); await pg.wait_for_timeout(700)
-        assert not await pg.query_selector("[data-nclose]"), "no recheck for staff"
-        assert "धन्यवाद" in await pg.evaluate("(document.querySelector('.toast')||{}).innerText||''")
+        # बिलिंग जैसा: "प्याज 88" खोजकर Enter, टमाटर टाइल → 26, आलू खत्म (0)
+        assert "भरने वाले" in await pg.inner_text("#sheet .sh-head") and "कमल भाई" in await pg.inner_text("#sheet .sh-head")
+        await pg.fill("#nsq", "प्याज 88"); await pg.press("#nsq", "Enter"); await pg.wait_for_timeout(200)
+        await pg.click('[data-nst="tamatar"]'); await pg.wait_for_selector("#nsQ"); await pg.fill("#nsQ", "26"); await pg.click("[data-nsok]"); await pg.wait_for_timeout(150)
+        await pg.click('[data-nst="kiwi"]'); await pg.wait_for_selector("#nsQ"); await pg.click("[data-nsp]"); await pg.click("[data-nsp]"); await pg.click("[data-nsok]"); await pg.wait_for_timeout(150)
+        await pg.fill("#nsq", "आलू"); await pg.press("#nsq", "Enter"); await pg.wait_for_selector("#nsQ"); await pg.click("[data-ns0]"); await pg.wait_for_timeout(150)
+        ntx = await pg.inner_text("#sheet")
+        assert "होना चाहिए" not in ntx and "बिका" not in ntx, "staff must not see expected stock"
+        assert "बचा माल (4)" in ntx and "खत्म (0)" in ntx and "₹" in await pg.inner_text("#sheet .ns-sum"), ntx[:500]
+        await pg.screenshot(path=f"{SHOTS}/34-night-entry.png")
+        await pg.click("[data-nsave]"); await pg.wait_for_selector("#nsadv"); await pg.wait_for_function("!document.querySelector('#nsadv').innerText.includes('बन रही')", timeout=8000)
+        adv = await pg.inner_text("#sheet"); assert "रात का स्टॉक सेव हुआ" in adv and "बचा माल" in adv and "रोज़ ~" not in adv, adv[:500]
+        await pg.screenshot(path=f"{SHOTS}/35-night-done.png")
+        await pg.evaluate("closeSheet()")
         st = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/meta')).map(([k,v])=>v.stock).filter(Boolean)[0]")
-        assert st["items"]["pyaj"]["close"] == 88 and st["nightBy"] == "कमल भाई", st["items"]["pyaj"]
+        assert st["items"]["pyaj"]["close"] == 88 and st["items"]["tamatar"]["close"] == 26 and st["items"]["kiwi"]["close"] == 2 and st["items"]["aloo"]["close"] == 0 and st["nightBy"] == "कमल भाई" and st["items"]["pyaj"]["closeBy"] == "कमल भाई" and st.get("nightVal", 0) > 0, st
         print("night count (no recheck) ok")
         await pg.screenshot(path=f"{SHOTS}/11-day.png", full_page=True)
         # 🔒 कर्मचारी को बिक्री/कमी/होना चाहिए/गल्ले का हिसाब नहीं — सिर्फ़ खरीद, खर्चा, खराबी, रात की गिनती
@@ -400,6 +409,8 @@ async def main():
         txt = await pg.inner_text("#p-day")
         assert "असली मुनाफ़ा" in txt, txt[:300]
         assert "रात का मिलान" in txt and "प्याज" in txt, txt[:600]
+        await pg.wait_for_function("document.querySelector('#p-day').innerText.includes('कल की खरीद की सलाह')", timeout=8000)
+        txt = await pg.inner_text("#p-day"); assert "भरने वाले" in txt and "रोज़ ~" in txt, txt[:800]
         assert "अभी गाड़ी में (लाइव)" in txt, "live stock card"
         await pg.click("[data-nrevok]"); await pg.wait_for_timeout(500)
         assert await pg.evaluate("Object.keys(window.__MOCK__.ownerCfg||{}).some(k=>k.startsWith('rev_'))"), "review not saved"
