@@ -108,12 +108,16 @@ async def main():
         await pg.screenshot(path=f"{SHOTS}/paper.png", full_page=True)
         assert not await pg.query_selector("#sheet [data-del]") and not await pg.query_selector("#sheet [data-edit]"), "no remove/edit on saved bill"
         assert await pg.query_selector("#sheet .pp-c") and await pg.query_selector("#sheet #sbqr canvas, #sheet #sbqr img"), "saved bill + QR shown in settle"
+        # ⚡ एक टैप शीट: 4 चिप एक लाइन, 4 बटन (एडिट/फोटो/शेयर/प्रिंट), नया ग्राहक + बड़ा बटन, सामान पर टैप = एडिट
+        assert len(await pg.query_selector_all("#sheet .paym4 [data-sbpay]")) == 4 and len(await pg.query_selector_all("#sheet .sb-act4 button")) == 4
+        assert await pg.query_selector("#sheet [data-sbrow='0']") and "पैसा आ गया · सेव" in await pg.inner_text("[data-sbok]") and "नया ग्राहक" in await pg.inner_text("[data-sblater]")
+        assert "VIKRAM CHARAN" in await pg.inner_text("#sheet .ppc-tot") and "@" in await pg.inner_text("#sheet .ppc-tot")
         assert await pg.evaluate("S.cart.length") == 0, "cart should be cleared after auto-save"
         b0 = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")
         assert b0 and b0[0]["settled"] is False and b0[0]["pay"]["cash"] == 0, b0
         await pg.screenshot(path=f"{SHOTS}/20-settle.png")
         # ✏️ सेव के बाद बदलें: टमाटर +0.25, आलू हटाकर फिर…
-        await pg.click("[data-sbedit2]"); await pg.wait_for_selector(".sbe-row")
+        await pg.click("#sheet [data-sbrow='0']"); await pg.wait_for_selector(".sbe-row")
         await pg.click('[data-sbp2="0"]'); await pg.fill("#sbeQ", "प्याज"); await pg.wait_for_timeout(200)
         await pg.click('[data-sbadd="pyaj"]'); await pg.wait_for_timeout(200)
         await pg.screenshot(path=f"{SHOTS}/21-edit.png")
@@ -121,7 +125,21 @@ async def main():
         b0 = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")[0] if False else (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))"))[0]
         assert b0.get("editCount") == 1 and "प्याज" in b0["edits"][0]["diff"] and b0["total"] > 85, b0
         print("edit after save ok:", b0["edits"][0]["diff"], b0["edits"][0]["totalBefore"], "->", b0["total"])
-        await pg.click('[data-sbpay="cash"]'); await pg.wait_for_timeout(150); await pg.click("[data-sbok]"); await pg.wait_for_timeout(1000)
+        await pg.click('[data-sbpay="cash"]'); await pg.wait_for_timeout(150)
+        await pg.fill("#sbGiven", "200"); await pg.wait_for_timeout(100)
+        assert "₹" in await pg.inner_text("#sbChg")
+        await pg.screenshot(path=f"{SHOTS}/27-onetap-cash.png")
+        settled_no = b0["no"]
+        await pg.click("[data-sbok]"); await pg.wait_for_timeout(1000)
+        # सेव के बाद अलग रसीद नहीं — सीधे खाली बिलिंग + संदेश
+        assert not await pg.query_selector("#sheet .scrim"), "no receipt screen after settle"
+        tst0 = await pg.evaluate("(document.querySelector('.toast')||{}).innerText||''"); assert "सेव" in tst0 and "नकद" in tst0, tst0
+        await pg.screenshot(path=f"{SHOTS}/28-after-save.png")
+        # बाद में "आज के बिल" से रसीद: QR (बिना रकम, भुगतान हो चुका), बदलाव का नोट ग्राहक के बिल पर नहीं
+        await pg.evaluate(f"showReceipt(S.dayBills.find(b=>b.no==='{settled_no}'),false)"); await pg.wait_for_selector("#sheet .paper")
+        assert await pg.query_selector("#sheet #ppqr canvas, #sheet #ppqr img") and "अगली बार" in await pg.inner_text("#sheet .pp-qr"), "QR on paid receipt"
+        assert not await pg.query_selector("#sheet .paper .pp-edit"), "edit note must not show on customer bill"
+        rtx = await pg.evaluate(f"receiptText(S.dayBills.find(b=>b.no==='{settled_no}'))"); assert "UPI:" in rtx and "@" in rtx and "बदला" not in rtx, rtx
         await pg.screenshot(path=f"{SHOTS}/5-receipt.png")
         await pg.click("[data-sharepdf]"); await pg.wait_for_selector("#shPh")
         await pg.screenshot(path=f"{SHOTS}/14-share-ask.png")

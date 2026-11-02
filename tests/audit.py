@@ -53,6 +53,9 @@ async def m():
         ok("UPI QR रकम के साथ (VIKRAM CHARAN 9460409552@okbizaxis)", qr and await pg.evaluate("upiId()") == "9460409552@okbizaxis")
         await pg.screenshot(path=f"{SHOTS}/a-upi.png")
         await pg.click("[data-sbok]"); await pg.wait_for_timeout(1000)
+        _sc = await pg.query_selector("#sheet .scrim"); _tt = await pg.evaluate("(document.querySelector('.toast')||{}).innerText||''")
+        ok("एक टैप: सेव के बाद सीधे खाली बिलिंग", not _sc and "सेव" in _tt)
+        await pg.evaluate("showReceipt(S.dayBills.slice().sort((a,b)=>b.ts-a.ts)[0],false)"); await pg.wait_for_selector("#sheet .paper")
         ok("बिल सेव + रसीद + WhatsApp + प्रिंट बटन", await pg.is_visible("[data-print]") and await pg.evaluate("!!document.querySelector('#sheet a[href*=\"wa.me\"]')"))
         await pg.evaluate("closeSheet()")
         # उधार

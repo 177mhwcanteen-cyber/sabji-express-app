@@ -28,9 +28,9 @@ SB.settleSheet=function(b,offline){
     const party=S.parties.find(p=>p.id===st.partyId);
     const needParty=st.pay==="udhar"||st.pay==="split";
     let ui="";
-    if(st.pay==="upi")ui=upiId()?`<p class="note sb-upin">📱 ऊपर बिल के QR से स्कैन करवाएँ · पैसा आने का मैसेज देखकर ही "सेटल" दबाएँ</p>`:`<div class="warn">UPI ID सेटिंग में नहीं है</div>`;
-    if(st.pay==="cash"){const g=num(st.given);ui=`<label class="fld">ग्राहक ने कितने दिए? (ज़रूरी नहीं)<input class="inp big-in" id="sbGiven" inputmode="decimal" value="${esc(st.given)}" placeholder="जैसे 500"></label>${g>0?`<p class="sb-change">लौटाने हैं: <b>${rs(Math.max(0,r2(g-tot)))}</b></p>`:""}`}
-    if(st.pay==="split")ui=`<label class="fld">अभी कितना नकद मिला?<input class="inp big-in" id="sbCash" inputmode="decimal" value="${esc(st.cashPart)}"></label><p class="note">उधार में जाएगा: <b style="color:var(--chili)">${rs(Math.max(0,r2(tot-num(st.cashPart))))}</b></p>`;
+    if(st.pay==="upi")ui=upiId()?`<p class="note sb-upin">📱 QR से स्कैन करवाएँ · पैसा आने का मैसेज देखकर ही नीचे दबाएँ</p>`:`<div class="warn">UPI ID सेटिंग में नहीं है</div>`;
+    if(st.pay==="cash"){const g=num(st.given);ui=`<div class="sb-line">💵 दिए ₹<input class="inp" id="sbGiven" inputmode="decimal" value="${esc(st.given)}" placeholder="ज़रूरी नहीं" aria-label="ग्राहक ने कितने दिए"><span>→ लौटाने <b id="sbChg">${g>0?rs(Math.max(0,r2(g-tot))):"—"}</b></span></div>`}
+    if(st.pay==="split")ui=`<div class="sb-line">💵 अभी नकद ₹<input class="inp" id="sbCash" inputmode="decimal" value="${esc(st.cashPart)}" aria-label="अभी कितना नकद मिला"><span>→ उधार <b style="color:var(--chili)">${rs(Math.max(0,r2(tot-num(st.cashPart))))}</b></span></div>`;
     if(needParty){
       const q=st.q.trim().toLowerCase();const L=S.parties.filter(p=>!q||(p.name||"").toLowerCase().includes(q)||String(p.phone||"").includes(q)||String(p.qtr||"").toLowerCase().includes(q)).slice(0,6);
       ui+=party?SB.udCheckHTML(party,SB.udAmt(b,st),st)
@@ -40,24 +40,28 @@ SB.settleSheet=function(b,offline){
     }
     const ok=!(needParty&&!party)&&!(st.pay==="upi"&&!upiId());
     const udBtn=needParty&&party?"📒 "+rs(SB.udAmt(b,st))+" उधार पक्का करें — "+party.name:"";
-    $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="भुगतान"><div class="grab"></div>
-    <div class="sh-head ppc-sh"><h3>💰 भुगतान <small class="note">· बिल ${esc(b.no)}</small></h3><button class="x" data-close aria-label="बंद करें">✕</button></div>
-    ${offline||b.pending?'<p class="note" style="color:var(--chili);font-weight:700;margin:0 0 6px">📴 बिल फोन में सेव है — नेट आते ही सर्वर पर जाएगा</p>':""}
-    <div class="sb-saved">✓ बिल सेव हो गया — अब भुगतान लें</div>
-    ${SF.compactPaperHTML(b,{qr:st.pay==="upi",qrId:"sbqr"})}
-    <div class="paym">${[["upi","📱 UPI / QR"],["cash","💵 नकद"],["udhar","📒 पूरा उधार"],["split","🔀 नकद + बाकी उधार"]].map(([k,v])=>`<button data-sbpay="${k}" aria-pressed="${st.pay===k}">${v}</button>`).join("")}</div>
+    const big=st.pay==="upi"?"✓ पैसा आ गया · सेव "+rs(tot):udBtn?udBtn:st.pay==="split"?"✓ सेव + सेटल · नकद "+rs(Math.min(tot,num(st.cashPart)))+" + उधार":"✓ सेव + सेटल "+rs(tot);
+    $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px sb1" role="dialog" aria-label="बिल और भुगतान"><div class="grab"></div>
+    <div class="sh-head ppc-sh"><h3>🧾 बिल <small class="note">· ${esc(b.no)}</small> <span class="sb-ok">${offline||b.pending?"📴 फोन में सेव":"✓ सेव"}</span></h3><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    ${SF.compactPaperHTML(b,{qr:true,qrId:"sbqr",tap:true})}
+    <div class="paym paym4" role="group" aria-label="भुगतान का तरीका">${[["upi","📱","UPI"],["cash","💵","नकद"],["udhar","📒","उधार"],["split","🔀","नकद+उधार"]].map(([k,i,v])=>`<button data-sbpay="${k}" aria-pressed="${st.pay===k}"><i>${i}</i>${v}</button>`).join("")}</div>
     ${ui}
-    <button class="big ${st.pay==="upi"?"haldi":""}" data-sbok ${ok?"":"disabled"}>${st.pay==="upi"?"✓ पैसा आ गया · सेटल करें":udBtn?esc(udBtn):"✓ सेटल करें · "+rs(tot)}</button>
-    <div class="sb-row"><button class="big ghost" data-sbedit2>✏️ बिल बदलें</button><button class="big ghost" data-sblater>⏳ बाद में</button></div>
+    <div class="sb-act4"><button data-sbedit2><i>✏️</i>एडिट</button><button data-sbphoto><i>📷</i>फोटो${b.photoN?" ("+b.photoN+")":""}</button><button data-sbshare><i>📤</i>शेयर</button><button data-sbprint><i>🖨️</i>प्रिंट</button></div>
+    <div class="sb-bot"><button class="big ghost" data-sblater>➕ नया ग्राहक</button><button class="big ${st.pay==="upi"?"haldi":""}" data-sbok ${ok?"":"disabled"}>${esc(big)}</button></div>
     </div></div>`;
-    if(st.pay==="upi"&&upiId()&&window.QRCode){const el=$("#sbqr");try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${tot.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+b.no)}`,width:124,height:124,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+    if(window.SF&&SF.drawPaperQR)SF.drawPaperQR(b,"sbqr",150);
   };
   draw();
   const sh=$("#sheet");
   sh.oninput=e=>{if(e.target.id==="sbUph"){st.ph=e.target.value;return}if(e.target.id==="sbUwhy"){st.why=e.target.value;return}if(e.target.id==="sbPq"){st.q=e.target.value;const pos=e.target.selectionStart;draw();const f=$("#sbPq");if(f){f.focus();try{f.setSelectionRange(pos,pos)}catch(x){}}}};
-  sh.onchange=e=>{if(e.target.id==="sbGiven"){st.given=e.target.value;draw()}if(e.target.id==="sbCash"){st.cashPart=e.target.value;draw()}};
+  sh.onchange=e=>{if(e.target.id==="sbCash"){st.cashPart=e.target.value;draw()}};
+  const _oi=sh.oninput;sh.oninput=e=>{if(e.target.id==="sbGiven"){st.given=e.target.value;const g=num(st.given),c=$("#sbChg");if(c)c.textContent=g>0?rs(Math.max(0,r2(g-tot))):"—";return}_oi(e)};
   sh.onclick=async e=>{
-    if(e.target.matches("[data-close]")||e.target.closest("[data-sblater]")){closeSheet();if(e.target.closest("[data-sblater]"))toast("⏳ बिल "+b.no+" का भुगतान बाकी — बिलिंग में ऊपर दिखेगा");try{renderPane()}catch(x){}return}
+    if(e.target.matches("[data-close]")||e.target.closest("[data-sblater]")){closeSheet();if(e.target.closest("[data-sblater]"))toast("⏳ बिल "+b.no+" रुका है — ऊपर \"भुगतान बाकी\" में · नया ग्राहक शुरू करें");try{renderPane()}catch(x){}return}
+    const rw=e.target.closest("[data-sbrow]");if(rw){SB.editSheet(b);return}
+    if(e.target.closest("[data-sbphoto]")){if(window.SF&&SF.addBillPhoto)SF.addBillPhoto(b,()=>{const x=sh.querySelector("[data-sbphoto]");if(x)x.innerHTML="<i>📷</i>फोटो ("+b.photoN+")"});return}
+    if(e.target.closest("[data-sbshare]")){const p=S.parties.find(x=>x.id===st.partyId);if(window.SF)SF.shareBill(b,(p&&p.phone)||b.custPhone,false);return}
+    if(e.target.closest("[data-sbprint]")){if(typeof printBill==="function")printBill(b);return}
     const p=e.target.closest("[data-sbpay]");if(p){st.pay=p.dataset.sbpay;draw();return}
     const pp=e.target.closest("[data-sbp]");if(pp){st.partyId=pp.dataset.sbp;draw();return}
     if(e.target.closest("[data-sbpch]")){st.partyId="";st.ph="";st.why="";draw();return}
@@ -112,6 +116,21 @@ SB.udharHTML=function(){
   ${L.map(b=>{const c=b.udChk||{};return `<div class="creq-row"><div><b>${esc(b.partyName||"")} · ${rs(b.pay.udhar)}</b><span class="note">${esc(b.no)} · ${ftime(b.ts)} · बिल ${esc(b.byName||"")}${c.after!=null?" · अब बाकी "+rs(c.after):""}</span>
     <span>${b.udSent?"✅ पर्ची गई":"❌ पर्ची नहीं गई"}${c.over?" · ⚠ सीमा "+rs(c.lim)+" पार":""}${c.stale?" · ⚠ "+(c.days||"")+" दिन से जमा नहीं":""}${c.newPh?" · 📱 नंबर अभी डाला":""}</span>${c.why?`<span>📝 ${esc(c.why)}</span>`:""}</div></div>`}).join("")}</div>`;
 };
+/* सेव होते ही: अलग रसीद वाली स्क्रीन नहीं — सीधे खाली बिलिंग, संदेश + बीप + कंपन; उधार हो तो सिर्फ़ "पर्ची भेजें" की छोटी पट्टी */
+SB.afterSettle=function(b){
+  const p=b.pay||{};const how=[p.upi?"UPI "+rs(p.upi):"",p.cash?"नकद "+rs(p.cash):"",p.udhar?"उधार "+rs(p.udhar):""].filter(Boolean).join(" + ");
+  closeSheet();try{renderPane()}catch(x){}
+  try{beep(true)}catch(x){}try{navigator.vibrate&&navigator.vibrate(60)}catch(x){}
+  toast("✓ बिल "+b.no+" सेव · "+how+(b.pending?" · 📴 नेट आते ही जाएगा":""));
+  if(num(p.udhar)>0)SB.udSlipSheet(b);
+};
+SB.udSlipSheet=function(b){
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="उधार की पर्ची"><div class="grab"></div>
+  <div class="sh-head"><div><h3>📒 ${rs(b.pay.udhar)} उधार चढ़ा</h3><span class="note">${esc(b.partyName||"")} · खाते में कुल बाकी ${rs(bal(b.partyId))}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  ${SB.udSendHTML(b)}
+  <button class="big ghost" data-close style="margin-top:8px">आगे बढ़ें → नया बिल</button></div></div>`;
+  $("#sheet").onclick=e=>{if(e.target.matches("[data-close]"))closeSheet()};
+};
 async function doSettle(b,st){
   const tot=num(b.total);const pay={cash:0,upi:0,udhar:0};
   if(st.pay==="cash")pay.cash=tot;else if(st.pay==="upi")pay.upi=tot;else if(st.pay==="udhar")pay.udhar=tot;else{const cp=Math.min(tot,num(st.cashPart));pay.cash=r2(cp);pay.udhar=r2(tot-cp)}
@@ -126,7 +145,7 @@ async function doSettle(b,st){
     if(pay.udhar>0&&party){const ent={ts:b.ts,date:b.date,partyId:party.id,partyName:party.name,type:"udhar",amt:pay.udhar,billNo:b.no,by:S.uid||"",byName:biller()};
       if(S.demo)S.ledger.push({id:b.no,...ent});else{const o=outboxGet();const inBox=o.some(x=>x.bill.no===b.no&&!(x.done&&x.done.l));if(!inBox)await S.db.collection("ledger").doc(b.no).set(ent);if(!S.ledger.find(x=>x.id===b.no))S.ledger.push({id:b.no,...ent})}}
     if(pay.udhar>0)SB._lastUd=b;
-    beep(true);showReceipt(b,true,b.pending);try{renderPane()}catch(x){}
+    SB.afterSettle(b);
   }catch(err){toast("सेटल नहीं हुआ: "+(err.code||err.message||""))}
 }
 

@@ -76,7 +76,8 @@ SF.flushPhotos=async function(){
           body:JSON.stringify({idToken:tok,apiKey:CFG.firebase.apiKey,pid:ph.pid,date:ph.date,name:ph.name,mime:"image/jpeg",b64:await b64(ph.blob)})});
         const j=await r.json();if(!j.ok)throw new Error(j.error||"upload");
         const F=firebase.firestore.FieldValue;
-        await S.db.doc("purchases/"+ph.pid).update({photos:F.arrayUnion({id:j.id,url:j.url,ts:Date.now()}),photoPending:F.increment(-1)});
+        if(ph.kind==="bill")await S.db.doc("days/"+ph.date+"/meta/billPhotos").set({[ph.no]:F.arrayUnion({id:j.id,url:j.url,ts:Date.now(),by:ph.by||""})},{merge:true});
+        else await S.db.doc("purchases/"+ph.pid).update({photos:F.arrayUnion({id:j.id,url:j.url,ts:Date.now()}),photoPending:F.increment(-1)});
         await IDB.del(ph.k);
       }catch(e){break}
     }
@@ -281,6 +282,9 @@ function viewPurchase(p){
   $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}
     if(e.target.closest("[data-paddphoto]")){pickPhoto(async blob=>{const k=p.id+"_x"+Date.now();await IDB.put({k,pid:p.id,date:p.date,name:`${p.date}_${p.supName}_x.jpg`,blob,ts:Date.now()});S.db.doc("purchases/"+p.id).update({photoPending:firebase.firestore.FieldValue.increment(1)}).catch(()=>{});toast("फोटो जुड़ी — नेट मिलते ही Drive पर जाएगी");closeSheet();SF.flushPhotos()})}};
 }
+SF.addBillPhoto=function(b,done){pickPhoto(async blob=>{try{const k="b_"+b.no+"_"+Date.now();
+  await IDB.put({k,kind:"bill",no:b.no,pid:b.no,date:b.date||today(),by:biller(),name:`${b.date||today()}_बिल_${b.no}_${(b.photoN||0)+1}.jpg`,blob,ts:Date.now()});
+  b.photoN=(b.photoN||0)+1;toast("📷 फोटो बिल "+b.no+" के साथ जुड़ी");SF.flushPhotos();if(done)done()}catch(e){toast("फोटो सेव नहीं हुई")}})};
 function pickPhoto(cb){const fi=document.createElement("input");fi.type="file";fi.accept="image/*";fi.capture="environment";
   fi.onchange=async()=>{const f=fi.files[0];if(!f)return;try{toast("फोटो छोटी कर रहे हैं…");cb(await shrinkPhoto(f))}catch(e){toast("फोटो नहीं ली जा सकी")}};fi.click()}
 function supPaySheet(sid){
@@ -833,11 +837,19 @@ SF.qrCanvas=function(amount,no){
 SF.orderPh=function(){const d=String(S.settings.shopPh||S.settings.ownerPh||"").replace(/\D/g,"").slice(-10);return d.length===10?d:""};
 SF.fmtPh=d=>d?d.slice(0,5)+" "+d.slice(5):"";
 SF.custTag=function(b){return b.mode==="inst"?"🏢 संस्था चालान · खरीद भाव":b.mode==="udhar"?"📒 क्रेडिट / उधार खाता":"⭐ VIP ग्राहक ⭐"};
+/* QR हर बिल पर (संस्था छोड़कर): बाकी हो तो उसी रकम का, उधार खाते का कुल बाकी, पैसा मिल चुका हो तो बिना रकम का */
+SF.qrFor=function(b){
+  if(!b||b.mode==="inst"||b.cancelled||!upiId())return null;
+  if(b.settled===false||!b.pay)return {amt:r2(b.total),label:"स्कैन करके भुगतान करें · ₹"+r2(b.total)};
+  const due=b.partyId?r2(bal(b.partyId)):0;
+  if(due>0)return {amt:due,label:"खाते में कुल बाकी ₹"+due+" — इसी QR से चुकाएँ"};
+  return {amt:0,label:"✓ भुगतान हो गया · अगली बार भी इसी QR से भुगतान करें"};
+};
 SF.rcptOpts=function(b,withQr){
   const due=b.pay?(b.pay.udhar||0):b.total;
   const inst=b.mode==="inst";
   return {shop:"सब्ज़ी एक्सप्रेस",tag:inst?"माल चालान — "+(b.partyName||""):"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:inst?"":SF.fmtPh(SF.orderPh()),nutri:!inst,custTag:SF.custTag(b),vip:b.mode!=="inst"&&b.mode!=="udhar",
-    date:fdate(b.date||today())+"  "+ftime(b.ts||Date.now()),fq,qr:withQr&&b.mode!=="inst"?SF.qrCanvas(due,b.no):null,upi:upiId(),payee:UPI_FIXED.payee,
+    date:fdate(b.date||today())+"  "+ftime(b.ts||Date.now()),fq,qr:(q=>q?SF.qrCanvas(q.amt,b.no):null)(SF.qrFor(b)),qrLabel:(SF.qrFor(b)||{}).label||"",upi:upiId(),payee:UPI_FIXED.payee,
     balance:b.partyId?r2(bal(b.partyId)+(b.pay?0:0)):null,paid:!!b.pay};
 };
 SF.nutriHTML=function(b){
@@ -858,13 +870,13 @@ SF.compactPaperHTML=function(b,o){
   return `<div class="paper pp-c${o.anim?" pp-anim":""}">
   <div class="ppc-head"><span class="ppc-logo">🥬</span><b>सब्ज़ी एक्सप्रेस</b>${tag}</div>
   <div class="ppc-meta"><span><b>${esc(b.no||"…")}</b> · ${fdate(b.date||today()).slice(0,5)} · ${ftime(b.ts||Date.now())}</span><span class="ppc-cust">${esc(cust)}</span></div>
+  ${b.byName?`<div class="ppc-meta ppc-by"><span>बिलर: ${esc(b.byName)}</span>${o.tap?'<span class="note">सामान पर टैप = मात्रा बदलें</span>':""}</div>`:""}
   <table class="pp-t ppc-t"><thead><tr><th>#</th><th>सामान</th><th class="r">मात्रा</th><th class="r">भाव</th><th class="r">रकम</th>${ed?"<th></th>":""}</tr></thead><tbody>
-  ${(b.lines||[]).map((l,i)=>`<tr${ed?` data-edit="${i}"`:""}><td>${i+1}</td><td>${esc(l.name)}${window.SN&&SN.en(l.name)?` <small class="pp-en">${esc(SN.en(l.name))}</small>`:""}${l.changed?' <span class="pp-chg">भाव बदला</span>':""}${l.free?' <span class="pp-chg">मुफ्त</span>':""}</td><td class="r">${fq(l.qty,l.unit).replace(" कि.ग्रा"," kg")}</td><td class="r">${l.free?"—":"₹"+l.rate}</td><td class="r"><b>₹${l.amt}</b></td>${ed?`<td><button class="pp-x" data-del="${i}" aria-label="${esc(l.name)} हटाएँ">✕</button></td>`:""}</tr>`).join("")}
+  ${(b.lines||[]).map((l,i)=>`<tr${ed?` data-edit="${i}"`:o.tap?` data-sbrow="${i}" class="tap"`:""}><td>${i+1}</td><td>${esc(l.name)}${window.SN&&SN.en(l.name)?` <small class="pp-en">${esc(SN.en(l.name))}</small>`:""}${l.changed?' <span class="pp-chg">भाव बदला</span>':""}${l.free?' <span class="pp-chg">मुफ्त</span>':""}</td><td class="r">${fq(l.qty,l.unit).replace(" कि.ग्रा"," kg")}</td><td class="r">${l.free?"—":"₹"+l.rate}</td><td class="r"><b>₹${l.amt}</b></td>${ed?`<td><button class="pp-x" data-del="${i}" aria-label="${esc(l.name)} हटाएँ">✕</button></td>`:""}</tr>`).join("")}
   </tbody></table>
   ${b.disc?`<div class="pp-row"><span>जोड़ ₹${sub}</span><span>छूट −₹${b.disc}</span></div>`:""}
-  ${window.SB&&SB.editNoteHTML?SB.editNoteHTML(b):""}
   <div class="ppc-foot${qr?"":" noqr"}">${qr?`<div class="ppc-qr" id="${o.qrId||"ppqr"}"></div>`:""}
-    <div class="ppc-tot"><span>कुल रकम · ${(b.lines||[]).length} सामान</span><b>₹${b.total}</b>${qr?`<small>📱 स्कैन करके भुगतान<br>${esc(UPI_FIXED.payee)}</small>`:""}</div></div>
+    <div class="ppc-tot"><span>कुल रकम · ${(b.lines||[]).length} सामान</span><b>₹${b.total}</b>${qr?`<small>📱 स्कैन करके भुगतान<br><b>${esc(UPI_FIXED.payee)}</b><br>${esc(upiId())}</small>`:""}</div></div>
   </div>`;
 };
 SF.paperHTML=function(b,o){
@@ -884,10 +896,9 @@ SF.paperHTML=function(b,o){
   <div class="pp-dash"></div>
   ${b.disc?`<div class="pp-row"><span>जोड़</span><span>₹${sub}</span></div><div class="pp-row"><span>छूट</span><span>−₹${b.disc}</span></div>`:""}
   <div class="pp-total"><span>कुल रकम</span><b>₹${b.total}</b></div>
-  ${window.SB&&SB.editNoteHTML?SB.editNoteHTML(b):""}
   <div class="pp-row note"><span>${(b.lines||[]).length} सामान</span><span>${b.partyId&&!ed?"खाते में कुल बाकी ₹"+r2(bal(b.partyId)):""}</span></div>
   ${stamp?`<div class="pp-stamp${b.cancelled?" red":""}">${b.cancelled?"रद्द · "+esc(b.cancelReason||""):"✓ "+esc(stamp)}</div>`:""}
-  ${o.qr&&b.mode!=="inst"&&upiId()?`<div class="pp-qr"><div id="${o.qrId||"ppqr"}"></div><b>स्कैन करके भुगतान करें · ₹${o.qrAmt!=null?o.qrAmt:b.total}</b><span>${esc(UPI_FIXED.payee)} · ${esc(upiId())}</span></div>`:""}
+  ${o.qr&&SF.qrFor(b)?`<div class="pp-qr"><div id="${o.qrId||"ppqr"}"></div><b>${esc(SF.qrFor(b).label)}</b><span>${esc(UPI_FIXED.payee)} · ${esc(upiId())}</span></div>`:""}
   <div class="pp-dash"></div>
   ${SF.nutriHTML(b)}
   ${SF.orderPh()?`<div class="pp-order"><b>📲 घर बैठे ताज़ी सब्ज़ी मँगाएँ</b><span>WhatsApp या कॉल करें</span><big>${SF.fmtPh(SF.orderPh())}</big></div>`:""}
@@ -895,7 +906,9 @@ SF.paperHTML=function(b,o){
   </div>`;
 };
 function drawQR(id,amt,no,size){const el=document.getElementById(id);if(!el||!window.QRCode||!upiId())return;el.innerHTML="";
-  try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${(+amt).toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`,width:size||190,height:size||190,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+  try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${+amt>0?"&am="+(+amt).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`,width:size||190,height:size||190,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+SF.drawQR=drawQR;
+SF.drawPaperQR=function(b,id,size){const q=SF.qrFor(b);if(q)drawQR(id||"ppqr",q.amt,b.no,size||150)};
 function draftBill(){
   const c=S.chk,party=S.parties.find(p=>p.id===S.partyId);
   const custName=S.mode==="inst"?S.inst:S.mode==="udhar"?(party?party.name:""):(S.cust.name||(S.cust.phone?"ग्राहक "+S.cust.phone:"VIP ग्राहक"));
