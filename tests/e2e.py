@@ -43,7 +43,7 @@ async def main():
 
         # ---------- 1) मालिक ----------
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1}}}, users)
+        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1}}}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
@@ -344,9 +344,11 @@ async def main():
         assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
         print("opening edit ok")
         # 🪧 बोर्ड के भाव: एक बार अपने-आप
-        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
         bd = await pg.evaluate("[window.__MOCK__.items.tamatar.sale,window.__MOCK__.items.nimbu.sale,!!window.__MOCK__.items.parwal,window.__MOCK__.items.parwal&&window.__MOCK__.items.parwal.sale,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.note&&x.note.includes('बोर्ड')).length,window.__MOCK__.ownerCfg.flags.board1>0]")
         assert bd[0] == 20 and bd[1] == 200 and bd[2] and bd[3] == 90 and bd[4] >= 10 and bd[5], bd
+        b2 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.board2>0,window.__MOCK__.items.harapyaj&&window.__MOCK__.items.harapyaj.sale,window.__MOCK__.items.kachchakela&&window.__MOCK__.items.kachchakela.sale,!window.__MOCK__.items.safalmatar,window.__MOCK__.items.methi.sale]")
+        assert b2 == [True, 80, 60, True, 200], b2
         print("board rates ok", bd)
         await pg.evaluate("closeSheet()")
         assert not await pg.query_selector("[data-oldud]") or True

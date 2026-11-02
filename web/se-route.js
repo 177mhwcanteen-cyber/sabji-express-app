@@ -755,30 +755,44 @@ const BOARD={date:"2026-11-01",flag:"board1",
   sale:{aloo:20,pyaj:60,tamatar:20,kheera:50,adrak:140,shimla:80,bhindi:80,gajar:70,lauki:30,palak:80,phoolgobhi:60,pattagobhi:50,karela:60,harimirch:120,dhaniya:180,beans:140,mushroom:65,chukandar:70,kundru:40,toroi:80,lahsun:240,baingan:60,sahjan:140,podina:100,karipatta:200,
     kela:50,seb:140,kiwi:100,anar:240,papita:80,tarbooj:50,ananas:100,amrood:110,nariyal:70,gilki:60,makka:60,motimirch:80,mooli:40,kaddu:40,nimbu:200,bhartabaingan:60,kinnu:180,amla:100,chandaliya:80,matar:200},
   add:[{id:"parwal",name:"परवल",unit:"kg",cat:"sabzi",emoji:"🥒",hue:110,sale:90},
-    {id:"safalmatar",name:"सफल मटर (पैकेट)",unit:"kg",cat:"sabzi",emoji:"🫛",hue:120,sale:100},
     {id:"harapyaj",name:"हरा प्याज",unit:"kg",cat:"patta",emoji:"🧅",hue:100,sale:0,cost:60},
     {id:"moongfali",name:"मूंगफली",unit:"kg",cat:"sabzi",emoji:"🥜",hue:35,sale:0},
     {id:"shakarkand",name:"शकरकंद",unit:"kg",cat:"sabzi",emoji:"🍠",hue:20,sale:0},
     {id:"malta",name:"माल्टा",unit:"kg",cat:"fal",emoji:"🍊",hue:30,sale:0}]};
-SR.BOARD=BOARD;
+/* 🪧 02-11-2026: छूटी सब्ज़ियाँ (कमल भाई की कॉपी 13–31 अक्टूबर से) + बचे भाव; "सफल मटर" बंद — सिर्फ़ खुली मटर बिकती है */
+const BOARD2={date:"2026-11-02",flag:"board2",src:"विक्रम जी की मंज़ूरी 02-11-2026 (कॉपी के खरीद भाव से)",
+  sale:{harapyaj:80,shakarkand:60,malta:180,methi:200,motamirch:80,arbi:70},
+  off:["safalmatar"],
+  add:[{id:"kachchakela",name:"कच्चा केला",unit:"kg",cat:"sabzi",emoji:"🍌",hue:90,sale:60,cost:40},
+    {id:"mausami",name:"मौसमी",unit:"kg",cat:"fal",emoji:"🍋",hue:65,sale:80,cost:60},
+    {id:"semfali",name:"सेमफली",unit:"kg",cat:"sabzi",emoji:"🫛",hue:115,sale:90,cost:60},
+    {id:"haldi",name:"हल्दी (कच्ची)",unit:"kg",cat:"sabzi",emoji:"🫚",hue:40,sale:150,cost:100},
+    {id:"sarson",name:"सरसों (साग)",unit:"kg",cat:"patta",emoji:"🥬",hue:110,sale:100,cost:65},
+    {id:"lalaloo",name:"लाल आलू",unit:"kg",cat:"sabzi",emoji:"🥔",hue:12,sale:30,cost:20}]};
+const PACKS=[BOARD,BOARD2];
+SR.BOARD=BOARD;SR.PACKS=PACKS;
 SR.applyBoard=async function(db){
   if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
   try{
-    const fr=db.doc("ownerCfg/flags");const f=await fr.get();if(f.exists&&f.data()[BOARD.flag])return;
-    const q=await db.collection("items").get();const items=q.docs.map(d=>({id:d.id,...d.data()}));
-    const W=db.batch?db.batch():null;const put=(ref,d,o)=>W?W.set(ref,d,o):ref.set(d,o);const upd=(ref,d)=>W?W.update(ref,d):ref.update(d);
-    const now=Date.now(),src="बोर्ड के भाव 01-11-2026";const ch=[];let add=0;
-    for(const [id,sale] of Object.entries(BOARD.sale)){const it=items.find(x=>x.id===id);if(!it||+it.sale===sale)continue;
-      ch.push(it.name+" ₹"+(+it.sale||0)+"→₹"+sale);
-      await upd(db.collection("items").doc(id),{sale,ratePrev:+it.sale||0,rateTs:now,rateBy:S.uid||"",rateByName:"विक्रम जी (बोर्ड)",saleSet:{date:BOARD.date,src}});
-      await put(db.collection("priceLog").doc("rb"+id+now.toString(36)),{itemId:id,name:it.name,field:"sale",old:+it.sale||0,new:sale,ts:now,by:S.uid||"",byName:"विक्रम जी (बोर्ड)",note:src})}
-    let ord=Math.max(0,...items.map(i=>+i.order||0));
-    for(const a of BOARD.add){if(items.some(x=>x.id===a.id||String(x.name||"").replace(/\s*\(.*\)/,"").trim()===a.name.replace(/\s*\(.*\)/,"").trim()))continue;
-      const d={active:true,name:a.name,unit:a.unit,cat:a.cat,emoji:a.emoji,hue:a.hue,sale:a.sale,cost:a.cost||0,order:++ord,photo:"",buyHist:a.cost?[{date:"2026-10-31",rate:a.cost,src:"कमल भाई की कॉपी 31-10"}]:[],saleSet:{date:BOARD.date,src:a.sale?src:"भाव बाकी — विक्रम जी बताएँगे"}};
-      await put(db.collection("items").doc(a.id),d);add++}
-    await put(fr,{[BOARD.flag]:now,boardChanged:ch,boardAdded:add},{merge:true});
-    if(W)await W.commit();
-    if(ch.length||add)toast("🪧 बोर्ड के भाव लगे: "+ch.length+" भाव बदले · "+add+" नई सब्ज़ी जुड़ी");
+    const fr=db.doc("ownerCfg/flags");
+    for(const P of PACKS){
+      const f=await fr.get();if(f.exists&&f.data()[P.flag])continue;
+      const q=await db.collection("items").get();const items=q.docs.map(d=>({id:d.id,...d.data()}));
+      const W=db.batch?db.batch():null;const put=(ref,d,o)=>W?W.set(ref,d,o):ref.set(d,o);const upd=(ref,d)=>W?W.update(ref,d):ref.update(d);
+      const now=Date.now(),src=P.src||"बोर्ड के भाव 01-11-2026";const ch=[];let add=0,off=0;
+      for(const [id,sale] of Object.entries(P.sale||{})){const it=items.find(x=>x.id===id);if(!it||+it.sale===sale)continue;
+        ch.push(it.name+" ₹"+(+it.sale||0)+"→₹"+sale);
+        await upd(db.collection("items").doc(id),{sale,ratePrev:+it.sale||0,rateTs:now,rateBy:S.uid||"",rateByName:"विक्रम जी (बोर्ड)",saleSet:{date:P.date,src}});
+        await put(db.collection("priceLog").doc("rb"+id+now.toString(36)),{itemId:id,name:it.name,field:"sale",old:+it.sale||0,new:sale,ts:now,by:S.uid||"",byName:"विक्रम जी (बोर्ड)",note:src})}
+      for(const id of (P.off||[])){const it=items.find(x=>x.id===id);if(it&&it.active!==false){await upd(db.collection("items").doc(id),{active:false,offNote:"बिकता नहीं — "+P.date});off++}}
+      let ord=Math.max(0,...items.map(i=>+i.order||0));
+      for(const a of (P.add||[])){if(items.some(x=>x.id===a.id||String(x.name||"").replace(/\s*\(.*\)/,"").trim()===a.name.replace(/\s*\(.*\)/,"").trim()))continue;
+        const d={active:true,name:a.name,unit:a.unit,cat:a.cat,emoji:a.emoji,hue:a.hue,sale:a.sale,cost:a.cost||0,order:++ord,photo:"",buyHist:a.cost?[{date:P.date,rate:a.cost,src:"कमल भाई की कॉपी (अक्टूबर)"}]:[],saleSet:{date:P.date,src:a.sale?src:"भाव बाकी — विक्रम जी बताएँगे"}};
+        await put(db.collection("items").doc(a.id),d);add++}
+      await put(fr,{[P.flag]:now,[P.flag+"Changed"]:ch,[P.flag+"Added"]:add},{merge:true});
+      if(W)await W.commit();
+      if(ch.length||add||off)toast("🪧 "+P.date.slice(8)+"-"+P.date.slice(5,7)+" के भाव: "+ch.length+" बदले · "+add+" नई सब्ज़ी"+(off?" · "+off+" बंद":""));
+    }
   }catch(e){SR._board=0}
 };
 /* SF के साथ जोड़ */
