@@ -447,6 +447,7 @@ main{padding-block:10px 120px}
 .ic-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:inherit;background:#e9f9ee;border:1.5px solid #25d366;border-radius:12px;padding:8px 10px;font:inherit;text-align:left;width:100%;cursor:pointer}.ic-btn span{display:grid;font-weight:800}.ic-btn small{font-weight:500;color:#4b5563}.ic-btn i{font-style:normal;font-weight:800;color:#0b7a35;white-space:nowrap}
 .ic-btn.off{background:transparent;border-style:dashed;border-color:#bbb}.ic-btn.off i{color:#888}
 .ic-grp{background:var(--surface);border-radius:14px;padding:8px 10px;margin:0 0 8px;box-shadow:var(--shadow)}.ic-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0;border-bottom:1px dashed #ccc}.ic-row select{grid-column:1/-1}
+.ic-cost{display:flex;align-items:center;gap:4px;font-weight:700}.ic-cost .inp{width:5.5em;padding:8px;text-align:right}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
 :root{--bg:#f2f2f7;--surface:#ffffff;--ink:#1c1c1e;--muted:#6c6c70;--line:#e3e3e8;--leaf:#1f7a4d;--leaf-ink:#ffffff;--haldi:#ffcc00;--haldi-ink:#2a1d00;--chili:#d70015;--chili-bg:#ffe9eb;--sky:#0064d2;--sky-bg:#e6f0fd;--ok-bg:#e4f6ea;--r:20px;--shadow:0 1px 1px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06);--glass:rgba(242,242,247,.72)}
@@ -867,7 +868,7 @@ async function saveBill(){
   if(c.pay==="cash")pay.cash=tot;else if(c.pay==="upi")pay.upi=tot;else if(c.pay==="udhar")pay.udhar=tot;
   else if(c.pay==="split"){const cp=Math.min(tot,parseFloat(c.cashPart)||0);pay.cash=cp;pay.udhar=r2(tot-cp)}
   const now=Date.now(),date=today();
-  const lines=S.cart.map(l=>({id:l.id,name:l.name,emoji:l.emoji||"",unit:l.unit,qty:l.qty,rate:l.rate,board:l.board,cost:l.cost,amt:l.amt,changed:!!l.changed,free:!!l.free,...(l.note?{note:l.note}:{})}));
+  const lines=S.cart.map(l=>({id:l.id,name:l.name,emoji:l.emoji||"",unit:l.unit,qty:l.qty,rate:l.rate,board:l.board,cost:l.cost,amt:l.amt,changed:!!l.changed,free:!!l.free,...(l.note?{note:l.note}:{}),...(l.costTyped?{costTyped:l.costTyped}:{})}));
   const cph=S.mode==="walk"?S.cust.phone:"",cnm=S.mode==="walk"?S.cust.name:"";
   const cost=r2(lines.reduce((a,l)=>a+l.cost*l.qty,0));
   if(c.no==="…"&&window.SF){S.saving=true;drawCheckout();try{c.no=await SF.reserveBillNo()}finally{S.saving=false}}

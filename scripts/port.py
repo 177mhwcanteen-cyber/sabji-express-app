@@ -333,6 +333,10 @@ rep(".toast{position:fixed;", """.sb-saving{display:flex;align-items:center;just
 .ic-grp{background:var(--surface);border-radius:14px;padding:8px 10px;margin:0 0 8px;box-shadow:var(--shadow)}.ic-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0;border-bottom:1px dashed #ccc}.ic-row select{grid-column:1/-1}
 .toast{position:fixed;""")
 
+# v30: संस्था का खरीद भाव हाथ से
+rep("free:!!l.free,...(l.note?{note:l.note}:{})}));", "free:!!l.free,...(l.note?{note:l.note}:{}),...(l.costTyped?{costTyped:l.costTyped}:{})}));")
+rep(".toast{position:fixed;", ".ic-cost{display:flex;align-items:center;gap:4px;font-weight:700}.ic-cost .inp{width:5.5em;padding:8px;text-align:right}\n.toast{position:fixed;")
+
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")

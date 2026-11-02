@@ -43,7 +43,7 @@ async def main():
 
         # ---------- 1) मालिक ----------
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1}}}, users)
+        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1}}}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
@@ -241,6 +241,21 @@ async def main():
         ib = [b for b in (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")) if b["mode"] == "inst"]
         assert ib and ib[0]["lines"][0]["rate"] == (await pg.evaluate("SF.costOf(item('aloo'))")) and ib[0]["total"] == 2*ib[0]["lines"][0]["rate"] and ib[0]["saleTotal"] == 42 and ib[0]["lines"][0]["rate"] < 21, ib
         print("inst challan ok", ic)
+        # जिस सब्ज़ी का खरीद भाव ऐप को नहीं पता → बिलर से पूछे, ₹0 / बिक्री भाव पर चालान नहीं
+        await pg.evaluate("closeSheet();setMode('inst');S.inst='डोसा पॉइंट';S.cart=[];renderBill();renderCart()")
+        nc = await pg.evaluate("(()=>{const it=S.items.find(it=>{if(it.active===false||it.unit!=='kg')return false;const c=it.cost;it.cost=0;const z=SF.costOf(it)===0;it.cost=c;return z});if(!it)return null;it.cost=0;if(window.__MOCK__.items[it.id])window.__MOCK__.items[it.id].cost=0;return it.id})()")
+        assert nc, "no item without purchase history"
+        await pg.click(f'[data-item="{nc}"]'); await pg.fill("#qIn", "3"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
+        nb0 = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).length")
+        await pg.click("#cartbtn"); await pg.wait_for_selector("#sheet #icc0"); await pg.wait_for_timeout(200)
+        await pg.screenshot(path=f"{SHOTS}/23b-inst-costask.png", full_page=True)
+        await pg.click("[data-iccsave]"); await pg.wait_for_timeout(200)
+        assert await pg.query_selector("#sheet #icc0"), "empty cost must not save"
+        await pg.fill("#icc0", "30"); await pg.click("[data-iccsave]"); await pg.wait_for_selector("#sheet .pp-ch"); await pg.wait_for_timeout(500)
+        ib2 = [b for b in (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")) if b["mode"] == "inst" and b["lines"][0]["id"] == nc]
+        assert ib2 and ib2[0]["lines"][0]["rate"] == 30 and ib2[0]["total"] == 90 and ib2[0]["lines"][0].get("costTyped") and not ib2[0]["lines"][0].get("noCost"), ib2
+        assert "भाव" in await pg.inner_text("#sheet .pp-ch") and not await pg.query_selector("#sheet #ppqr")
+        print("inst cost ask ok", nc, nb0)
         await pg.evaluate("closeSheet();setMode('walk')")
         # लेबल: सब्ज़ी की टोकरी — टमाटर (नाम + भाव + बारकोड) → स्कैन → वज़न पूछे
         await pg.click('[data-tab="label"]'); await pg.wait_for_timeout(200)
@@ -344,12 +359,14 @@ async def main():
         assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
         print("opening edit ok")
         # 🪧 बोर्ड के भाव: एक बार अपने-आप
-        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
         bd = await pg.evaluate("[window.__MOCK__.items.tamatar.sale,window.__MOCK__.items.nimbu.sale,!!window.__MOCK__.items.parwal,window.__MOCK__.items.parwal&&window.__MOCK__.items.parwal.sale,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.note&&x.note.includes('बोर्ड')).length,window.__MOCK__.ownerCfg.flags.board1>0]")
         assert bd[0] == 20 and bd[1] == 200 and bd[2] and bd[3] == 90 and bd[4] >= 10 and bd[5], bd
         b2 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.board2>0,window.__MOCK__.items.harapyaj&&window.__MOCK__.items.harapyaj.sale,window.__MOCK__.items.kachchakela&&window.__MOCK__.items.kachchakela.sale,!window.__MOCK__.items.safalmatar,window.__MOCK__.items.methi.sale]")
         assert b2 == [True, 80, 60, True, 200], b2
-        print("board rates ok", bd)
+        c1 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.cost1>0,window.__MOCK__.items.tamatar.cost,window.__MOCK__.items.aloo.cost,(window.__MOCK__.items.aloo.lastBuy||{}).rate,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.field==='cost').length]")
+        assert c1[0] and c1[1] == 8 and c1[2] == 13 and c1[3] == 13 and c1[4] >= 20, c1
+        print("board rates ok", bd, c1)
         await pg.evaluate("closeSheet()")
         assert not await pg.query_selector("[data-oldud]") or True
         # 📈 मालिक: टाइल पर मुनाफ़ा

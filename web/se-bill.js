@@ -166,7 +166,27 @@ SB.autoSave=function(){
   if(S.saving)return;
   if(!(S.cart||[]).length){toast("पहले सब्ज़ी चुनें");return}
   if(S.mode!=="inst"&&!(cartTotal()>0)){toast("बिल ₹0 का है — मात्रा देखें");return}
+  if(S.mode==="inst"){const miss=S.cart.filter(l=>!l.free&&!(SB.instCost(l)>0));if(miss.length){SB.costAsk(miss);return}}
   saveBill();
+};
+/* संस्था: जिस सामान का खरीद भाव ऐप को नहीं पता, वह बिलर उसी समय लिखे — चालान कभी ₹0 या बिक्री भाव पर न बने */
+SB.instCost=function(l){const it=item(l.id);let pr=it&&window.SF?num(SF.costOf(it)):0;if(!(pr>0))pr=num(l.cost);if(!(pr>0))pr=num(it&&it.cost);return pr};
+SB.costAsk=function(miss){
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="खरीद भाव"><div class="grab"></div>
+  <div class="sh-head"><div><h3>🏢 खरीद भाव लिखें</h3><span class="note">${esc(S.inst||"संस्था")} को माल खरीद भाव पर जाता है। इनका खरीद भाव ऐप में नहीं है:</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="sbe-list">${miss.map((l,i)=>`<div class="sbe-row"><div class="sbe-n"><b>${esc(l.name)}</b><span>${fq(l.qty,l.unit)} · बिक्री भाव ₹${l.rate}</span></div>
+    <label class="ic-cost">₹<input class="inp" id="icc${i}" data-icc="${i}" inputmode="decimal" placeholder="खरीद" aria-label="${esc(l.name)} का खरीद भाव"> /${esc(UNITS[l.unit]||l.unit)}</label></div>`).join("")}</div>
+  <button class="big" data-iccsave style="margin-top:10px">💾 चालान सेव करें</button></div></div>`;
+  const f=$("#icc0");if(f)f.focus();
+  $("#sheet").onclick=e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    if(!e.target.closest("[data-iccsave]"))return;
+    const vals=miss.map((l,i)=>num(($("#icc"+i)||{}).value));
+    const bad=vals.findIndex(v=>!(v>0));if(bad>-1){toast(miss[bad].name+" का खरीद भाव लिखें");const x=$("#icc"+bad);if(x)x.focus();return}
+    const over=miss.findIndex((l,i)=>vals[i]>num(l.rate));if(over>-1&&!e.target.dataset.sure){e.target.dataset.sure="1";e.target.textContent="⚠ "+miss[over].name+" का खरीद भाव बिक्री भाव से ज़्यादा — फिर भी सेव करें?";return}
+    miss.forEach((l,i)=>{l.cost=vals[i];l.costTyped=biller()||"बिलर"});
+    saveBill();
+  };
 };
 /* सेव होते समय (या सेव न हो पाए तो) दिखने वाली खिड़की — इसमें कुछ हटाने/बदलने का बटन नहीं */
 SB.savingHTML=function(b){
@@ -180,7 +200,7 @@ SB.savingHTML=function(b){
 SB.instReprice=function(bill){
   (bill.lines||[]).forEach(l=>{
     const it=item(l.id);const sale=r2(num(it&&it.sale)||num(l.board)||num(l.rate));
-    let pr=it&&window.SF?num(SF.costOf(it)):0;if(!(pr>0))pr=num(l.cost);
+    let pr=it&&window.SF?num(SF.costOf(it)):0;if(l.costTyped&&num(l.cost)>0&&!(it&&num(it.cost)>0))pr=num(l.cost);if(!(pr>0))pr=num(l.cost);
     l.saleRate=sale;
     if(pr>0)l.rate=r2(pr);else{l.rate=sale;l.noCost=true}
     l.board=l.rate;l.cost=l.rate;l.changed=false;l.amt=l.free?0:r2(num(l.qty)*l.rate);
@@ -202,7 +222,7 @@ SB.challanHTML=function(b,o){
   <div class="pp-meta"><span>माल लाए: <b>${esc(b.byName||"")}</b></span><span>${L.length} सामान</span></div>
   <div class="pp-dash"></div>
   <table class="pp-t"><thead><tr><th>क्र.</th><th>सामान</th><th class="r">मात्रा</th><th class="r">खरीद भाव</th><th class="r">रकम</th></tr></thead><tbody>
-  ${L.map((l,i)=>`<tr><td>${i+1}</td><td>${esc(l.name)}${l.noCost?' <span class="pp-chg">⚠ खरीद भाव नहीं मिला</span>':""}</td><td class="r">${qtxt(l)}</td><td class="r">₹${l.rate}</td><td class="r"><b>₹${l.amt}</b></td></tr>`).join("")}
+  ${L.map((l,i)=>`<tr><td>${i+1}</td><td>${esc(l.name)}${l.noCost?' <span class="pp-chg">⚠ खरीद भाव नहीं मिला</span>':""}${l.costTyped?` <span class="pp-chg">✍️ भाव ${esc(l.costTyped)} ने लिखा</span>`:""}</td><td class="r">${qtxt(l)}</td><td class="r">₹${l.rate}</td><td class="r"><b>₹${l.amt}</b></td></tr>`).join("")}
   </tbody></table>
   <div class="pp-dash"></div>
   <div class="ch-tot"><span>${esc(b.partyName||"संस्था")} — कुल सब्ज़ी</span><b>₹${b.total}</b><small>(खरीद भाव पर · कोई मुनाफ़ा नहीं)</small></div>

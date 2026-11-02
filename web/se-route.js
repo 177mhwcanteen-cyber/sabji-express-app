@@ -769,7 +769,9 @@ const BOARD2={date:"2026-11-02",flag:"board2",src:"विक्रम जी क
     {id:"haldi",name:"हल्दी (कच्ची)",unit:"kg",cat:"sabzi",emoji:"🫚",hue:40,sale:150,cost:100},
     {id:"sarson",name:"सरसों (साग)",unit:"kg",cat:"patta",emoji:"🥬",hue:110,sale:100,cost:65},
     {id:"lalaloo",name:"लाल आलू",unit:"kg",cat:"sabzi",emoji:"🥔",hue:12,sale:30,cost:20}]};
-const PACKS=[BOARD,BOARD2];
+/* 💰 02-11-2026: हर सामान का पक्का खरीद भाव (कमल भाई की कॉपी, 13–31 अक्टूबर की आख़िरी खरीद) — संस्था का चालान इसी पर बने, कभी ₹0 या बिक्री भाव पर नहीं */
+const COST1={date:"2026-11-02",flag:"cost1",src:"कमल भाई की कॉपी — आख़िरी खरीद भाव (अक्टूबर)",cost:{adrak:57.1,aloo:13,amla:65,amrood:65,ananas:55,anar:170,arbi:45,baingan:40,beans:80,bhartabaingan:40,bhindi:60,chandaliya:100,chukandar:60,dhaniya:80,dragonfruit:180,gajar:54.3,gilki:40,gwarfali:60,haldi:100,harapyaj:60,harimirch:50,kachchakela:40,kaddu:20,karela:40,karipatta:100,kela:36,kheera:30,kinnu:120,kiwi:76.7,kundru:30,lahsun:160,lalaloo:20,lauki:25,makka:35,malta:120,matar:80,mausami:70,methi:100,mooli:20,motamirch:50,motimirch:50,mushroom:50,nariyal:45,nimbu:120,palak:50,papita:50,parwal:80,pattagobhi:14,phoolgobhi:40,podina:50,pyaj:50,sahjan:120,sarson:65,seb:100,semfali:60,shakarkand:40,shimla:54.3,singhada:80,tamatar:8,tarbooj:20,toroi:40}};
+const PACKS=[BOARD,BOARD2,COST1];
 SR.BOARD=BOARD;SR.PACKS=PACKS;
 SR.applyBoard=async function(db){
   if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
@@ -784,6 +786,10 @@ SR.applyBoard=async function(db){
         ch.push(it.name+" ₹"+(+it.sale||0)+"→₹"+sale);
         await upd(db.collection("items").doc(id),{sale,ratePrev:+it.sale||0,rateTs:now,rateBy:S.uid||"",rateByName:"विक्रम जी (बोर्ड)",saleSet:{date:P.date,src}});
         await put(db.collection("priceLog").doc("rb"+id+now.toString(36)),{itemId:id,name:it.name,field:"sale",old:+it.sale||0,new:sale,ts:now,by:S.uid||"",byName:"विक्रम जी (बोर्ड)",note:src})}
+      for(const [id,cost] of Object.entries(P.cost||{})){const it=items.find(x=>x.id===id);if(!it||+it.cost===cost)continue;
+        ch.push(it.name+" खरीद ₹"+(+it.cost||0)+"→₹"+cost);
+        await upd(db.collection("items").doc(id),{cost,lastBuy:{date:P.date,rate:cost,note:src}});
+        await put(db.collection("priceLog").doc("rc"+id+now.toString(36)),{itemId:id,name:it.name,field:"cost",old:+it.cost||0,new:cost,ts:now,by:S.uid||"",byName:"विक्रम जी",note:src})}
       for(const id of (P.off||[])){const it=items.find(x=>x.id===id);if(it&&it.active!==false){await upd(db.collection("items").doc(id),{active:false,offNote:"बिकता नहीं — "+P.date});off++}}
       let ord=Math.max(0,...items.map(i=>+i.order||0));
       for(const a of (P.add||[])){if(items.some(x=>x.id===a.id||String(x.name||"").replace(/\s*\(.*\)/,"").trim()===a.name.replace(/\s*\(.*\)/,"").trim()))continue;
@@ -791,7 +797,7 @@ SR.applyBoard=async function(db){
         await put(db.collection("items").doc(a.id),d);add++}
       await put(fr,{[P.flag]:now,[P.flag+"Changed"]:ch,[P.flag+"Added"]:add},{merge:true});
       if(W)await W.commit();
-      if(ch.length||add||off)toast("🪧 "+P.date.slice(8)+"-"+P.date.slice(5,7)+" के भाव: "+ch.length+" बदले · "+add+" नई सब्ज़ी"+(off?" · "+off+" बंद":""));
+      if(ch.length||add||off)toast((P.cost?"💰 खरीद भाव पक्के: ":"🪧 "+P.date.slice(8)+"-"+P.date.slice(5,7)+" के भाव: ")+ch.length+" बदले · "+add+" नई सब्ज़ी"+(off?" · "+off+" बंद":""));
     }
   }catch(e){SR._board=0}
 };
