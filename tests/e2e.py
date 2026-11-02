@@ -244,6 +244,8 @@ async def main():
         assert any(k["what"] == "गाड़ी किराया" and k["amt"] == 250 for k in kh), kh
         print("waste + kharch ok")
         await pg.screenshot(path=f"{SHOTS}/9-kharid-saved.png", full_page=True)
+        pl = await pg.evaluate("Object.values(window.__MOCK__.purchases||{}).map(p=>[p.date,!!p.loc])")
+        assert pl and all(x[1] for x in pl), ("purchase must carry location", pl)
         # संस्था को प्याज — आज के खरीद भाव ₹52 पर
         await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(200)
         inst_rate = await pg.evaluate("(()=>{const b={lines:[{id:'pyaj',name:'प्याज',unit:'kg',qty:5,rate:60,board:60,cost:0,amt:300}]};SB.instReprice(b);return [b.lines[0].rate,b.lines[0].saleRate,b.total,b.saleTotal]})()")
@@ -301,6 +303,21 @@ async def main():
         uh = await pg.evaluate("S.isOwner?SB.udharHTML():'notowner'")
         assert uh == "notowner" or ("आज का उधार" in uh and "पर्ची गई" in uh and "सीमा" in uh), uh[:300]
         print("udhar flow ok", ub, ud[0]["udChk"])
+        # 🚫 रद्द: कर्मचारी की अर्ज़ी — बिना वजह नहीं, अर्ज़ी के साथ जगह; बिल शीट पर "⏳ रद्द अर्ज़ी गई"
+        await pg.evaluate("closeSheet();setMode('walk');S.cart=[];renderBill();renderCart();window.__oph=S.settings.ownerPh;S.settings.ownerPh=''")
+        await pg.click('[data-item="tamatar"]'); await pg.fill("#qIn", "1"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
+        await pg.click("#cartbtn"); await pg.wait_for_selector("[data-sbcancel]"); cxno = await pg.evaluate("SB.unpaid().slice(-1)[0].no")
+        await pg.click("[data-sbcancel]"); await pg.wait_for_selector("#crWhy"); await pg.click("[data-cxgo]"); await pg.wait_for_timeout(200)
+        assert await pg.query_selector("#crWhy"), "reason required"
+        await pg.fill("#crWhy", "ग्राहक ने सामान नहीं लिया"); await pg.click("[data-cxgo]"); await pg.wait_for_timeout(600)
+        cr = await pg.evaluate(f"(window.__MOCK__.cancelReq||{{}})['{cxno}']")
+        assert cr and cr["status"] == "pending" and cr.get("loc") and cr["settled"] is False, cr
+        await pg.evaluate(f"SB.settleSheet(SB.unpaid().find(b=>b.no==='{cxno}'))"); await pg.wait_for_timeout(200)
+        assert "रद्द अर्ज़ी गई" in await pg.inner_text("#sheet .sh-head")
+        await pg.screenshot(path=f"{SHOTS}/30-cancel-pending.png")
+        await pg.evaluate("closeSheet();S.settings.ownerPh=window.__oph")
+        mb = await pg.evaluate("SF.missingBuy().map(x=>x.it.id+':'+x.need)")
+        print("cancel request ok", cxno, "missing buy:", mb)
         # 🔒 लोकेशन सिर्फ़ मालिक की: बिलर को कोई पट्टी/शब्द नहीं, बिल पर जगह का नाम नहीं
         own = await pg.evaluate("S.isOwner")
         allb = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")
@@ -338,9 +355,11 @@ async def main():
         await pg.screenshot(path=f"{SHOTS}/11-day.png", full_page=True)
         # बिल रद्द करने की अर्ज़ी (कर्मचारी)
         await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
-        await pg.click('#p-bills [data-bill] >> nth=0'); await pg.wait_for_timeout(300)
+        _bn = await pg.evaluate("[...document.querySelectorAll('#p-bills [data-bill]')].map(x=>x.dataset.bill).find(n=>!(S.cancelReqs||[]).some(r=>r.no===n)&&!(S.dayBills.find(b=>b.no===n)||{}).cancelled&&(S.dayBills.find(b=>b.no===n)||{}).settled!==false)")
+        await pg.click(f'#p-bills [data-bill="{_bn}"]'); await pg.wait_for_timeout(300)
         await pg.click('details.creq summary'); await pg.fill('#crWhy', 'ग्राहक ने सामान लौटाया'); await pg.click('[data-creq]'); await pg.wait_for_timeout(600)
         cr = await pg.evaluate("Object.values(window.__MOCK__.cancelReq||{})")
+        cr = [x for x in cr if x["reason"] == "ग्राहक ने सामान लौटाया"]
         assert len(cr) == 1 and cr[0]["status"] == "pending", cr
         print("cancel request", cr[0]["no"], cr[0]["reason"])
         mock = await pg.evaluate("window.__MOCK__")
@@ -515,10 +534,14 @@ async def main():
         assert await pg.is_visible("[data-npok]"), "pending new item card missing"
         await pg.click("[data-npok]"); await pg.wait_for_timeout(500)
         assert not [v for v in (await pg.evaluate("Object.values(window.__MOCK__.items)")) if v.get("pending")], "approve failed"
-        await pg.click('[data-crok]'); await pg.click('[data-crok]'); await pg.wait_for_timeout(800)
+        for _ in range(4):
+            if not await pg.query_selector('[data-crok]'): break
+            await pg.click('[data-crok]'); await pg.wait_for_timeout(100)
+            if await pg.query_selector('[data-crok]'): await pg.click('[data-crok]')
+            await pg.wait_for_timeout(800)
         cancelled = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).filter(b=>b.cancelled).length")
-        assert cancelled == 1, cancelled
-        assert await pg.evaluate("Object.values(window.__MOCK__.cancelReq)[0].status") == "approved"
+        assert cancelled == 2, cancelled
+        assert all(x["status"] == "approved" for x in await pg.evaluate("Object.values(window.__MOCK__.cancelReq)"))
         print("owner approved cancel")
         await pg.click("[data-a4]"); await pg.wait_for_timeout(800)
         html = await pg.evaluate("(()=>{const f=[...document.querySelectorAll('iframe')].pop();return f?f.contentDocument.documentElement.outerHTML:''})()")

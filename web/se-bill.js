@@ -42,14 +42,14 @@ SB.settleSheet=function(b,offline){
     const udBtn=needParty&&party?"📒 "+rs(SB.udAmt(b,st))+" उधार पक्का करें — "+party.name:"";
     const big=st.pay==="upi"?"✓ पैसा आ गया · सेव "+rs(tot):udBtn?udBtn:st.pay==="split"?"✓ सेव + सेटल · नकद "+rs(Math.min(tot,num(st.cashPart)))+" + उधार":"✓ सेव + सेटल "+rs(tot);
     $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px sb1" role="dialog" aria-label="बिल और भुगतान"><div class="grab"></div>
-    <div class="sh-head ppc-sh"><h3>🧾 बिल <small class="note">· ${esc(b.no)}</small> <span class="sb-ok">${offline||b.pending?"📴 फोन में सेव":"✓ सेव"}</span></h3><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    <div class="sh-head ppc-sh"><h3>🧾 बिल <small class="note">· ${esc(b.no)}</small> <span class="sb-ok">${offline||b.pending?"📴 फोन में सेव":"✓ सेव"}</span></h3>${(S.cancelReqs||[]).some(r=>r.no===b.no)?'<span class="sb-cx wait">⏳ रद्द अर्ज़ी गई</span>':'<button class="sb-cx" data-sbcancel>🚫 रद्द</button>'}<button class="x" data-close aria-label="बंद करें">✕</button></div>
     ${SF.compactPaperHTML(b,{qr:true,qrId:"sbqr",tap:true,hint:st.pay})}
     <div class="paym paym4" role="group" aria-label="भुगतान का तरीका">${[["upi","📱","UPI"],["cash","💵","नकद"],["udhar","📒","उधार"],["split","🔀","नकद+उधार"]].map(([k,i,v])=>`<button data-sbpay="${k}" aria-pressed="${st.pay===k}"><i>${i}</i>${v}</button>`).join("")}</div>
     ${ui}
     <div class="sb-act4"><button data-sbedit2><i>✏️</i>एडिट</button><button data-sbphoto><i>📷</i>फोटो${b.photoN?" ("+b.photoN+")":""}</button><button data-sbshare class="wa" aria-label="WhatsApp पर भेजें"><i class="wa-i"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#fff" d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path fill="#25d366" d="M7 9h10v1.6H7zM7 12h7v1.6H7z"/></svg></i>WhatsApp</button><button data-sbprint><i>🖨️</i>प्रिंट</button></div>
     <div class="sb-bot"><button class="big ghost" data-sblater>➕ नया ग्राहक</button><button class="big ${st.pay==="upi"?"haldi":""}" data-sbok ${ok?"":"disabled"}>${esc(big)}</button></div>
     </div></div>`;
-    if(window.SF&&SF.drawPaperQR)SF.drawPaperQR(b,"sbqr",150);
+    if(window.SF&&SF.drawPaperQR)SF.drawPaperQR(b,"sbqr",240);
   };
   draw();
   const sh=$("#sheet");
@@ -59,6 +59,7 @@ SB.settleSheet=function(b,offline){
   sh.onclick=async e=>{
     if(e.target.matches("[data-close]")||e.target.closest("[data-sblater]")){closeSheet();if(e.target.closest("[data-sblater]"))toast("⏳ बिल "+b.no+" रुका है — ऊपर \"भुगतान बाकी\" में · नया ग्राहक शुरू करें");try{renderPane()}catch(x){}return}
     const rw=e.target.closest("[data-sbrow]");if(rw){SB.editSheet(b);return}
+    if(e.target.closest("[data-sbcancel]")){SB.cancelSheet(b);return}
     if(e.target.closest("[data-sbphoto]")){if(window.SF&&SF.addBillPhoto)SF.addBillPhoto(b,()=>{const x=sh.querySelector("[data-sbphoto]");if(x)x.innerHTML="<i>📷</i>फोटो ("+b.photoN+")"});return}
     if(e.target.closest("[data-sbshare]")){const p=S.parties.find(x=>x.id===st.partyId);if(window.SF)SF.shareBill(b,(p&&p.phone)||b.custPhone,false);return}
     if(e.target.closest("[data-sbprint]")){if(typeof printBill==="function")printBill(b);return}
@@ -149,6 +150,30 @@ async function doSettle(b,st){
   }catch(err){toast("सेटल नहीं हुआ: "+(err.code||err.message||""))}
 }
 
+/* ================= 🚫 बिल रद्द — कर्मचारी: अर्ज़ी (मालिक की हाँ पर); मालिक: सीधे · माल स्टॉक में वापस, उधार खाते से हटे, बिल कभी नहीं मिटता ================= */
+SB.cancelSheet=function(b){
+  const own=S.isOwner&&!S.demo;
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिल रद्द"><div class="grab"></div>
+  <div class="sh-head"><div><h3>🚫 बिल ${esc(b.no)} रद्द ${own?"करें":"करने की अर्ज़ी"}</h3><span class="note">${rs(b.total)} · ${(b.lines||[]).map(l=>esc(l.name)).join(", ")}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <p class="note" style="margin:0 0 6px">${own?"रद्द होते ही माल स्टॉक में वापस जुड़ेगा, उधार हो तो खाते से हटेगा। बिल मिटेगा नहीं — \"रद्द\" का निशान रहेगा।":"अर्ज़ी विक्रम जी के पास जाएगी — उनकी हाँ पर बिल रद्द होगा और माल स्टॉक में वापस जुड़ेगा।"}</p>
+  <label class="fld">रद्द करने की वजह (ज़रूरी)<input class="inp" id="crWhy" placeholder="जैसे ग्राहक ने सामान नहीं लिया / गलत बिल बना" autocomplete="off"></label>
+  <button class="big" data-cxgo style="margin-top:8px;background:var(--chili);color:#fff">${own?"🚫 बिल रद्द करें":"📩 अर्ज़ी विक्रम जी को भेजें"}</button>
+  <button class="big ghost" data-cxback style="margin-top:8px">← वापस बिल पर</button></div></div>`;
+  setTimeout(()=>{const f=$("#crWhy");if(f)f.focus()},100);
+  $("#sheet").oninput=null;$("#sheet").onchange=null;
+  $("#sheet").onclick=async e=>{
+    if(e.target.matches("[data-close]")){closeSheet();return}
+    if(e.target.closest("[data-cxback]")){SB.settleSheet(b);return}
+    const go=e.target.closest("[data-cxgo]");if(!go)return;
+    const why=($("#crWhy").value||"").trim();if(why.length<3){toast("पहले रद्द करने की वजह लिखें");$("#crWhy").focus();return}
+    if(!own){if(window.SF)SF.sendCancelReq(b);return}
+    if(go.dataset.sure!=="1"){go.dataset.sure="1";go.textContent="पक्का रद्द करें? दोबारा दबाएँ";return}
+    try{const ch={cancelled:true,cancelledBy:S.uid||"",cancelReason:why,cancelTs:Date.now()};
+      if(b.pay&&b.pay.udhar>0){try{G.okdel.add(b.no)}catch(x){}await S.db.doc("ledger/"+b.no).delete().catch(()=>{})}
+      await patchBill(b,ch);try{await adjStock(trackedPairs(b.lines||[],1),"रद्द बिल "+b.no)}catch(x){}
+      closeSheet();try{renderPane()}catch(x){}toast("🚫 बिल "+b.no+" रद्द — माल स्टॉक में वापस")}catch(err){toast("रद्द नहीं हुआ: "+(err.code||err.message||""))}
+  };
+};
 /* ================= ✏️ सेव के बाद बिल बदलें ================= */
 SB.editSheet=function(b){
   if(!b||b.settled!==false){toast("भुगतान हो चुका है — अब बिल नहीं बदल सकते, रद्द की अर्ज़ी भेजें");return}

@@ -276,8 +276,10 @@ SE.receiptCanvas=function(b,o,widthPx){
   if(b.pay&&o.paid!==false&&!o.stampL){const p=b.pay;const parts=[p.cash?"नकद ₹"+p.cash:"",p.upi?"UPI ₹"+p.upi:"",p.udhar?"उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T("भुगतान: "+parts.join(" · "),fs(16),"l")}
   if(o.balance!=null)LR("खाते में कुल बाकी",`₹${o.balance}`,fs(18),true);
   if(o.qr||o.stampL){DASH();if(o.qr)T(o.qrLabel||"स्कैन करके भुगतान करें",fs(17),"c",true);
-    const s=o.qr?Math.round(W*0.42):0,y0=y,sideW=Math.round((W-2*P-s)/2)-fs(8);
-    if(o.qr){x.imageSmoothingEnabled=false;x.drawImage(o.qr,(W-s)/2,y,s,s)}
+    const s=o.qr?Math.round(W*0.44):0,pad=fs(8),y0=y+pad,sideW=Math.round((W-2*P-s)/2)-fs(12);
+    if(o.qr){x.imageSmoothingEnabled=false;x.drawImage(o.qr,(W-s)/2,y0,s,s);
+      const bx=(W-s)/2-pad,by=y0-pad,bw=s+2*pad,r=fs(12);x.lineWidth=Math.max(3,fs(3.5));x.strokeStyle="#000";x.beginPath();x.moveTo(bx+r,by);x.arcTo(bx+bw,by,bx+bw,by+bw,r);x.arcTo(bx+bw,by+bw,bx,by+bw,r);x.arcTo(bx,by+bw,bx,by,r);x.arcTo(bx,by,bx+bw,by,r);x.closePath();x.stroke();
+      x.font=`800 ${fs(13)}px ${F}`;const tg="UPI · स्कैन करें",tw=x.measureText(tg).width+fs(14);x.fillStyle="#000";x.fillRect((W-tw)/2,by-fs(9),tw,fs(18));x.fillStyle="#fff";x.fillText(tg,(W-tw)/2+fs(7),by-fs(8));x.fillStyle="#000"}
     const stamp=(st,x0,col)=>{if(!st)return;const L=[[st.l1,fs(19),800],[st.l2,fs(16),700],[st.l3,fs(13),500]].filter(l=>l[0]);
       const lh=L.map(l=>Math.round(l[1]*1.3));const h=lh.reduce((a,b)=>a+b,0)+fs(16);const by=y0+Math.max(0,((s||h)-h)/2);
       x.save();x.translate(x0+sideW/2,by+h/2);x.rotate(col==="l"?-0.06:0.06);x.lineWidth=Math.max(2,fs(2.5));x.strokeStyle="#000";
@@ -286,7 +288,7 @@ SE.receiptCanvas=function(b,o,widthPx){
       let yy=-h/2+fs(8);L.forEach((l,k)=>{x.font=`${l[2]} ${l[1]}px ${F}`;for(const ln of wrapLines(x,l[0],sideW-fs(14)).slice(0,2)){const w=x.measureText(ln).width;x.fillStyle="#000";x.fillText(ln,-w/2,yy);yy+=lh[k]}});x.restore();
       return by+h};
     const e1=stamp(o.stampL,P,"l")||0,e2=stamp(o.stampR,W-P-sideW,"r")||0;
-    y=Math.max(y0+s,e1,e2)+fs(6);if(o.qr&&o.upi)T("UPI: "+o.upi,fs(14),"c")}
+    y=Math.max(y0+s+pad,e1,e2)+fs(8);if(o.qr&&o.upi)T("UPI: "+o.upi,fs(14),"c")}
   const t=o.nutri!==false&&window.SN&&SN.ofBill(b);
   if(t){DASH();T("🥗 इस थैले में आपकी सेहत (लगभग)",fs(18),"c",true);
     const cells=SN.cells(t),half=(W-2*P)/2;x.font=`500 ${fs(15)}px ${F}`;

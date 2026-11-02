@@ -94,10 +94,19 @@ SR.fixLoc=async function(){
   }catch(e){}
   SR.banner();setTimeout(SR.tick,1500);
 };
-/* हर बिल पर जगह का ठप्पा */
+/* 📍 अभी की जगह (15 मिनट तक ताज़ा) — हर एंट्री के साथ दर्ज, सिर्फ़ मालिक की योजना के लिए; कहीं छपती नहीं */
+SR.ownerLoc=null;
+SR.locNow=function(){const g=SR.lastGood,c=[g,SR.last,SR.ownerLoc].find(x=>x&&Date.now()-x.ts<15*60000);return c?{lat:c.lat,lng:c.lng,acc:c.acc||0,ts:c.ts}:null};
+SR.quickFix=function(){
+  if(!navigator.geolocation||SR._qf||(SR.ownerLoc&&Date.now()-SR.ownerLoc.ts<4*60000))return Promise.resolve(SR.locNow());
+  SR._qf=new Promise(res=>{try{navigator.geolocation.getCurrentPosition(p=>{const c=p.coords;if(c.accuracy<=250)SR.ownerLoc={lat:+c.latitude.toFixed(6),lng:+c.longitude.toFixed(6),acc:Math.round(c.accuracy),ts:Date.now()};SR._qf=null;res(SR.locNow())},
+    ()=>{SR._qf=null;res(SR.locNow())},{enableHighAccuracy:true,timeout:9000,maximumAge:120000})}catch(e){SR._qf=null;res(null)}});return SR._qf};
+SR.withLoc=function(doc){const l=SR.locNow();if(l)doc.loc=l;else if(S.isOwner)SR.quickFix();return doc};
+/* हर बिल पर जगह का ठप्पा (बिल पर छपता नहीं) — मालिक के फोन का बिल हो तो एक बार GPS लेकर बाद में जोड़ दो */
 SR.stamp=function(bill){
-  const g=SR.lastGood,l=g&&Date.now()-g.ts<15*60000?g:SR.last;
-  if(l&&Date.now()-l.ts<15*60000){bill.loc={lat:l.lat,lng:l.lng,acc:l.acc||0,ts:l.ts}}/* जगह का नाम बिल पर नहीं — मालिक के रूट में अपने-आप जुड़ता है */
+  const l=SR.locNow();
+  if(l){bill.loc=l}
+  else if(S.isOwner&&!S.demo){SR.quickFix().then(x=>{if(x&&!bill.loc&&bill.no&&bill.no!=="…"){bill.loc=x;S.db.doc("days/"+(bill.date||today())+"/bills/"+bill.no).update({loc:x}).catch(()=>{})}})}
   setTimeout(SR.tick,300);
 };
 

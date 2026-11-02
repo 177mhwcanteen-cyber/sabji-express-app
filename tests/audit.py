@@ -58,6 +58,13 @@ async def m():
         await pg.evaluate("showReceipt(S.dayBills.slice().sort((a,b)=>b.ts-a.ts)[0],false)"); await pg.wait_for_selector("#sheet .paper")
         ok("बिल सेव + रसीद + WhatsApp + प्रिंट बटन", await pg.is_visible("[data-print]") and await pg.evaluate("!!document.querySelector('#sheet a[href*=\"wa.me\"]')"))
         await pg.evaluate("closeSheet()")
+        # 🚫 मालिक सीधे रद्द — माल वापस, बिल पर निशान
+        await pg.click('[data-item="tamatar"]'); await pg.fill("#qIn", "1"); await pg.click("[data-add]")
+        await pg.click("#cartbtn"); await pg.wait_for_selector("[data-sbcancel]"); _cx = await pg.evaluate("SB.unpaid().slice(-1)[0].no")
+        await pg.click("[data-sbcancel]"); await pg.fill("#crWhy", "टेस्ट — गलत बिल"); await pg.click("[data-cxgo]"); await pg.click("[data-cxgo]"); await pg.wait_for_timeout(800)
+        _cb = await pg.evaluate(f"Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).find(b=>b.no==='{_cx}')")
+        ok("मालिक: बिल शीट से सीधे रद्द (वजह के साथ, बिल मिटा नहीं)", bool(_cb and _cb.get("cancelled") and _cb.get("cancelReason")), _cb and _cb.get("cancelReason"))
+        await pg.evaluate("closeSheet()")
         # उधार
         await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(400)
         await pg.screenshot(path=f"{SHOTS}/a-udhar.png")
