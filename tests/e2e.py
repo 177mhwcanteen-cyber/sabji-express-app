@@ -28,6 +28,7 @@ async def page(b, mock, users, cfg=True):
         await r.fulfill(body='{"ok":true,"id":"f%d","url":"https://drive.google.com/file/d/f%d"}' % (len(UPLOADS), len(UPLOADS)), content_type="application/json")
     await pg.route("**/fake-upload", up)
     await pg.route("https://tile.openstreetmap.org/**", lambda r: r.fulfill(body=b"", status=204))
+    await pg.route("https://server.arcgisonline.com/**", lambda r: r.fulfill(body=b"", status=204))
     await pg.goto(URL)
     return pg
 
@@ -538,6 +539,27 @@ async def main():
           const a=SR.analyze(today(),[{uid:'x',name:'t',pts}],[]);return [a.pts[0].P.length,a.stops.length,+a.stops[0].lng.toFixed(4)]})()""")
         assert cl == [10, 1, 71.3521], cl
         print("gps place lock ok", pl[0]["acc"], g[0]["lat"], cl)
+        # 🛰️ ट्रैकर: सैटेलाइट/सादा, व्यक्ति फ़िल्टर, ▶ रीप्ले, पड़ाव पर बिल, जगह का पूरा हिसाब
+        await pg.evaluate("closeSheet()"); await pg.click('[data-rref]'); await pg.wait_for_selector("#rmapw .rctl"); await pg.wait_for_timeout(1500)
+        assert "सादा" in await pg.inner_text("[data-rsat]"), "satellite should be default"
+        assert len(await pg.query_selector_all("[data-rwho]")) >= 2
+        await pg.click("[data-rplay]"); await pg.wait_for_timeout(1400)
+        rs_ = await pg.inner_text("#rpSt"); assert ("रुकी" in rs_ or "चल रही" in rs_), rs_
+        assert await pg.query_selector("#rmap .rvan"), "moving van marker"
+        await pg.screenshot(path=f"{SHOTS}/31-tracker.png")
+        await pg.click("[data-rplay]")
+        await pg.click('[data-rstop="0"]'); await pg.wait_for_selector("#sheet #rthumb"); await pg.wait_for_timeout(300)
+        stx = await pg.inner_text("#sheet"); assert "यहाँ बने बिल" in stx and "₹" in stx, stx[:300]
+        await pg.screenshot(path=f"{SHOTS}/32-stop-sheet.png")
+        await pg.evaluate("closeSheet()")
+        await pg.click('[data-rpl="सरल लाइन"]'); await pg.wait_for_function("document.querySelector('#sheet')&&document.querySelector('#sheet').innerText.includes('ग्राहकों के नंबर')", timeout=8000)
+        await pg.click('#sheet [data-psn="7"]'); await pg.wait_for_function("document.querySelector('#sheet').innerText.includes('ग्राहकों के नंबर')", timeout=8000)
+        await pg.screenshot(path=f"{SHOTS}/33-place-sheet.png")
+        await pg.evaluate("closeSheet()")
+        await pg.click('[data-rwho]:not([data-rwho=""])'); await pg.wait_for_timeout(600)
+        await pg.click('[data-rsat]'); await pg.wait_for_timeout(600); assert "सैटेलाइट" in await pg.inner_text("[data-rsat]")
+        await pg.click('[data-rsat]'); await pg.wait_for_timeout(300); await pg.click('[data-rwho=""]'); await pg.wait_for_timeout(400)
+        print("tracker ok")
         await pg.screenshot(path=f"{SHOTS}/16-route.png", full_page=True)
         print("route stops", len(stops), "|", stops[0].replace("\n", " ")[:80])
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(500)

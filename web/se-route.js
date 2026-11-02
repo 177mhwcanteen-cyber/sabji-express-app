@@ -231,9 +231,11 @@ document.addEventListener("click",async e=>{
 });
 
 /* ======================= 📍 मालिक का रूट डैशबोर्ड ======================= */
-const R={date:null,map:null,live:[],day:null,agg:null,loading:false,custQ:"",custAll:false,liveLayer:null};
+const R={date:null,map:null,live:[],day:null,raw:null,agg:null,loading:false,custQ:"",custAll:false,liveLayer:null,who:"",sat:LSx.get("se_rsat")!=="0",lbl:LSx.get("se_rlbl")!=="0",big:false,placeQ:"",play:{t:0,on:false,spd:5,timer:null},bcache:{}};
+const HOME={lat:25.79024,lng:71.39961};/* सरदारपुरा, बिदासर (Q9RX+3RX) — नक्शे का शुरुआती इलाका */
+const COLORS=["#22c55e","#f59e0b","#a855f7","#06b6d4","#ef4444"];
 SR.onDb=function(db){
-  if(S.isOwner)db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.day){R.day=analyze(R.day.date,R.day.docs,R.day.bills);SR.renderRoute()}},()=>{});
+  if(S.isOwner)db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.raw){R.day=dayFor();SR.renderRoute()}},()=>{});
   if(S.isOwner)setTimeout(()=>SR.autoOldUdhar(db),2500);
   if(S.isOwner)setTimeout(()=>SR.applyBoard(db),4500);
   if(S.isOwner)db.collection("live").onSnapshot(s=>{R.live=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route")SR.updateLive()},()=>{});
@@ -273,8 +275,11 @@ function gapsOf(u){
 }
 function analyze(date,docs,bills){
   const U=parse(docs);const stops=[],gaps=[],pts=[];let km=0;
+  let moveMs=0,first=0,last=0;
   U.forEach(u=>{findStops(u.P).forEach(s=>stops.push({...s,uid:u.uid,name:u.name}));gapsOf(u).forEach(g=>gaps.push({...g,name:u.name}));
-    for(let i=1;i<u.P.length;i++){const d=dist(u.P[i-1],u.P[i]);if(d>40&&d<5000)km+=d/1000}pts.push({uid:u.uid,name:u.name,P:u.P})});
+    for(let i=1;i<u.P.length;i++){const a=u.P[i-1],b=u.P[i],d=dist(a,b),dt=b.ts-a.ts;if(d>40&&d<5000)km+=d/1000;if(dt>0&&dt<=12*60000&&d/(dt/3600000)>3000)moveMs+=dt}
+    if(u.P.length){first=first?Math.min(first,u.P[0].ts):u.P[0].ts;last=Math.max(last,u.P[u.P.length-1].ts)}
+    pts.push({uid:u.uid,name:u.name,P:u.P})});
   stops.sort((a,b)=>a.start-b.start);
   stops.forEach(s=>{s.place=placeAt(s);s.bills=[];s.sales=0;s.inst=0});
   const free=[];
@@ -282,16 +287,20 @@ function analyze(date,docs,bills){
     stops.forEach(s=>{if(b.by&&s.uid!==b.by)return;const inT=b.ts>=s.start-3*60000&&b.ts<=s.end+3*60000;const near=b.loc?dist(s,b.loc)<=250:true;if(inT&&near)best=s});
     if(!best&&b.loc)best=stops.find(s=>(!b.by||s.uid===b.by)&&dist(s,b.loc)<=120&&Math.abs(b.ts-s.start)<3*3600e3)||null;
     if(best){best.bills.push(b);if(b.mode==="inst")best.inst+=+b.total||0;else best.sales+=+b.total||0}else free.push(b)});
-  return {date,docs,bills,stops,gaps,km:Math.round(km*10)/10,pts,free};
+  return {date,docs,bills,stops,gaps,km:Math.round(km*10)/10,pts,free,moveMin:mins(moveMs),first,last};
 }
 SR.analyze=analyze;
+/* व्यक्ति के हिसाब से छाँटा हुआ दिन */
+function dayFor(){const r=R.raw;if(!r)return null;const w=R.who;return analyze(r.date,w?r.docs.filter(x=>x.uid===w):r.docs,w?r.bills.filter(b=>b.by===w):r.bills)}
+function people(){const m=new Map();((R.raw&&R.raw.docs)||[]).forEach(d=>{if(d.uid&&!m.has(d.uid))m.set(d.uid,d.name||"")});R.live.forEach(v=>{if(v.id&&!m.has(v.id))m.set(v.id,v.name||"")});return [...m.entries()]}
+const colorOf=uid=>{const L=people().map(x=>x[0]);const i=Math.max(0,L.indexOf(uid));return COLORS[i%COLORS.length]};
 SR.loadDay=async function(date){
   R.loading=true;
   try{
     const docs=S.demo||!S.db?[]:(await S.db.collection("trk").where("date","==",date).get()).docs.map(x=>x.data());
     let bills=date===S.billsDate?S.dayBills:(S.demo||!S.db?[]:(await S.db.collection("days/"+date+"/bills").get()).docs.map(x=>x.data()));
-    R.day=analyze(date,docs,bills.filter(b=>!b.cancelled));
-  }catch(e){R.day={date,docs:[],bills:[],stops:[],gaps:[],pts:[],free:[],km:0,err:e.code||e.message||""}}
+    R.raw={date,docs,bills:bills.filter(b=>!b.cancelled)};R.day=dayFor();R.play.t=0;R.play.on=false;
+  }catch(e){R.raw=null;R.day={date,docs:[],bills:[],stops:[],gaps:[],pts:[],free:[],km:0,err:e.code||e.message||""}}
   R.loading=false;if(S.tab==="route")SR.renderRoute();
 };
 /* रूट का छोटा लिखित हाल — AI ऑडिट पैक के लिए */
@@ -319,7 +328,8 @@ SR.updateLive=function(){const el=document.getElementById("rLive");if(el)el.inne
 function drawLive(){
   if(!R.map||!window.L)return;if(!R.liveLayer)R.liveLayer=L.layerGroup().addTo(R.map);R.liveLayer.clearLayers();
   if(R.date!==today())return;
-  R.live.forEach(v=>{if(v.lat==null)return;L.circleMarker([v.lat,v.lng],{radius:12,color:"#7c2d12",weight:3,fillColor:"#f97316",fillOpacity:.95}).addTo(R.liveLayer).bindTooltip("🚐 "+(v.name||"")+" · "+(v.ts?agoTxt(v.ts):""),{permanent:true,direction:"top",offset:[0,-10]})});
+  R.live.forEach(v=>{if(v.lat==null||(R.who&&v.id!==R.who))return;const fresh=v.ts&&Date.now()-v.ts<6*60000;
+    L.marker([v.lat,v.lng],{icon:L.divIcon({className:"rvan live"+(fresh?"":" old"),html:`<span style="border-color:${colorOf(v.id)}">🚐<b>${esc(String(v.name||"").split(" ")[0])}</b><i>${v.ts?agoTxt(v.ts):""}</i></span>`,iconSize:[110,30],iconAnchor:[55,15]}),zIndexOffset:900}).addTo(R.liveLayer)});
 }
 const WHY={OFF:"फोन की लोकेशन बंद की",STOP:"ऐप/लोकेशन रुकी",NOPERM:"लोकेशन की अनुमति नहीं",NOFIX:"गाड़ी चली पर खबर नहीं आई"};
 function dayHTML(d){
@@ -328,11 +338,11 @@ function dayHTML(d){
   const sale=r2(all.filter(b=>b.mode!=="inst").reduce((a,b)=>a+(+b.total||0),0));
   if(!d.pts.length)return `<div class="empty"><b>${fdate(d.date)} की लोकेशन नहीं आई</b>कर्मचारी के फोन में नई APK, लॉगिन और लोकेशन चालू होनी चाहिए। (इस दिन ${all.length} बिल · ${rs(sale)})</div>`;
   const freeAmt=r2(d.free.filter(b=>b.mode!=="inst").reduce((a,b)=>a+(+b.total||0),0));
-  return `<div class="kpis"><div class="kpi"><span>रुकने की जगहें</span><b>${d.stops.length}</b></div><div class="kpi"><span>कुल रुकी</span><b style="font-size:17px">${durTxt(stopMin)}</b></div>
-   <div class="kpi"><span>दूरी</span><b>${d.km} km</b></div><div class="kpi ${withLoc<all.length?"red":""}"><span>बिल पर जगह</span><b>${withLoc}/${all.length}</b></div></div>
+  return `<div class="kpis k3"><div class="kpi"><span>🛣️ दूरी</span><b>${d.km} km</b></div><div class="kpi"><span>🚐 चलती रही</span><b style="font-size:16px">${durTxt(d.moveMin||0)}</b></div><div class="kpi"><span>🛑 रुकी (${d.stops.length} जगह)</span><b style="font-size:16px">${durTxt(stopMin)}</b></div>
+   <div class="kpi"><span>🧾 बिक्री</span><b style="font-size:18px">${rs(sale)}</b></div><div class="kpi"><span>⏰ पहली–आख़िरी</span><b style="font-size:15px">${d.first?ftime(d.first)+"–"+ftime(d.last):"—"}</b></div><div class="kpi ${withLoc<all.length?"red":""}"><span>📍 बिल पर जगह</span><b>${withLoc}/${all.length}</b></div></div>
   ${d.gaps.length?`<div class="warn">⚠ लोकेशन में रुकावट: ${d.gaps.map(g=>`<br>• ${esc(g.name)} · ${ftime(g.start)}–${g.end?ftime(g.end):"आखिर तक"} · ${WHY[g.why]||g.why}`).join("")}</div>`:""}
   <h3 style="margin:10px 0 6px">🛑 गाड़ी कहाँ-कहाँ रुकी</h3>
-  <div class="list">${d.stops.map((s,i)=>{const m=mins(s.end-s.start),ph=m>0?r2(s.sales/(m/60)):0;return `<div class="rstop">
+  <div class="list">${d.stops.map((s,i)=>{const m=mins(s.end-s.start),ph=m>0?r2(s.sales/(m/60)):0;return `<div class="rstop" data-rstop="${i}" role="button" tabindex="0"><span class="rs-no">${i+1}</span>
     <div class="rs-t"><b>${ftime(s.start)}</b><span>${durTxt(m)}</span></div>
     <div class="rs-m"><b>${s.place?"📍 "+esc(s.place.name):"📍 बिना नाम की जगह"}</b><span class="note">${s.bills.length} बिल · ${rs(r2(s.sales))}${s.inst?" · संस्था "+rs(r2(s.inst)):""}${m>=10?" · "+rs(ph)+"/घंटा":""}${d.pts.length>1?" · "+esc(s.name):""}</span></div>
     <button class="${s.place?"lnk":"chip"}" data-rname="${i}">${s.place?"✏️":"✏️ नाम दें"}</button></div>`}).join("")||'<p class="note" style="padding:10px">अभी कोई जगह 4 मिनट से ज़्यादा नहीं रुकी।</p>'}</div>
@@ -381,7 +391,7 @@ function custList(){
 }
 function custListHTML(){
   const C=custList();const show=R.custAll||R.custQ?C.slice(0,300):C.slice(0,10);
-  return show.map(c=>`<button class="li" data-chist="${esc(c.id)}"><div class="mid"><b>${esc(c.name||"ग्राहक")} · ${esc(c.id)}</b><span>${c.visits||0} बार · कुल ${rs(c.spent||0)}${c.lastTs?" · आखिरी "+fdate(dOf(c.lastTs)):""}${c.lastItems?" · "+esc(String(c.lastItems).slice(0,40)):""}</span></div><span>›</span></button>`).join("")||'<p class="note" style="padding:10px">कोई ग्राहक नहीं मिला</p>';
+  return show.map(c=>{const pl=c.lastLoc?placeAt(c.lastLoc):null;return `<div class="rcrow"><button class="li" data-chist="${esc(c.id)}"><div class="mid"><b>${esc(c.name||"ग्राहक")} · ${esc(c.id)}</b><span>${pl?"📍 "+esc(pl.name)+" · ":c.lastLoc?"📍 बिना नाम की जगह · ":""}${c.visits||0} बार · कुल ${rs(c.spent||0)}${c.lastTs?" · आखिरी "+fdate(dOf(c.lastTs)):""}${c.lastItems?" · "+esc(String(c.lastItems).slice(0,40)):""}</span></div><span>›</span></button>${c.lastLoc?`<button class="chip rc-map" data-cmap="${c.lastLoc.lat},${c.lastLoc.lng}" data-cname="${esc(c.name||c.id)}" aria-label="नक्शे पर दिखाएँ">🎯</button>`:""}</div>`}).join("")||'<p class="note" style="padding:10px">कोई ग्राहक नहीं मिला</p>';
 }
 function custHTML(){
   return `<div class="card2"><h3>👥 ग्राहक रजिस्टर (${(S.customers||[]).length})</h3><p class="note" style="margin:0">हर मोबाइल नंबर = एक पक्का ग्राहक। नाम पर दबाएँ तो पूरी खरीद का इतिहास।</p>
@@ -389,51 +399,159 @@ function custHTML(){
   <div class="list" id="rcl" style="margin:0">${custListHTML()}</div>
   <div class="row2" style="margin-top:8px"><button class="big ghost" data-callc>${R.custAll?"सिर्फ़ टॉप 10":"सभी ग्राहक"}</button><button class="big ghost" data-ccsv>⬇️ CSV (कैंपेन के लिए)</button></div></div>`;
 }
+/* 🏷️ सेव की हुई जगहें — खोज, आज की बिक्री, टैप = पूरा हिसाब */
+function placeSales(){const m={};((R.raw&&R.raw.bills)||[]).forEach(b=>{if(R.who&&b.by!==R.who)return;const pl=b.loc?placeAt(b.loc):null;if(!pl)return;const o=m[pl.name]||(m[pl.name]={n:0,amt:0});o.n++;if(b.mode!=="inst")o.amt+=+b.total||0});return m}
 function placesHTML(){
-  const by={};SR.places.forEach(p=>(by[p.name]||(by[p.name]=[])).push(p));const names=Object.keys(by).sort((a,b)=>a.localeCompare(b,"hi"));
+  const by={};SR.places.forEach(p=>(by[p.name]||(by[p.name]=[])).push(p));const sale=placeSales();
+  const q=R.placeQ.trim().toLowerCase();
+  const names=Object.keys(by).filter(n=>!q||n.toLowerCase().includes(q)).sort((a,b)=>((sale[b]||{}).amt||0)-((sale[a]||{}).amt||0)||a.localeCompare(b,"hi"));
   const sure=p=>p.src==="gps"&&+p.acc>0&&+p.acc<=GOOD;
-  return `<div class="card2"><h3>🏷️ जगहों के नाम (${names.length})</h3><p class="note" style="margin:0 0 6px">सबसे सही तरीका: उस जगह पर खड़े होकर <b>"📍 मैं यहाँ हूँ"</b> दबाएँ — फोन का असली GPS दर्ज होगा। ⚠ वाली जगहें रूट के अंदाज़े से बनी हैं — वहाँ पहुँचकर "यहीं पक्का करें" दबा दें।</p>
-  ${names.map(n=>{const ok=by[n].filter(sure).length;return `<div class="stkmeta"><span>📍 <b style="color:var(--ink)">${esc(n)}</b> <span class="note">(${by[n].length} जगह · ${ok?`✅ ${ok} फोन GPS से पक्की`:"⚠ अंदाज़े से"})</span></span><span><button class="lnk" data-plfix="${esc(n)}">📍 यहीं पक्का करें</button> · <button class="lnk" data-pren="${esc(n)}">नाम बदलें</button> · <button class="lnk" data-pdel="${esc(n)}" style="color:var(--chili)">हटाएँ</button></span></div>`}).join("")||'<p class="note">अभी कोई नाम नहीं रखा।</p>'}</div>`;
+  return `<div class="card2"><h3>🏷️ जगहें (${Object.keys(by).length})</h3><p class="note" style="margin:0 0 6px">जगह पर दबाएँ — बिल, बिक्री, ग्राहकों के नंबर, फोटो। ⚠ वाली जगहें अंदाज़े से बनी हैं — वहाँ पहुँचकर "📍 यहीं पक्का करें" दबा दें।</p>
+  <input class="inp" id="rpq" placeholder="🔍 जगह खोजें" value="${esc(R.placeQ)}" autocomplete="off" style="margin:0 0 6px">
+  <div id="rpl">${names.map(n=>{const ok=by[n].filter(sure).length,s=sale[n];return `<div class="rplace"><button class="rp-n" data-rpl="${esc(n)}"><b>📍 ${esc(n)}</b><span class="note">${ok?"✅ फोन GPS से पक्की":"⚠ अंदाज़े से"}${s?` · ${fdate(R.date).slice(0,5)}: ${s.n} बिल · ${rs(r2(s.amt))}`:""}</span></button>
+    <span class="rp-a"><button class="lnk" data-plfix="${esc(n)}">📍 यहीं पक्का करें</button> · <button class="lnk" data-pren="${esc(n)}">नाम बदलें</button> · <button class="lnk" data-pdel="${esc(n)}" style="color:var(--chili)">हटाएँ</button></span></div>`}).join("")||'<p class="note">अभी कोई नाम नहीं रखा।</p>'}</div></div>`;
 }
+function playRange(d){let a=Infinity,b=0;d.pts.forEach(u=>{if(u.P.length){a=Math.min(a,u.P[0].ts);b=Math.max(b,u.P[u.P.length-1].ts)}});return [a,b]}
+function playHTML(d){const [a,b]=playRange(d);const t=R.play.t&&R.play.t>=a&&R.play.t<=b?R.play.t:a;
+  return `<div class="rplay"><button class="rp-btn" data-rplay aria-label="रास्ता चलाकर देखें">${R.play.on?"⏸":"▶"}</button>
+  <div class="rp-mid"><input type="range" id="rpT" min="${a}" max="${b}" step="30000" value="${t}" aria-label="समय"><div class="rp-info"><b id="rpTime">${R.play.t?ftime(R.play.t):ftime(a)+" – "+ftime(b)}</b> <span id="rpSt">${R.play.t?"":"▶ दबाएँ — गाड़ी दिन भर के रास्ते पर चलती दिखेगी"}</span></div></div>
+  <div class="rp-spd" role="group" aria-label="तेज़ी">${[[1,"1 मि/से"],[5,"5 मि/से"],[15,"15 मि/से"]].map(([v,l])=>`<button data-rspd="${v}" aria-pressed="${R.play.spd===v}">${l}</button>`).join("")}</div></div>`}
 SR.renderRoute=function(){
   const el=document.getElementById("p-route");if(!el)return;bindRoute(el);if(!R.date)R.date=today();
-  if((!R.day||R.day.date!==R.date)&&!R.loading)SR.loadDay(R.date);
-  const d=R.day&&R.day.date===R.date?R.day:null;
-  el.innerHTML=`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">📍 गाड़ी का रूट</h2><button class="chip" data-rref aria-label="ताज़ा करें">🔄</button><input class="inp" type="date" id="rDate" value="${R.date}" aria-label="तारीख"></div>
+  if((!R.raw||R.raw.date!==R.date)&&!R.loading)SR.loadDay(R.date);
+  const d=R.day&&R.day.date===R.date?R.day:null,yd=dayAdd(today(),-1),P=people();
+  el.innerHTML=`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">📍 गाड़ी ट्रैकर</h2><button class="chip" data-rref aria-label="ताज़ा करें">🔄</button></div>
+  <div class="rt-f"><div class="rt-chips">${[[today(),"आज"],[yd,"कल"]].map(([v,t])=>`<button class="chip" data-rday="${v}" aria-pressed="${R.date===v}">${t}</button>`).join("")}<input class="inp" type="date" id="rDate" value="${R.date}" aria-label="तारीख"></div>
+    ${P.length?`<div class="rt-chips"><button class="chip" data-rwho="" aria-pressed="${!R.who}">👥 सब</button>${P.map(([u,n])=>`<button class="chip" data-rwho="${esc(u)}" aria-pressed="${R.who===u}"><i class="rdot" style="background:${colorOf(u)}"></i>${esc(n||"फोन")}</button>`).join("")}</div>`:""}</div>
   <div class="card2 rlive" id="rLive">${liveHTML()}</div>
-  <div id="rmap" class="rmap" role="img" aria-label="गाड़ी का रास्ता नक्शे पर"></div>
+  <div class="rmapw${R.big?" big":""}" id="rmapw"><div id="rmap" class="rmap" role="img" aria-label="गाड़ी का रास्ता नक्शे पर"></div>
+    <div class="rctl"><button data-rsat>${R.sat?"🗺️ सादा":"🛰️ सैटेलाइट"}</button><button data-rlbl aria-pressed="${R.lbl}">🏷️ नाम</button><button data-rme>📍 मैं</button><button data-rbig>${R.big?"✕ छोटा":"⛶ बड़ा"}</button></div></div>
+  ${d&&d.pts.some(u=>u.P.length>1)?playHTML(d):""}
   <button class="big" data-plhere style="margin:8px 0">📍 मैं यहाँ हूँ — फोन की असली जगह से जगह जोड़ें</button>
   ${d?dayHTML(d):'<div class="empty">⏳ रूट लोड हो रहा है…</div>'}
+  ${placesHTML()}
   <div class="card2"><h3>🏆 जगह की कमाई</h3><p class="note" style="margin:0">कहाँ कितना समय, कितने बिल, कितनी बिक्री। ₹ प्रति घंटा से पता चलेगा कि कहाँ ज़्यादा रुकना है।</p>
     <div class="ragg"><button class="big ghost" data-ragg="1">इस दिन</button><button class="big ghost" data-ragg="7">7 दिन</button><button class="big ghost" data-ragg="30">30 दिन</button></div>
     <div id="rAgg">${R.agg?aggHTML(R.agg):""}</div></div>
-  ${custHTML()}
-  ${placesHTML()}`;
+  ${custHTML()}`;
   SR.drawMap();
 };
 function loadLeaflet(){return new Promise((res,rej)=>{if(window.L)return res();if(!document.querySelector('link[href="lib/leaflet.css"]')){const l=document.createElement("link");l.rel="stylesheet";l.href="lib/leaflet.css";document.head.appendChild(l)}
   const s=document.createElement("script");s.src="lib/leaflet.js";s.onload=()=>res();s.onerror=rej;document.head.appendChild(s)})}
+const ESRI="https://server.arcgisonline.com/ArcGIS/rest/services/",SATU=ESRI+"World_Imagery/MapServer/tile/{z}/{y}/{x}";
+function baseLayers(m,lbl){
+  if(R.sat){L.tileLayer(SATU,{maxZoom:20,maxNativeZoom:18,attribution:"Imagery © Esri, Maxar, Earthstar Geographics"}).addTo(m);
+    if(lbl){L.tileLayer(ESRI+"Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,maxNativeZoom:18,opacity:.5}).addTo(m);
+      L.tileLayer(ESRI+"Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,maxNativeZoom:18,opacity:.9}).addTo(m)}}
+  else L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,maxNativeZoom:19,attribution:"© OpenStreetMap"}).addTo(m);
+}
+const pin=(html,cls,w,h)=>L.divIcon({className:cls,html,iconSize:[w,h],iconAnchor:[w/2,h/2]});
 SR.drawMap=async function(){
   const el=document.getElementById("rmap");if(!el)return;
   if(!window.L){try{await loadLeaflet()}catch(e){el.innerHTML='<p class="note" style="padding:12px">नक्शा लोड नहीं हुआ (इंटरनेट देखें)</p>';return}}
-  if(R.map){try{R.map.remove()}catch(e){}R.map=null;R.liveLayer=null;R.meLayer=null}
+  if(R.map){try{R.map.remove()}catch(e){}R.map=null;R.liveLayer=null;R.meLayer=null;R.playLayer=null;R.billLayer=null;R.findLayer=null}
   if(!document.body.contains(el))return;
-  const m=R.map=L.map(el,{zoomControl:true,attributionControl:true});
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);
+  const m=R.map=L.map(el,{zoomControl:true,attributionControl:true,maxZoom:20});
+  baseLayers(m,R.lbl);
   const B=[];
-  SR.places.forEach(p=>{const ok=p.src==="gps";L.circle([p.lat,p.lng],{radius:+p.r||150,color:ok?"#2f6fdb":"#d97706",weight:ok?1:2,dashArray:ok?null:"6 5",fillOpacity:.07}).addTo(m).bindTooltip(p.name+(ok?" ✅":" ⚠ अंदाज़े से"))});
-  const Me=L.control({position:"topright"});Me.onAdd=()=>{const b=L.DomUtil.create("button","rme");b.type="button";b.textContent="📍 मेरी जगह";b.setAttribute("aria-label","नक्शे पर मेरी असली जगह");L.DomEvent.disableClickPropagation(b);b.onclick=()=>SR.showMe();return b};Me.addTo(m);
+  SR.places.forEach(p=>{const ok=p.src==="gps";const c=L.circle([p.lat,p.lng],{radius:+p.r||150,color:ok?"#38bdf8":"#f59e0b",weight:2,dashArray:ok?null:"6 5",fillOpacity:.07}).addTo(m);
+    c.bindTooltip(esc(p.name)+(ok?"":" ⚠"),{permanent:true,direction:"center",className:"rlbl"});c.on("click",()=>SR.placeSheet(p.name))});
   const d=R.day&&R.day.date===R.date?R.day:null;
   if(d){
-    d.pts.forEach((u,ui)=>{const ll=u.P.map(p=>[p.lat,p.lng]);if(ll.length>1)L.polyline(ll,{color:["#1f8a4c","#d97706","#7c3aed"][ui%3],weight:4,opacity:.75}).addTo(m);ll.forEach(x=>B.push(x))});
-    d.stops.forEach(s=>{const r=8+Math.min(18,Math.sqrt(s.sales)/3);L.circleMarker([s.lat,s.lng],{radius:r,color:"#14532d",fillColor:s.sales>0?"#22c55e":"#94a3b8",fillOpacity:.85,weight:2}).addTo(m)
-      .bindPopup(`<b>${esc(s.place?s.place.name:"बिना नाम की जगह")}</b><br>${ftime(s.start)}–${ftime(s.end)} · ${durTxt(mins(s.end-s.start))}<br>${s.bills.length} बिल · ${rs(r2(s.sales))}`);B.push([s.lat,s.lng])});
-    d.bills.forEach(b=>{if(b.loc){L.circleMarker([b.loc.lat,b.loc.lng],{radius:3,color:"#b91c1c",weight:1,fillOpacity:1}).addTo(m);B.push([b.loc.lat,b.loc.lng])}});
+    d.pts.forEach(u=>{const ll=u.P.map(p=>[p.lat,p.lng]);if(ll.length<2)return;const col=colorOf(u.uid);
+      L.polyline(ll,{color:"#ffffff",weight:7,opacity:.4}).addTo(m);L.polyline(ll,{color:col,weight:4,opacity:.95}).addTo(m);
+      L.marker(ll[0],{icon:pin("▶","rpin st",22,22)}).addTo(m).bindTooltip("शुरू · "+ftime(u.P[0].ts)+" · "+esc(u.name||""));
+      L.marker(ll[ll.length-1],{icon:pin("🏁","rpin en",24,24)}).addTo(m).bindTooltip("आख़िरी · "+ftime(u.P[u.P.length-1].ts)+" · "+esc(u.name||""));
+      ll.forEach(x=>B.push(x))});
+    d.stops.forEach((s,i)=>{const sz=Math.round(24+Math.min(14,Math.sqrt(s.sales)/2.5));
+      L.marker([s.lat,s.lng],{icon:pin(`<span class="${s.sales>0?"sale":""}" style="width:${sz}px;height:${sz}px;line-height:${sz-4}px">${i+1}</span>`,"rstopi",sz,sz),zIndexOffset:500}).addTo(m)
+        .on("click",()=>SR.stopSheet(i)).bindTooltip(`${i+1}. ${s.place?esc(s.place.name):"बिना नाम"} · ${ftime(s.start)} · ${durTxt(mins(s.end-s.start))} · ${s.bills.length} बिल · ${rs(r2(s.sales))}`);B.push([s.lat,s.lng])});
+    R.billLayer=L.layerGroup();d.bills.forEach(b=>{if(!b.loc)return;L.circleMarker([b.loc.lat,b.loc.lng],{radius:4,color:"#fff",weight:1,fillColor:"#ef4444",fillOpacity:1}).addTo(R.billLayer).bindTooltip(ftime(b.ts)+" · "+rs(b.total)+" · "+esc(b.byName||""));B.push([b.loc.lat,b.loc.lng])});
   }
-  if(R.date===today())R.live.forEach(v=>{if(v.lat!=null)B.push([v.lat,v.lng])});
+  const dec=()=>{const z=m.getZoom();el.classList.toggle("nolbl",!(R.lbl&&z>=15));if(R.billLayer){if(z>=17)R.billLayer.addTo(m);else m.removeLayer(R.billLayer)}};
+  m.on("zoomend",dec);
+  if(R.date===today())R.live.forEach(v=>{if(v.lat!=null&&(!R.who||v.id===R.who))B.push([v.lat,v.lng])});
   drawLive();
-  if(B.length)m.fitBounds(B,{padding:[28,28],maxZoom:17});else m.setView([25.75,71.39],13);
+  if(B.length)m.fitBounds(B,{padding:[30,30],maxZoom:17});else m.setView([HOME.lat,HOME.lng],16);
+  dec();playDraw();
   setTimeout(()=>{try{m.invalidateSize()}catch(e){}},250);
+};
+/* ▶ रीप्ले: समय t पर हर व्यक्ति कहाँ था */
+function posAt(P,t){if(!P.length||t<P[0].ts)return null;const i=P.findIndex(p=>p.ts>t);if(i<0)return {p:P[P.length-1],mv:false,kmh:0};
+  const a=P[i-1],b=P[i];if(!a)return null;const dt=b.ts-a.ts;if(dt>12*60000)return {p:a,mv:false,kmh:0};
+  const f=(t-a.ts)/dt,kmh=dt>0?dist(a,b)/(dt/3600000)/1000:0;return {p:{lat:a.lat+(b.lat-a.lat)*f,lng:a.lng+(b.lng-a.lng)*f},mv:kmh>3,kmh}}
+function playDraw(){
+  const d=R.day;if(!R.map||!d||!window.L)return;
+  if(!R.playLayer)R.playLayer=L.layerGroup().addTo(R.map);R.playLayer.clearLayers();
+  const t=R.play.t;if(!t)return;const st=[];
+  d.pts.forEach(u=>{const q=posAt(u.P,t);if(!q)return;const col=colorOf(u.uid);
+    const done=u.P.filter(p=>p.ts<=t).map(p=>[p.lat,p.lng]);done.push([q.p.lat,q.p.lng]);
+    if(done.length>1)L.polyline(done,{color:"#fde047",weight:5,opacity:.95}).addTo(R.playLayer);
+    L.marker([q.p.lat,q.p.lng],{icon:L.divIcon({className:"rvan",html:`<span style="border-color:${col}">🚐<b>${esc(String(u.name||"").split(" ")[0])}</b></span>`,iconSize:[78,28],iconAnchor:[39,14]}),zIndexOffset:1000}).addTo(R.playLayer);
+    const pl=placeAt(q.p);st.push(`${esc(String(u.name||"").split(" ")[0])}: ${q.mv?"🚐 चल रही "+Math.round(q.kmh)+" km/h":"🛑 रुकी"}${pl?" · 📍"+esc(pl.name):""}`)});
+  const a=document.getElementById("rpTime");if(a)a.textContent=ftime(t);const b=document.getElementById("rpSt");if(b)b.innerHTML=st.join(" · ")||"इस समय कोई जगह नहीं";const r=document.getElementById("rpT");if(r&&+r.value!==t)r.value=t;
+}
+function playStop(){R.play.on=false;clearInterval(R.play.timer);const x=document.querySelector("[data-rplay]");if(x)x.textContent="▶"}
+function playToggle(){const d=R.day;if(!d)return;const [a,b]=playRange(d);if(!(b>a))return;
+  if(R.play.on){playStop();return}
+  if(!R.play.t||R.play.t>=b)R.play.t=a;R.play.on=true;clearInterval(R.play.timer);
+  const x=document.querySelector("[data-rplay]");if(x)x.textContent="⏸";
+  R.play.timer=setInterval(()=>{if(S.tab!=="route"||!document.getElementById("rmap")){playStop();return}
+    R.play.t=Math.min(b,R.play.t+R.play.spd*60000*0.2);playDraw();if(R.play.t>=b)playStop()},200);
+  playDraw();
+}
+SR.playToggle=playToggle;
+/* छोटा सैटेलाइट "फोटो" — जगह कैसी दिखती है */
+function thumbInit(id,lat,lng,r){const el=document.getElementById(id);if(!el||!window.L)return;
+  const m=L.map(el,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false}).setView([lat,lng],r>200?17:18);
+  L.tileLayer(SATU,{maxZoom:20,maxNativeZoom:18}).addTo(m);L.circle([lat,lng],{radius:r||80,color:"#38bdf8",weight:2,fillOpacity:.08}).addTo(m);
+  L.circleMarker([lat,lng],{radius:6,color:"#fff",weight:2,fillColor:"#ef4444",fillOpacity:1}).addTo(m);setTimeout(()=>{try{m.invalidateSize()}catch(e){}},200)}
+function billRowsHTML(L0){const L1=L0.slice().sort((a,b)=>b.ts-a.ts);if(!L1.length)return '<p class="note">कोई बिल नहीं</p>';
+  return `<div class="rbl">${L1.slice(0,80).map(b=>{const p=b.pay||{};const how=b.mode==="inst"?"🏢 संस्था":b.settled===false?"⏳ बाकी":[p.upi?"UPI":"",p.cash?"नकद":"",p.udhar?"📒 उधार":""].filter(Boolean).join("+");const ph=clean(b.custPhone||"");
+    return `<div class="rb"><div class="rb-m"><b>${b.date!==R.date?fdate(b.date).slice(0,5)+" ":""}${ftime(b.ts)} · ${rs(b.total)} <span class="pill">${esc(how)}</span></b><span class="note">${esc(b.no)} · ${esc(b.partyName||"VIP ग्राहक")}${ph?" · "+ph:""} · बिलर ${esc(b.byName||"")}</span><small>${esc((b.lines||[]).map(l=>l.name+" "+fq(l.qty,l.unit)).join(", "))}</small></div>${ph.length===10?`<div class="rb-a"><a href="https://wa.me/91${ph}" target="_blank" rel="noopener" aria-label="WhatsApp">🟢</a><a href="tel:+91${ph}" aria-label="कॉल">📞</a></div>`:""}</div>`}).join("")}${L1.length>80?`<p class="note">…और ${L1.length-80} बिल</p>`:""}</div>`}
+SR.stopSheet=function(i){const d=R.day,s=d&&d.stops[i];if(!s)return;const m=mins(s.end-s.start);
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="पड़ाव"><div class="grab"></div>
+  <div class="sh-head"><div><h3>${i+1}. ${s.place?"📍 "+esc(s.place.name):"📍 बिना नाम की जगह"}</h3><span class="note">${esc(s.name||"")} · ${ftime(s.start)}–${ftime(s.end)} · ${durTxt(m)} · ${s.bills.length} बिल · ${rs(r2(s.sales))}${s.inst?" · संस्था "+rs(r2(s.inst)):""}${m>=10?" · "+rs(r2(s.sales/(m/60)))+"/घंटा":""}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="rthumb" id="rthumb" aria-label="जगह की सैटेलाइट फोटो"></div>${s.place&&s.place.photo?`<img class="rphoto" src="${s.place.photo}" alt="जगह की फोटो">`:""}
+  <div class="row2" style="margin:8px 0">${s.place?`<button class="big ghost" data-sspl="${esc(s.place.name)}">📊 इस जगह का पूरा हिसाब</button>`:`<button class="big" data-ssname>✏️ इस जगह को नाम दें</button>`}<a class="big ghost" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="https://maps.google.com/?q=${s.lat},${s.lng}">🗺️ Google Map</a></div>
+  <h4 style="margin:6px 0">🧾 यहाँ बने बिल (${s.bills.length})</h4>${billRowsHTML(s.bills)}</div></div>`;
+  thumbInit("rthumb",s.lat,s.lng,s.place?+s.place.r||150:60);
+  $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}if(e.target.closest("[data-ssname]")){nameSheet(s.lat,s.lng,null);return}const p=e.target.closest("[data-sspl]");if(p)SR.placeSheet(p.dataset.sspl)};
+};
+SR.billsRange=async function(n){const end=R.date||today(),out=[];
+  for(let k=0;k<n;k++){const d=dayAdd(end,-k);let L1=R.bcache[d];
+    if(!L1){if(d===S.billsDate)L1=S.dayBills;else{try{L1=S.demo||!S.db?[]:(await S.db.collection("days/"+d+"/bills").get()).docs.map(x=>x.data())}catch(e){L1=[]}if(d!==today())R.bcache[d]=L1}}
+    out.push(...L1.filter(b=>!b.cancelled))}
+  return out};
+function shrink(file,max){return new Promise((res,rej)=>{const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const sc=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement("canvas");c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL("image/jpeg",.62))};img.onerror=rej;img.src=u})}
+SR.placeSheet=async function(name,n){
+  n=n||1;const G=SR.places.filter(p=>p.name===name);if(!G.length)return;const c=G.find(p=>p.src==="gps")||G[0],photo=(G.find(p=>p.photo)||{}).photo||"";
+  const head=`<div class="sh-head"><div><h3>📍 ${esc(name)}</h3><span class="note">${G.length} जगह · ${c.src==="gps"?"✅ फोन GPS से पक्की ±"+(c.acc||"?")+" मी.":"⚠ अंदाज़े से बनी"} · दायरा ${+c.r||150} मी.</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  <div class="rt-chips" style="margin:0 0 8px">${[[1,fdate(R.date)===fdate(today())?"आज":fdate(R.date).slice(0,5)],[7,"7 दिन"],[30,"30 दिन"]].map(([v,t])=>`<button class="chip" data-psn="${v}" aria-pressed="${n===v}">${t}</button>`).join("")}</div>
+  <div class="rthumb" id="rthumb" aria-label="जगह की सैटेलाइट फोटो"></div>${photo?`<img class="rphoto" src="${photo}" alt="जगह की फोटो">`:""}
+  <div class="row2" style="margin:8px 0"><button class="big ghost" data-pphoto>📷 ${photo?"फोटो बदलें":"जगह की फोटो लें"}</button><button class="big ghost" data-pgo>🎯 नक्शे पर</button></div>`;
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="जगह का हिसाब"><div class="grab"></div>${head}<p class="note">⏳ बिल आ रहे हैं…</p></div></div>`;
+  const wire=()=>{thumbInit("rthumb",c.lat,c.lng,+c.r||150);
+    $("#sheet").onclick=async e=>{if(e.target.matches("[data-close]")){closeSheet();return}
+      const ps=e.target.closest("[data-psn]");if(ps){SR.placeSheet(name,+ps.dataset.psn);return}
+      if(e.target.closest("[data-pgo]")){closeSheet();if(R.map){R.map.setView([c.lat,c.lng],18);const w=document.getElementById("rmapw");if(w)w.scrollIntoView({behavior:"smooth",block:"center"})}return}
+      if(e.target.closest("[data-pphoto]")){const fi=document.createElement("input");fi.type="file";fi.accept="image/*";fi.capture="environment";
+        fi.onchange=async()=>{const f=fi.files[0];if(!f)return;try{toast("फोटो छोटी कर रहे हैं…");const u=await shrink(f,720);await S.db.collection("places").doc(c.id).update({photo:u,photoTs:Date.now()});c.photo=u;toast("📷 "+name+" की फोटो सेव हुई");SR.placeSheet(name,n)}catch(err){toast("फोटो सेव नहीं हुई")}};fi.click();return}}};
+  wire();
+  const all=await SR.billsRange(n);const B=all.filter(b=>b.loc&&(!R.who||b.by===R.who)&&(placeAt(b.loc)||{}).name===name);
+  const sale=r2(B.filter(b=>b.mode!=="inst").reduce((a,b)=>a+(+b.total||0),0)),days=new Set(B.map(b=>b.date)).size;
+  const C={};B.forEach(b=>{const ph=clean(b.custPhone);if(ph.length!==10)return;const o=C[ph]||(C[ph]={ph,name:"",n:0,amt:0,last:0});o.n++;o.amt+=+b.total||0;o.last=Math.max(o.last,b.ts||0);if(b.partyName&&!/^(VIP ग्राहक|ग्राहक \d+)$/.test(b.partyName))o.name=b.partyName});
+  (S.customers||[]).forEach(cu=>{if(cu.lastLoc&&(placeAt(cu.lastLoc)||{}).name===name){const o=C[cu.id]||(C[cu.id]={ph:cu.id,name:"",n:0,amt:0,last:0});o.name=o.name||cu.name||"";o.tot=cu.spent||0;o.last=Math.max(o.last,cu.lastTs||0)}});
+  (S.customers||[]).forEach(cu=>{if(C[cu.id]&&!C[cu.id].name)C[cu.id].name=cu.name||""});
+  const CL=Object.values(C).sort((a,b)=>b.amt-a.amt||b.last-a.last);
+  if(!document.getElementById("rthumb"))return;
+  $("#sheet").querySelector(".sheet").innerHTML=`<div class="grab"></div>${head}
+  <div class="kpis"><div class="kpi"><span>बिल</span><b>${B.length}</b></div><div class="kpi"><span>बिक्री</span><b>${rs(sale)}</b></div><div class="kpi"><span>ग्राहक (नंबर)</span><b>${CL.length}</b></div><div class="kpi"><span>${n>1?"दिन जब बिका":"औसत बिल"}</span><b>${n>1?days:rs(B.length?r2(sale/Math.max(1,B.filter(b=>b.mode!=="inst").length)):0)}</b></div></div>
+  <h4 style="margin:10px 0 6px">👥 इस जगह के ग्राहकों के नंबर (${CL.length})</h4>
+  ${CL.length?`<div class="rbl">${CL.map(o=>`<div class="rb"><div class="rb-m"><b>${esc(o.name||"ग्राहक")} · ${o.ph}</b><span class="note">${o.n?o.n+" बिल · "+rs(r2(o.amt)):"आख़िरी बार यहीं दिखे"}${o.last?" · आख़िरी "+fdate(dOf(o.last)).slice(0,5):""}</span></div><div class="rb-a"><a href="https://wa.me/91${o.ph}" target="_blank" rel="noopener" aria-label="WhatsApp">🟢</a><a href="tel:+91${o.ph}" aria-label="कॉल">📞</a><button class="lnk" data-chist="${o.ph}" aria-label="इतिहास">📜</button></div></div>`).join("")}</div>`:'<p class="note">अभी इस जगह के किसी बिल पर ग्राहक का नंबर नहीं लिखा गया।</p>'}
+  <h4 style="margin:10px 0 6px">🧾 बिल (${B.length})</h4>${billRowsHTML(B)}`;
+  wire();
+  const sh=$("#sheet"),o0=sh.onclick;sh.onclick=e=>{const h=e.target.closest("[data-chist]");if(h){custHistSheet(h.dataset.chist);return}o0(e)};
 };
 /* 🛰️ फोन का असली GPS: कई रीडिंग लेकर सबसे सटीक (±मीटर सबसे कम) — नेटवर्क/पुरानी जगह नहीं */
 SR.preciseFix=function(onProgress,maxMs){
@@ -550,14 +668,19 @@ function csvCustomers(){
 }
 function bindRoute(el){
   if(el._b)return;el._b=1;
-  el.addEventListener("change",e=>{if(e.target.id==="rDate"){R.date=e.target.value||today();R.agg=null;R.day=null;SR.renderRoute()}});
-  el.addEventListener("input",e=>{if(e.target.id==="rcq"){R.custQ=e.target.value;const l=document.getElementById("rcl");if(l)l.innerHTML=custListHTML()}});
+  const reday=()=>{R.day=dayFor();R.play.t=0;playStop();SR.renderRoute()};
+  el.addEventListener("change",e=>{if(e.target.id==="rDate"){R.date=e.target.value||today();R.agg=null;R.raw=null;R.day=null;playStop();R.play.t=0;SR.renderRoute()}});
+  el.addEventListener("input",e=>{
+    if(e.target.id==="rcq"){R.custQ=e.target.value;const l=document.getElementById("rcl");if(l)l.innerHTML=custListHTML();return}
+    if(e.target.id==="rpq"){R.placeQ=e.target.value;const pos=e.target.selectionStart;const box=document.getElementById("rpl");if(box){const tmp=document.createElement("div");tmp.innerHTML=placesHTML();const nb=tmp.querySelector("#rpl");if(nb)box.innerHTML=nb.innerHTML}return}
+    if(e.target.id==="rpT"){R.play.t=+e.target.value;playDraw();return}
+  });
   el.addEventListener("click",e=>{
-    const t=e.target.closest("[data-plhere],[data-plfix],[data-ragg],[data-rname],[data-pren],[data-pdel],[data-chist],[data-ccsv],[data-callc],[data-rref],[data-aggname]");if(!t)return;
+    const t=e.target.closest("[data-plhere],[data-plfix],[data-ragg],[data-rname],[data-pren],[data-pdel],[data-chist],[data-ccsv],[data-callc],[data-rref],[data-aggname],[data-rday],[data-rwho],[data-rsat],[data-rlbl],[data-rme],[data-rbig],[data-rplay],[data-rspd],[data-rpl],[data-cmap],[data-rstop]");if(!t)return;
     if(t.dataset.plhere!==undefined){SR.lockSheet("");return}
     if(t.dataset.plfix){SR.lockSheet(t.dataset.plfix);return}
     if(t.dataset.ragg){SR.loadAgg(+t.dataset.ragg);return}
-    if(t.dataset.rref!==undefined){R.day=null;R.agg=null;SR.renderRoute();return}
+    if(t.dataset.rref!==undefined){R.raw=null;R.day=null;R.agg=null;R.bcache={};SR.renderRoute();return}
     if(t.dataset.rname!==undefined){const s=R.day&&R.day.stops[+t.dataset.rname];if(s)nameSheet(s.lat,s.lng,s.place);return}
     if(t.dataset.aggname){const [la,ln]=t.dataset.aggname.split(",");nameSheet(+la,+ln,null);return}
     if(t.dataset.pren){const old=t.dataset.pren;const nn=(prompt("नया नाम",old)||"").trim();if(!nn||nn===old)return;SR.places.filter(p=>p.name===old).forEach(p=>S.db.collection("places").doc(p.id).update({name:nn}).catch(()=>{}));toast("नाम बदला");return}
@@ -565,6 +688,19 @@ function bindRoute(el){
     if(t.dataset.chist){custHistSheet(t.dataset.chist);return}
     if(t.dataset.callc!==undefined){R.custAll=!R.custAll;SR.renderRoute();return}
     if(t.dataset.ccsv!==undefined){SR.saveFile("SabjiExpress_Customers_"+today()+".csv",csvCustomers(),"text/csv");return}
+    if(t.dataset.rday){if(R.date!==t.dataset.rday){R.date=t.dataset.rday;R.agg=null;R.raw=null;R.day=null;playStop();R.play.t=0;SR.renderRoute()}return}
+    if(t.dataset.rwho!==undefined){R.who=t.dataset.rwho;reday();return}
+    if(t.dataset.rsat!==undefined){R.sat=!R.sat;LSx.set("se_rsat",R.sat?"1":"0");SR.renderRoute();return}
+    if(t.dataset.rlbl!==undefined){R.lbl=!R.lbl;LSx.set("se_rlbl",R.lbl?"1":"0");SR.renderRoute();return}
+    if(t.dataset.rme!==undefined){SR.showMe();return}
+    if(t.dataset.rbig!==undefined){R.big=!R.big;const w=document.getElementById("rmapw");if(w)w.classList.toggle("big",R.big);t.textContent=R.big?"✕ छोटा":"⛶ बड़ा";document.body.classList.toggle("rbig-on",R.big);setTimeout(()=>{try{R.map.invalidateSize()}catch(x){}},150);return}
+    if(t.dataset.rplay!==undefined){playToggle();return}
+    if(t.dataset.rspd){R.play.spd=+t.dataset.rspd;el.querySelectorAll("[data-rspd]").forEach(x=>x.setAttribute("aria-pressed",x===t));return}
+    if(t.dataset.rpl){SR.placeSheet(t.dataset.rpl);return}
+    if(t.dataset.cmap){const [la,ln]=t.dataset.cmap.split(",").map(Number);if(!R.map||!window.L)return;if(!R.findLayer)R.findLayer=L.layerGroup().addTo(R.map);R.findLayer.clearLayers();
+      L.marker([la,ln],{icon:L.divIcon({className:"rvan find",html:`<span>👤<b>${esc(t.dataset.cname||"")}</b></span>`,iconSize:[120,28],iconAnchor:[60,14]})}).addTo(R.findLayer);R.map.setView([la,ln],18);
+      const w=document.getElementById("rmapw");if(w)w.scrollIntoView({behavior:"smooth",block:"center"});return}
+    if(t.dataset.rstop!==undefined){SR.stopSheet(+t.dataset.rstop);return}
   });
 }
 
