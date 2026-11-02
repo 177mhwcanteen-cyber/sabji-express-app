@@ -43,7 +43,7 @@ async def main():
 
         # ---------- 1) मालिक ----------
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1}}}, users)
+        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1}}}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
@@ -279,6 +279,14 @@ async def main():
         uh = await pg.evaluate("S.isOwner?SB.udharHTML():'notowner'")
         assert uh == "notowner" or ("आज का उधार" in uh and "पर्ची गई" in uh and "सीमा" in uh), uh[:300]
         print("udhar flow ok", ub, ud[0]["udChk"])
+        # 🔒 लोकेशन सिर्फ़ मालिक की: बिलर को कोई पट्टी/शब्द नहीं, बिल पर जगह का नाम नहीं
+        own = await pg.evaluate("S.isOwner")
+        allb = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")
+        assert not any(b.get("place") for b in allb), [b.get("place") for b in allb]
+        if not own:
+            assert await pg.evaluate("!document.getElementById('locbar')||document.getElementById('locbar').hidden") and await pg.evaluate("SR.places.length") == 0
+            assert "लोकेशन" not in await pg.inner_text("body")
+        print("location private ok, owner=", own)
         await pg.evaluate("closeSheet();setMode('walk')")
         # लेबल: सब्ज़ी की टोकरी — टमाटर (नाम + भाव + बारकोड) → स्कैन → वज़न पूछे
         await pg.click('[data-tab="label"]'); await pg.wait_for_timeout(200)
@@ -382,14 +390,19 @@ async def main():
         assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
         print("opening edit ok")
         # 🪧 बोर्ड के भाव: एक बार अपने-आप
-        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
         bd = await pg.evaluate("[window.__MOCK__.items.tamatar.sale,window.__MOCK__.items.nimbu.sale,!!window.__MOCK__.items.parwal,window.__MOCK__.items.parwal&&window.__MOCK__.items.parwal.sale,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.note&&x.note.includes('बोर्ड')).length,window.__MOCK__.ownerCfg.flags.board1>0]")
         assert bd[0] == 20 and bd[1] == 200 and bd[2] and bd[3] == 90 and bd[4] >= 10 and bd[5], bd
         b2 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.board2>0,window.__MOCK__.items.harapyaj&&window.__MOCK__.items.harapyaj.sale,window.__MOCK__.items.kachchakela&&window.__MOCK__.items.kachchakela.sale,!window.__MOCK__.items.safalmatar,window.__MOCK__.items.methi.sale]")
         assert b2 == [True, 80, 60, True, 200], b2
         c1 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.cost1>0,window.__MOCK__.items.tamatar.cost,window.__MOCK__.items.aloo.cost,(window.__MOCK__.items.aloo.lastBuy||{}).rate,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.field==='cost').length]")
         assert c1[0] and c1[1] == 8 and c1[2] == 13 and c1[3] == 13 and c1[4] >= 20, c1
-        print("board rates ok", bd, c1)
+        p1 = await pg.evaluate("""(()=>{const M=window.__MOCK__,I=M.items,st=(M['days/2026-11-01/meta']||{}).stock||{};return [M.ownerCfg.flags.photo1>0,I.moongfali&&I.moongfali.active,I.sitafal.active,I.parwal.photo,I.dragonfruit.photo,(st.items||{}).seb&&st.items.seb.close,(st.items||{}).shimla&&st.items.shimla.close,Object.keys(st.items||{}).length,SE.bundled.has('lalaloo')]})()""")
+        assert p1 == [True, False, False, "b", "b", 5, 1.7, 22, True], p1
+        if await pg.evaluate("today()") == "2026-11-02":
+            await pg.wait_for_timeout(500)
+            assert await pg.evaluate("(S.prevStock||{}).seb&&S.prevStock.seb.close") == 5, "opening stock not loaded for today"
+        print("board rates ok", bd, c1, p1)
         await pg.evaluate("closeSheet()")
         assert not await pg.query_selector("[data-oldud]") or True
         # 📈 मालिक: टाइल पर मुनाफ़ा

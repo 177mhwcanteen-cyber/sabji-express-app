@@ -64,7 +64,7 @@ public class TrackService extends Service implements LocationListener {
         String who = intent != null && intent.getStringExtra("name") != null ? intent.getStringExtra("name") : "";
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm != null) {
-            NotificationChannel ch = new NotificationChannel(CH, "गाड़ी की लोकेशन", NotificationManager.IMPORTANCE_LOW);
+            NotificationChannel ch = new NotificationChannel(CH, "सब्ज़ी एक्सप्रेस", NotificationManager.IMPORTANCE_MIN);
             nm.createNotificationChannel(ch);
         }
         Intent open = new Intent(this, MainActivity.class);
@@ -72,8 +72,8 @@ public class TrackService extends Service implements LocationListener {
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, pf);
         Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ? new Notification.Builder(this, CH) : new Notification.Builder(this);
         Notification n = b.setContentTitle("🥬 सब्ज़ी एक्सप्रेस चालू है")
-            .setContentText("गाड़ी की लोकेशन दर्ज हो रही है" + (who.isEmpty() ? "" : " · " + who))
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentText("ऐप चालू है" + (who.isEmpty() ? "" : " · " + who))
+            .setSmallIcon(getApplicationInfo().icon)
             .setContentIntent(pi)
             .setOngoing(true)
             .build();

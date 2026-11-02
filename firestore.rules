@@ -102,7 +102,7 @@ service cloud.firestore {
       allow read: if isOwner() || (signedIn() && request.auth.uid == uid);
       allow write: if active() && request.auth.uid == uid;
     }
-    match /places/{id} { allow read: if active(); allow write: if isOwner(); }
+    match /places/{id} { allow read, write: if isOwner(); }  // जगहें सिर्फ़ मालिक की
 
     // 🔐 मालिक का UPI मिलान, असली दुकानदार, अपने खाते — कर्मचारी पढ़ भी नहीं सकते
     match /pay/{id}      { allow read, write: if isOwner(); }
