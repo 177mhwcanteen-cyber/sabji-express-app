@@ -38,7 +38,7 @@ SF.onDate=function(d){
   if(S.isOwner){SF._rev=null;if(SF._unRev)try{SF._unRev()}catch(e){}SF._unRev=S.db.doc("ownerCfg/rev_"+d).onSnapshot(x=>{SF._rev=x.exists?x.data():null;if(S.tab==="day")renderDay()},()=>{});
     if(SF._unN)try{SF._unN()}catch(e){}SF._nt=undefined;
     if(d===today())SF._unN=S.db.doc("days/"+d+"/meta/stock").onSnapshot(x=>{const v=x.exists?x.data():null;const nt=v&&v.nightTs;if(SF._nt!==undefined&&nt&&nt!==SF._nt&&v.by!==S.uid)setTimeout(()=>{const D=nightDiffs(),tot=r2(D.filter(y=>y.r.short>0).reduce((a,y)=>a+y.val,0));toast("🌙 "+(v.nightBy||"कर्मचारी")+" ने रात का स्टॉक लिखा"+(D.length?" · "+D.length+" में फर्क"+(tot>0?" · लगभग "+rs(tot):"")+" — दिन का हिसाब देखें":" · हिसाब मिल गया 👍"))},900);SF._nt=nt||null},()=>{})}
-  S.prevStock={};
+  S.prevStock={};SF.loadCopy(d);
   S.db.doc("days/"+dayAdd(d,-1)+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day")renderDay()}).catch(()=>{});
 };
 const livePurch=()=>S.purch.filter(p=>!p.cancelled);
@@ -368,7 +368,7 @@ SF.dayStockHTML=function(){
     <button class="big" data-night>🌙 रात का स्टॉक डालें</button>${S.stock&&S.stock.nightTs?`<p class="note" style="margin:6px 0 0">✓ ${esc(S.stock.nightBy||"")} ने ${ftime(S.stock.nightTs)} पर भरा — बदलना हो तो फिर से दबाएँ</p>`:""}</div>
   <div class="card2"><h3>🛒 मंडी की खरीद</h3><p class="note" style="margin:0">सुबह न जुड़ पाई तो दोपहर, शाम या रात को "खरीद" में डाल दें। आधी रात के बाद हो तो वहाँ "कल" चुनें।</p>
     <button class="big ghost" data-gokharid>🛒 खरीद डालें</button></div>`;
-  return `${SF.liveStockHTML()+SF.nightReviewHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html}
+  return `${SF.liveStockHTML()+SF.nightReviewHTML()+SF.copyCardHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html}
   ${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
   ${SF.missingBuyHTML()}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>
@@ -696,6 +696,7 @@ ${TH(["बिल","समय","किसने","ग्राहक","मोड"
 ${T(all.slice().sort((a,b)=>a.ts-b.ts).map(b=>[b.no,ftime(b.ts),b.byName||"",(b.partyName||"")+(b.custPhone?" "+b.custPhone:""),b.mode==="inst"?"संस्था":b.mode==="udhar"?"उधार खाता":"ग्राहक",
   (b.lines||[]).map(l=>l.name+" "+fq(l.qty,l.unit)+"×"+l.rate+(l.changed?"(बदला)":"")+(l.free?"(मुफ्त)":"")).join("; "),b.total,num(b.pay&&b.pay.cash),num(b.pay&&b.pay.upi),num(b.pay&&b.pay.udhar),b.place||(b.loc?"दर्ज":"—"),b.cancelled?"रद्द":b.pending?"फोन में (सर्वर पर नहीं गया)":"ठीक"]))}
 
+${SF.copyAuditText()}
 ---
 (ऊपर की हिदायत के हिसाब से A से F तक जवाब दें।)
 `;
@@ -1136,5 +1137,123 @@ SF.purchA4HTML=function(){
   ${list.map((p,i)=>`<tr><td>${pNo(p,i+1)}</td><td>${esc(p.supName||"")}</td><td>${esc(p.byName||"")}</td><td>${(p.lines||[]).map(l=>`${esc(l.name)} ${fq(l.qty,l.unit)}×${rs(l.rate)}${l.prev&&l.rate>l.prev*1.03?" 🔺":""}`).join(", ")}</td><td class="r">${rs(p.total)}</td><td>${PAY[p.pay]||""}${num(p.due)>0?" · बाकी "+rs(p.due):""}</td><td>${(p.photos||[]).length?(p.photos||[]).map((f,j)=>`<a href="${esc(f.url)}">${j+1}</a>`).join(" "):"—"}</td></tr>`).join("")}</table>
   <p>भुगतान: ${Object.entries(by).map(([k,v])=>`${PAY[k]||k} ${rs(v)}`).join(" · ")}</p>`;
 };
+/* =============== 💹 हर बिल का मुनाफ़ा (सिर्फ़ मालिक, सूची में — बिल पर नहीं छपता) =============== */
+SF.lineCost=function(l,date){const it=l.id?item(l.id):null;if(!it)return num(l.cost);
+  const b=buyOf(it.id,S.purchHist.filter(p=>!p.cancelled&&p.date===(date||today())));if(b.q>0)return r2(b.a/b.q);
+  if(num(l.cost)>0)return num(l.cost);return num(SF.costOf(it))};
+SF.billProfit=function(b){
+  if(!b||b.cancelled)return null;if(b.mode==="inst")return {p:0,pct:0,inst:true,miss:0};
+  let p=0,miss=0;(b.lines||[]).forEach(l=>{if(l.id==="xyz"){p+=num(l.amt);return}const c=SF.lineCost(l,b.date);if(!(c>0))miss++;p+=(l.free?0:num(l.amt))-num(l.qty)*c});
+  p=r2(p-num(b.disc));return {p,pct:num(b.total)>0?Math.round(p/num(b.total)*100):0,miss}};
+SF.billProfitTag=function(b){const x=SF.billProfit(b);if(!x)return "";if(x.inst)return '<small class="pf z">खरीद भाव</small>';
+  return `<small class="pf ${x.p<0?"neg":x.pct<20?"low":""}">${x.p<0?"घाटा":"फायदा"} ₹${Math.abs(Math.round(x.p))} · ${x.pct}%${x.miss?" *":""}</small>`};
+SF.profitKpiHTML=function(L){const P=L.map(SF.billProfit).filter(Boolean);const p=r2(P.reduce((a,x)=>a+x.p,0)),t=r2(L.filter(b=>b.mode!=="inst").reduce((a,b)=>a+num(b.total),0));
+  const lowN=P.filter(x=>!x.inst&&x.pct<20).length,miss=P.some(x=>x.miss);
+  return `<div class="pfk"><span>💹 इन बिलों पर कुल फायदा <small>(सिर्फ़ आपको दिखता है)</small></span><b>${rs(Math.round(p))}</b><small>बिक्री ${rs(t)} · औसत ${t>0?Math.round(p/t*100):0}%${lowN?` · ${lowN} बिल में 20% से कम`:""}${miss?" · * कुछ सब्ज़ियों का खरीद भाव नहीं मिला":""}</small></div>`};
+
+/* =============== 🤖 कर्मचारी की कॉपी → AI → ऐप (सिर्फ़ मालिक) =============== */
+SF.PROMPT_DAY=`तुम सब्ज़ी एक्सप्रेस (सब्ज़ी की गाड़ी, जालीपा कैंट, बाड़मेर) के हिसाब-किताब के मुंशी हो।
+मैं कर्मचारी (कमल भाई) की हाथ से लिखी कॉपी के पन्नों की फोटो दे रहा हूँ। इनमें ये हो सकता है:
+(1) मंडी की खरीद — सामान, किलो/नग × भाव = रकम, और कई लाइनों के ब्रैकेट वाले जोड़
+(2) होटल/संस्था को दिया माल (मारवाड़ रसोई, 177 MH कैंटीन, डोसा पॉइंट, भैरव कैंटीन) — सामान, मात्रा, रकम
+(3) "अवेलेबल सब्ज़ी" = रात को गाड़ी में बचा माल, और "बेकार/खराब" वाला माल
+(4) बिक्री — ऑनलाइन, कैश, और किस-किस के नाम "बाकी" (उधार)
+(5) खर्च — टैक्सी किराया, भाड़ा, हम्माली वगैरह
+
+नियम (ध्यान से):
+• जो लिखा है वही लिखो — अपनी तरफ़ से कुछ मत जोड़ो, अंदाज़ा मत लगाओ।
+• पन्ने पर लिखी तारीख का महीना अक्सर गलत होता है (जैसे 02/10/26 असल में 02/11/26) — मैं जो तारीख बताऊँ वही लिखो: तारीख = ____ (YYYY-MM-DD)।
+• ग्राम को किलो में बदलो: 500 gm = 0.5, 300 gm = 0.3; "1½" = 1.5, "20½" = 20.5। नग/पीस/Pac/Nos वाले सामान में unit = "pc"।
+• हर खरीद लाइन में मात्रा × भाव खुद गुणा करके देखो; लिखी रकम से न मिले तो वह लाइन "unclear" में भी लिखो (लिखी रकम + तुम्हारा गुणा)।
+• ब्रैकेट वाले जोड़ और कुल जोड़ (जैसे "टोटल सब्ज़ी 6700") भी खुद जोड़कर देखो; न मिले तो "unclear" में लिखो।
+• नाम वैसे ही लिखो जैसे कॉपी में है (जैसे G4, मोटी मिर्च, बिन्स, नारंगी)। जो शब्द पढ़ा न जाए उसके आगे (?) लगाओ।
+• सिर्फ़ नीचे वाला JSON दो — कोई और बात, शीर्षक या समझाइश नहीं।
+
+{"type":"sabji-copy","date":"YYYY-MM-DD",
+ "kharid":[{"name":"खीरा","qty":30,"unit":"kg","rate":30,"amount":900,"shop":""}],
+ "kharidTotalWritten":0,
+ "sanstha":[{"to":"मारवाड़ रसोई","name":"खीरा","qty":5,"unit":"kg","amount":150}],
+ "night":[{"name":"आलू","qty":30,"unit":"kg"}],
+ "kharab":[{"name":"पपीता","qty":2.5,"unit":"kg"}],
+ "sale":{"online":0,"cash":0,"udhar":[{"name":"अफसर मेस","amount":500,"items":""}],"totalWritten":0,"bachatWritten":0},
+ "kharch":[{"what":"टैक्सी किराया","amount":250}],
+ "unclear":["जो पढ़ा न गया या जोड़ न मिला — साफ़ लिखो"]}`;
+SF.PROMPT_NIGHT=`तुम सब्ज़ी एक्सप्रेस (सब्ज़ी की गाड़ी) के स्टॉक मुंशी हो। फोटो में कर्मचारी की कॉपी का "अवेलेबल सब्ज़ी" (रात को गाड़ी में बचा माल) वाला पन्ना है, और साथ में "बेकार/खराब" वाला हिस्सा भी हो सकता है।
+नियम:
+• हर सब्ज़ी जैसी लिखी है वैसे ही, उसकी मात्रा के साथ — अपनी तरफ़ से कुछ मत जोड़ो।
+• ग्राम को किलो में: 500 gm = 0.5, 300 gm = 0.3, 700 gm = 0.7; "1½" = 1.5। नग/पीस/Pac/Nos = unit "pc"। जहाँ सिर्फ़ गिनती है (नारियल, कीवी, मक्का) वहाँ "pc"।
+• "बेकार/खराब" वाली लाइनें "kharab" में, बाकी "night" में।
+• जो पढ़ा न जाए उसके आगे (?) और "unclear" में लिखो।
+• तारीख = ____ (YYYY-MM-DD) — पन्ने की तारीख का महीना गलत हो सकता है, मेरी बताई तारीख लिखो।
+• सिर्फ़ यह JSON दो, और कुछ नहीं:
+{"type":"sabji-night","date":"YYYY-MM-DD","night":[{"name":"आलू","qty":30,"unit":"kg"}],"kharab":[{"name":"पपीता","qty":2.5,"unit":"kg"}],"unclear":[]}`;
+const NAL={"g4":"harimirch","जी4":"harimirch","मिर्ची":"harimirch","मिर्च":"harimirch","हरीमिर्च":"harimirch","मोटीमिर्च":"motimirch","बड़ीमिर्च":"motimirch","बडीमिर्च":"motimirch","शिमला":"shimla","शिमलामिर्च":"shimla","नारंगी":"malta","संतरा":"malta","ऑरेंज":"malta","बिन्स":"beans","बीन्स":"beans","निम्बू":"nimbu","नींबू":"nimbu","पोदीना":"podina","पुदीना":"podina","कोदीना":"podina","मक्का":"makka","स्वीटकॉर्न":"makka","तुरई":"toroi","तोरी":"toroi","तोरई":"toroi","गोभी":"phoolgobhi","फुलगोभी":"phoolgobhi","पतागोभी":"pattagobhi","पत्तागोबी":"pattagobhi","अमरुद":"amrood","अमरूद":"amrood","तरबुज":"tarbooj","तरबूज":"tarbooj","कदु":"kaddu","कद्दू":"kaddu","कड्डू":"kaddu","कीवि":"kiwi","किवी":"kiwi","पपिता":"papita","अनानास":"ananas","पाइनेपल":"ananas","सहजन":"sahjan","सेब":"seb","केला":"kela","धनिया":"dhaniya","मटर":"matar","आलू":"aloo","लालआलू":"lalaloo","प्याज":"pyaj","प्याज़":"pyaj","चुकंदर":"chukandar","चकुन्दर":"chukandar","खीरा":"kheera"};
+const nrm2=s=>String(s||"").toLowerCase().replace(/\(\?\)|\?/g,"").replace(/[\s.\-_()]/g,"").replace(/ं/g,"ं");
+SF.matchItem=function(name){const n=nrm2(name);if(!n)return null;if(NAL[n]&&item(NAL[n]))return item(NAL[n]);
+  const L=S.items.filter(i=>!i.virtual);return L.find(i=>nrm2(i.name)===n)||L.find(i=>nrm2(String(i.name).replace(/\(.*\)/,""))===n)||L.find(i=>(window.SN&&nrm2(SN.en(i))===n))||L.find(i=>nrm2(i.name).includes(n)||n.includes(nrm2(String(i.name).replace(/\(.*\)/,""))))||L.find(i=>String(i.alias||"").toLowerCase().split(/\s+/).includes(String(name).toLowerCase()))||null};
+SF.parseCopy=function(txt){const s=String(txt||"");const i=s.indexOf("{"),j=s.lastIndexOf("}");if(i<0||j<i)throw new Error("JSON नहीं मिला");
+  const o=JSON.parse(s.slice(i,j+1).replace(/[“”]/g,'"'));if(!o||(o.type!=="sabji-copy"&&o.type!=="sabji-night"))throw new Error("type sabji-copy या sabji-night नहीं");return o};
+SF.copyDoc=null;
+SF.loadCopy=function(d){SF.copyDoc=null;if(!S.isOwner||S.demo||!S.db)return;S.db.doc("days/"+d+"/meta/copy").get().then(x=>{SF.copyDoc=x.exists?x.data():null;if(S.tab==="day")renderDay()}).catch(()=>{})};
+SF.copyCardHTML=function(){
+  if(!S.isOwner)return "";const C=SF.copyDoc&&SF.copyDoc.day,N=SF.copyDoc&&SF.copyDoc.night;
+  return `<div class="card2 cpy"><h3>🤖 कर्मचारी की कॉपी → AI → ऐप</h3>
+  <p class="note" style="margin:0 0 6px">कॉपी के पन्नों की फोटो किसी भी AI (Claude / ChatGPT / Gemini) में डालें, साथ में नीचे का प्रॉम्प्ट चिपकाएँ (तारीख भरें)। AI जो JSON दे, वह यहाँ चिपकाएँ — ऐप कॉपी बनाम ऐप का मिलान दिखाएगा। यह सिर्फ़ आपको दिखता है।</p>
+  <div class="row2" style="margin:0"><button class="big ghost" data-cpp="day">📋 पूरे दिन का प्रॉम्प्ट</button><button class="big ghost" data-cpp="night">📋 सिर्फ़ रात का स्टॉक</button></div>
+  <textarea class="inp" id="cpyIn" rows="3" placeholder="AI का जवाब (JSON) यहाँ चिपकाएँ" style="margin-top:8px;width:100%"></textarea>
+  <button class="big" data-cpsave style="margin-top:6px">✓ पढ़ें और सेव करें</button>
+  ${C||N?SF.copyCompareHTML(C,N):""}</div>`;
+};
+function sumA(L,f){return r2((L||[]).reduce((a,x)=>a+num(f(x)),0))}
+SF.copyCompareHTML=function(C,N){
+  const bills=S.dayBills.filter(b=>!b.cancelled),sale=bills.filter(b=>b.mode!=="inst");
+  const app={upi:sumA(sale,b=>b.pay&&b.pay.upi),cash:sumA(sale,b=>b.pay&&b.pay.cash),ud:sumA(sale,b=>b.pay&&b.pay.udhar),tot:sumA(sale,b=>b.total),inst:sumA(bills.filter(b=>b.mode==="inst"),b=>b.total)};
+  const row=(t,a,b)=>{const d=r2(num(a)-num(b));return `<tr><td>${t}</td><td class="r">${rs(a)}</td><td class="r">${rs(b)}</td><td class="r ${Math.abs(d)>5?"bad":""}">${d>0?"+":""}${rs(d)}</td></tr>`};
+  let h="";
+  if(C){const cs=C.sale||{},cud=sumA(cs.udhar,x=>x.amount),ctot=r2(num(cs.online)+num(cs.cash)+cud);
+    h+=`<h4>🧾 बिक्री — कॉपी बनाम ऐप</h4><table class="cpt"><tr><th></th><th class="r">कॉपी</th><th class="r">ऐप</th><th class="r">फर्क</th></tr>${row("ऑनलाइन / UPI",cs.online,app.upi)}${row("नकद",cs.cash,app.cash)}${row("उधार",cud,app.ud)}${row("<b>कुल</b>",ctot,app.tot)}</table>
+    ${Math.abs(ctot-app.tot)>5?`<p class="ud-w">⚠ कॉपी में ${rs(ctot)} की बिक्री, ऐप में ${rs(app.tot)} के बिल — ${rs(Math.abs(r2(ctot-app.tot)))} ${ctot>app.tot?"की बिक्री बिना बिल के":"का फर्क"}</p>`:""}
+    ${(()=>{const A={};(S.ledger||[]).filter(l=>l.date===S.billsDate&&l.type==="udhar").forEach(l=>A[l.partyName]=(A[l.partyName]||0)+num(l.amt));const K=new Set([...(cs.udhar||[]).map(x=>x.name),...Object.keys(A)]);
+      return K.size?`<p class="note" style="margin:4px 0 0">📒 उधार: ${[...K].map(k=>{const c=num(((cs.udhar||[]).find(x=>x.name===k)||{}).amount),a=num(A[k]);return `${esc(k)} कॉपी ${rs(c)} / ऐप ${rs(a)}${Math.abs(c-a)>1?" ⚠":""}`}).join(" · ")}</p>`:""})()}`;
+    const PA={};livePurch().forEach(p=>(p.lines||[]).forEach(l=>{const k=l.id||l.name;PA[k]=(PA[k]||0)+num(l.billAmt||l.amt)}));const used=new Set();
+    const pr=(C.kharid||[]).map(x=>{const it=SF.matchItem(x.name);const k=it?it.id:x.name;used.add(k);const a=r2(PA[k]||0),calc=num(x.qty)*num(x.rate);return {n:x.name,it,c:num(x.amount),a,calc,q:x.qty,u:x.unit,r:x.rate}});
+    Object.entries(PA).forEach(([k,a])=>{if(!used.has(k)){const it=item(k);pr.push({n:it?it.name:k,it,c:0,a:r2(a),calc:0})}});
+    const pc=sumA(C.kharid,x=>x.amount),pa=sumA(livePurch(),p=>p.total);
+    h+=`<h4>🛒 खरीद — कॉपी बनाम ऐप</h4><table class="cpt"><tr><th>सामान</th><th class="r">कॉपी</th><th class="r">ऐप</th><th class="r">फर्क</th></tr>${pr.map(x=>{const d=r2(x.c-x.a);const bad=Math.abs(d)>5||(x.calc>0&&Math.abs(x.calc-x.c)>5);return `<tr class="${bad?"bad":""}"><td>${esc(x.n)}${x.it?"":" <small>(ऐप में नहीं मिला)</small>"}${x.calc>0&&Math.abs(x.calc-x.c)>5?` <small>⚠ ${x.q}×${x.r}=${rs(x.calc)}</small>`:""}</td><td class="r">${rs(x.c)}</td><td class="r">${rs(x.a)}</td><td class="r">${d>0?"+":""}${rs(d)}</td></tr>`}).join("")}${row("<b>कुल</b>",pc,pa)}</table>
+    ${num(C.kharidTotalWritten)&&Math.abs(num(C.kharidTotalWritten)-pc)>5?`<p class="ud-w">⚠ कॉपी में कुल ${rs(C.kharidTotalWritten)} लिखा, लाइनों का जोड़ ${rs(pc)}</p>`:""}`;
+    const sc=sumA(C.sanstha,x=>x.amount);if(sc||app.inst)h+=`<h4>🏢 संस्था — कॉपी ${rs(sc)} · ऐप ${rs(app.inst)}</h4>${sc&&!app.inst?`<p class="ud-w">⚠ संस्था का माल ऐप में चालान बनाए बिना गया</p>`:""}<p class="note" style="margin:0">${(C.sanstha||[]).map(x=>esc((x.to?x.to+": ":"")+x.name+" "+x.qty+(x.unit==="pc"?" नग":" kg")+" ₹"+num(x.amount))).join(" · ")}</p>`;
+    const kc=sumA(C.kharch,x=>x.amount);if(kc)h+=`<p class="note">💸 खर्च (कॉपी): ${(C.kharch||[]).map(x=>esc(x.what)+" ₹"+num(x.amount)).join(" · ")} · ऐप में ${rs(sumA(S.kharch,k=>k.amt))}</p>`;
+    if((C.unclear||[]).length)h+=`<p class="ud-w">❓ AI को साफ़ नहीं: ${(C.unclear||[]).map(esc).join(" · ")}</p>`;
+  }
+  const NN=(N&&N.night)||(C&&C.night)||[],KK=(N&&N.kharab)||(C&&C.kharab)||[];
+  if(NN.length){const I=S.stock.items||{};const M=NN.map(x=>({x,it:SF.matchItem(x.name)}));const un=M.filter(m=>!m.it);const appFilled=!!(S.stock&&S.stock.nightTs);
+    h+=`<h4>🌙 रात का बचा माल — कॉपी${appFilled?" बनाम ऐप":""}</h4><div class="mbuy-l">${M.map(({x,it})=>{const a=it&&I[it.id]&&I[it.id].close!==undefined?num(I[it.id].close):null;return `<span>${esc(x.name)} <b>${x.qty}${x.unit==="pc"?" नग":" kg"}</b>${appFilled&&it?(a==null?" · ऐप: —":Math.abs(a-num(x.qty))>0.15?` · ऐप ${a} ⚠`:" ✓"):""}${it?"":" (?)"}</span>`}).join("")}</div>
+    ${KK.length?`<p class="note" style="margin:4px 0 0">🗑️ खराब (कॉपी): ${KK.map(x=>esc(x.name)+" "+x.qty+(x.unit==="pc"?" नग":" kg")).join(" · ")}</p>`:""}
+    ${un.length?`<p class="ud-w">ऐप में नाम नहीं मिला: ${un.map(m=>esc(m.x.name)).join(", ")}</p>`:""}
+    <button class="big" data-cpnight style="margin-top:6px">🌙 कॉपी वाला रात का स्टॉक${KK.length?" + खराबी":""} ऐप में चढ़ाएँ${appFilled?" (जो ऐप में नहीं भरा, सिर्फ़ वही)":""}</button>`}
+  return h;
+};
+SF.copySave=async function(){
+  const t=($("#cpyIn")||{}).value||"";let o;try{o=SF.parseCopy(t)}catch(e){toast("❌ "+e.message+" — AI का पूरा जवाब चिपकाएँ");return}
+  if(o.date&&o.date!==S.billsDate&&!confirm("AI की तारीख "+o.date+" है, ऐप में "+S.billsDate+" खुली है। फिर भी "+S.billsDate+" में सेव करें?"))return;
+  const doc={...(SF.copyDoc||{}),ts:Date.now(),by:biller()};if(o.type==="sabji-night")doc.night=o;else doc.day=o;
+  try{await S.db.doc("days/"+S.billsDate+"/meta/copy").set(doc);SF.copyDoc=doc;toast("✓ कॉपी का हिसाब सेव — नीचे मिलान देखें");renderDay()}catch(e){toast("सेव नहीं हुआ: "+(e.code||""))}
+};
+SF.copyApplyNight=async function(){
+  const C=SF.copyDoc||{};const NN=(C.night&&C.night.night)||(C.day&&C.day.night)||[],KK=(C.night&&C.night.kharab)||(C.day&&C.day.kharab)||[];
+  const items=S.stock.items||(S.stock.items={});const now=Date.now(),by="कॉपी से (AI) · "+biller();let n=0,w=0;
+  NN.forEach(x=>{const it=SF.matchItem(x.name);if(!it)return;const o=items[it.id]||(items[it.id]={});if(o.close!==undefined&&o.close!=="")return;o.close=num(x.qty);o.closeBy=by;o.closeTs=now;o.src="copy";n++});
+  KK.forEach(x=>{const it=SF.matchItem(x.name);if(!it)return;const o=items[it.id]||(items[it.id]={});if(num(o.waste)>0)return;o.waste=num(x.qty);o.wasteSrc="copy";w++;
+    (S.stock.wlog||(S.stock.wlog=[])).push({id:it.id,name:it.name,unit:it.unit,qty:num(x.qty),reason:"कॉपी में खराब लिखा",ts:now,by:S.uid||"",byName:by})});
+  if(!S.stock.nightTs){S.stock.nightBy=by;S.stock.nightTs=now}
+  await saveStock();renderDay();toast("🌙 "+n+" सब्ज़ी रात के स्टॉक में"+(w?" · "+w+" खराबी":"")+" चढ़ीं");
+};
+document.addEventListener("click",async e=>{
+  const p=e.target.closest("[data-cpp]");if(p){const t=(p.dataset.cpp==="day"?SF.PROMPT_DAY:SF.PROMPT_NIGHT).replace("तारीख = ____ (YYYY-MM-DD)","तारीख = "+S.billsDate);try{await navigator.clipboard.writeText(t);toast("📋 प्रॉम्प्ट कॉपी हुआ — AI में फोटो के साथ चिपकाएँ")}catch(x){const ta=$("#cpyIn");if(ta){ta.value=t;ta.select()}toast("प्रॉम्प्ट डिब्बे में है — कॉपी कर लें")}return}
+  if(e.target.closest("[data-cpsave]")){SF.copySave();return}
+  if(e.target.closest("[data-cpnight]")){SF.copyApplyNight();return}
+});
+SF.copyAuditText=function(){const C=SF.copyDoc;if(!C)return "";const D=C.day||{},N=C.night||{};const cs=D.sale||{};
+  return `\n## 12. कर्मचारी की कॉपी (AI से पढ़ी — मिलान के लिए)\n- बिक्री (कॉपी): ऑनलाइन ₹${num(cs.online)} · नकद ₹${num(cs.cash)} · उधार ${(cs.udhar||[]).map(x=>x.name+" ₹"+num(x.amount)).join(", ")||"—"} · लिखा कुल ₹${num(cs.totalWritten)}\n- खरीद (कॉपी): ${(D.kharid||[]).map(x=>x.name+" "+x.qty+"×"+x.rate+"="+x.amount).join("; ")||"—"} · लिखा कुल ₹${num(D.kharidTotalWritten)}\n- संस्था (कॉपी): ${(D.sanstha||[]).map(x=>(x.to||"")+" "+x.name+" ₹"+x.amount).join("; ")||"—"}\n- रात का बचा (कॉपी): ${((N.night)||D.night||[]).map(x=>x.name+" "+x.qty+(x.unit==="pc"?"नग":"kg")).join(", ")||"—"}\n- खराब (कॉपी): ${((N.kharab)||D.kharab||[]).map(x=>x.name+" "+x.qty).join(", ")||"—"}\n- खर्च (कॉपी): ${(D.kharch||[]).map(x=>x.what+" ₹"+x.amount).join(", ")||"—"}\n- AI को साफ़ नहीं: ${(D.unclear||[]).concat(N.unclear||[]).join("; ")||"—"}\n`};
 SF.bindKharid();SF.bindLabel();SF.bindDay();SF.bindLabelSettings();
 })();

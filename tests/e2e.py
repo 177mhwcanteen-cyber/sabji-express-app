@@ -372,6 +372,10 @@ async def main():
             await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(300)
             assert not await pg.query_selector("#grid .stk"), "staff must not see stock left on tiles"
             await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300)
+            await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
+            assert not await pg.query_selector("#p-bills .pf") and not await pg.query_selector("#p-bills .pfk"), "staff must not see profit"
+            await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300)
+            assert not await pg.query_selector("#p-day .cpy"), "staff must not see copy card"
             print("staff day view private ok")
         # बिल रद्द करने की अर्ज़ी (कर्मचारी)
         await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
@@ -418,6 +422,29 @@ async def main():
         mh = await pg.evaluate("(()=>{const o=S.prevStock;S.prevStock={pyaj:{close:88},tamatar:{close:26}};const h=SF.morningHTML();S.prevStock=o;return h})()")
         assert "कल रात आपने लिखा था" in mh and "प्याज 88" in mh, mh
         print("owner night review ok")
+        # 💹 हर बिल का फायदा (सिर्फ़ मालिक, सूची में)
+        await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(400)
+        assert await pg.query_selector("#p-bills .pfk") and await pg.query_selector("#p-bills .rt small.pf"), "owner profit tags"
+        pft = await pg.inner_text("#p-bills .pfk"); assert "फायदा" in pft, pft
+        await pg.screenshot(path=f"{SHOTS}/36-bills-profit.png")
+        # 🤖 कॉपी → AI JSON → मिलान + रात का स्टॉक चढ़ाना
+        await pg.click('[data-tab="day"]'); await pg.wait_for_selector("#p-day .cpy")
+        await pg.click('[data-cpp="day"]'); await pg.wait_for_timeout(300)
+        clip2 = await pg.evaluate("navigator.clipboard.readText()"); assert "sabji-copy" in clip2 and await pg.evaluate("today()") in clip2, clip2[:200]
+        dj = {"type":"sabji-copy","date":"","kharid":[{"name":"टमाटर","qty":28,"unit":"kg","rate":10,"amount":280},{"name":"धनिया","qty":5,"unit":"kg","rate":50,"amount":250}],"kharidTotalWritten":600,
+              "sanstha":[{"to":"मारवाड़ रसोई","name":"खीरा","qty":5,"unit":"kg","amount":150}],"night":[],"kharab":[],
+              "sale":{"online":900,"cash":300,"udhar":[{"name":"अफसर मेस","amount":500}],"totalWritten":1700},"kharch":[{"what":"टैक्सी","amount":250}],"unclear":["लाइन 5 पढ़ी नहीं गई"]}
+        import json as _j
+        dj["date"] = await pg.evaluate("S.billsDate")
+        await pg.fill("#cpyIn", "यह रहा:\n```json\n" + _j.dumps(dj, ensure_ascii=False) + "\n```"); await pg.click("[data-cpsave]"); await pg.wait_for_timeout(800)
+        ctx2 = await pg.inner_text("#p-day .cpy"); assert "बिक्री — कॉपी बनाम ऐप" in ctx2 and "खरीद — कॉपी बनाम ऐप" in ctx2 and "संस्था — कॉपी" in ctx2 and "पढ़ी नहीं" in ctx2, ctx2[:600]
+        nj = {"type":"sabji-night","date":dj["date"],"night":[{"name":"सेब","qty":2,"unit":"kg"},{"name":"तरबुज","qty":4,"unit":"kg"},{"name":"G4","qty":1,"unit":"kg"},{"name":"प्याज","qty":12,"unit":"kg"}],"kharab":[{"name":"पपीता","qty":2.5,"unit":"kg"}],"unclear":[]}
+        await pg.fill("#cpyIn", _j.dumps(nj, ensure_ascii=False)); await pg.click("[data-cpsave]"); await pg.wait_for_selector("[data-cpnight]")
+        await pg.screenshot(path=f"{SHOTS}/37-copy-compare.png", full_page=True)
+        await pg.click("[data-cpnight]"); await pg.wait_for_timeout(800)
+        st2 = await pg.evaluate("S.stock.items")
+        assert st2["seb"]["close"] == 2 and st2["tarbooj"]["close"] == 4 and st2["harimirch"]["close"] == 1 and st2["pyaj"]["close"] == 88 and st2["papita"]["waste"] == 2.5, {k: st2.get(k) for k in ["seb","tarbooj","harimirch","pyaj","papita"]}
+        print("profit + copy import ok", pft.replace("\n"," "))
         # 📒 पुराना बाकी (मालिक)
         await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300)
         await pg.click('#p-udhar [data-party="jco-mess"]'); await pg.wait_for_selector(".nsbox summary"); await pg.click(".nsbox summary")
