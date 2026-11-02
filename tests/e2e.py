@@ -256,6 +256,29 @@ async def main():
         assert ib2 and ib2[0]["lines"][0]["rate"] == 30 and ib2[0]["total"] == 90 and ib2[0]["lines"][0].get("costTyped") and not ib2[0]["lines"][0].get("noCost"), ib2
         assert "भाव" in await pg.inner_text("#sheet .pp-ch") and not await pg.query_selector("#sheet #ppqr")
         print("inst cost ask ok", nc, nb0)
+        # 📒 उधार का पक्का रास्ता: खाते का हाल, नंबर ज़रूरी, सीमा पार → वजह, पर्ची का सबूत, मालिक को जाँच कार्ड
+        pn = await pg.evaluate("(()=>{closeSheet();setMode('walk');S.cart=[];renderBill();renderCart();const p=S.parties[0];p.phone='';p.limit=50;return [p.id,p.name]})()")
+        await pg.click('[data-item="tamatar"]'); await pg.fill("#qIn", "2"); await pg.click("[data-add]"); await pg.wait_for_timeout(200)
+        await pg.click("#cartbtn"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(300)
+        await pg.click('[data-sbpay="udhar"]'); await pg.wait_for_selector("#sbPq"); await pg.fill("#sbPq", pn[1]); await pg.wait_for_timeout(200)
+        await pg.click(f'[data-sbp="{pn[0]}"]'); await pg.wait_for_selector("#sheet .ud-chk"); await pg.wait_for_timeout(200)
+        await pg.screenshot(path=f"{SHOTS}/24-udhar-check.png", full_page=True)
+        assert await pg.query_selector("#sbUph") and await pg.query_selector("#sbUwhy"), "phone + reason asked"
+        assert "उधार पक्का करें" in await pg.inner_text("[data-sbok]")
+        await pg.click("[data-sbok]"); await pg.wait_for_timeout(300)
+        assert await pg.query_selector("#sbUph"), "no phone → must not settle"
+        await pg.fill("#sbUph", "98765 43210"); await pg.click("[data-sbok]"); await pg.wait_for_timeout(300)
+        assert await pg.query_selector("#sbUwhy"), "over limit without reason → must not settle"
+        await pg.fill("#sbUwhy", "विक्रम जी ने हाँ कहा"); await pg.click("[data-sbok]"); await pg.wait_for_selector("[data-udsend]"); await pg.wait_for_timeout(300)
+        await pg.screenshot(path=f"{SHOTS}/25-udhar-receipt.png", full_page=True)
+        ub = await pg.evaluate("S._lastUd&&S._lastUd.no||SB._lastUd.no")
+        await pg.evaluate("(()=>{const a=document.querySelector('[data-udsend]');a.addEventListener('click',e=>e.preventDefault());a.click()})()"); await pg.wait_for_timeout(400)
+        ud = [b for b in (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")) if b["no"] == ub]
+        assert ud and ud[0]["pay"]["udhar"] == ud[0]["total"] and ud[0]["udChk"]["over"] and ud[0]["udChk"]["why"] and ud[0]["udChk"]["newPh"] == "9876543210" and ud[0].get("udSent"), ud
+        assert (await pg.evaluate(f"window.__MOCK__.parties['{pn[0]}'].phone")) == "9876543210"
+        uh = await pg.evaluate("S.isOwner?SB.udharHTML():'notowner'")
+        assert uh == "notowner" or ("आज का उधार" in uh and "पर्ची गई" in uh and "सीमा" in uh), uh[:300]
+        print("udhar flow ok", ub, ud[0]["udChk"])
         await pg.evaluate("closeSheet();setMode('walk')")
         # लेबल: सब्ज़ी की टोकरी — टमाटर (नाम + भाव + बारकोड) → स्कैन → वज़न पूछे
         await pg.click('[data-tab="label"]'); await pg.wait_for_timeout(200)

@@ -23,7 +23,7 @@ const lineTxt=l=>l.name+" "+fq(l.qty,l.unit);
 /* ================= 💰 भुगतान (सेटल) ================= */
 SB.settleSheet=function(b,offline){
   if(!b)return;const tot=num(b.total);
-  const st={pay:b._np||(b.mode==="udhar"&&b.partyId)?"udhar":"upi",given:"",cashPart:"",partyId:b._np||b.partyId||"",q:""};delete b._np;
+  const st={pay:b._np||(b.mode==="udhar"&&b.partyId)?"udhar":"upi",given:"",cashPart:"",partyId:b._np||b.partyId||"",q:"",ph:"",why:""};delete b._np;
   const draw=()=>{
     const party=S.parties.find(p=>p.id===st.partyId);
     const needParty=st.pay==="udhar"||st.pay==="split";
@@ -33,12 +33,13 @@ SB.settleSheet=function(b,offline){
     if(st.pay==="split")ui=`<label class="fld">अभी कितना नकद मिला?<input class="inp big-in" id="sbCash" inputmode="decimal" value="${esc(st.cashPart)}"></label><p class="note">उधार में जाएगा: <b style="color:var(--chili)">${rs(Math.max(0,r2(tot-num(st.cashPart))))}</b></p>`;
     if(needParty){
       const q=st.q.trim().toLowerCase();const L=S.parties.filter(p=>!q||(p.name||"").toLowerCase().includes(q)||String(p.phone||"").includes(q)||String(p.qtr||"").toLowerCase().includes(q)).slice(0,6);
-      ui+=party?`<div class="sb-party">📒 <b>${esc(party.name)}</b> <span class="note">अभी बाकी ${rs(bal(party.id))}</span><button class="lnk" data-sbpch>बदलें</button></div>`
+      ui+=party?SB.udCheckHTML(party,SB.udAmt(b,st),st)
         :`<div class="udbox"><b>उधार किसके नाम?</b><input class="inp" id="sbPq" placeholder="नाम, क्वार्टर या मोबाइल से खोजें" value="${esc(st.q)}" autocomplete="off">
           <div class="udlist">${L.map(p=>`<button data-sbp="${esc(p.id)}"><div>${esc(p.name)}<br><span>${p.qtr?"क्वार्टर "+esc(p.qtr)+" · ":""}${esc(p.phone||"नंबर नहीं")}</span></div><span>${bal(p.id)>0?"बाकी "+rs(bal(p.id)):"साफ़"}</span></button>`).join("")||'<p class="note" style="margin:4px">कोई नहीं मिला</p>'}</div>
           <button class="big ghost" data-sbnewp>+ नया उधार खाता</button></div>`;
     }
     const ok=!(needParty&&!party)&&!(st.pay==="upi"&&!upiId());
+    const udBtn=needParty&&party?"📒 "+rs(SB.udAmt(b,st))+" उधार पक्का करें — "+party.name:"";
     $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="भुगतान"><div class="grab"></div>
     <div class="sh-head ppc-sh"><h3>💰 भुगतान <small class="note">· बिल ${esc(b.no)}</small></h3><button class="x" data-close aria-label="बंद करें">✕</button></div>
     ${offline||b.pending?'<p class="note" style="color:var(--chili);font-weight:700;margin:0 0 6px">📴 बिल फोन में सेव है — नेट आते ही सर्वर पर जाएगा</p>':""}
@@ -46,35 +47,85 @@ SB.settleSheet=function(b,offline){
     ${SF.compactPaperHTML(b,{qr:st.pay==="upi",qrId:"sbqr"})}
     <div class="paym">${[["upi","📱 UPI / QR"],["cash","💵 नकद"],["udhar","📒 पूरा उधार"],["split","🔀 नकद + बाकी उधार"]].map(([k,v])=>`<button data-sbpay="${k}" aria-pressed="${st.pay===k}">${v}</button>`).join("")}</div>
     ${ui}
-    <button class="big ${st.pay==="upi"?"haldi":""}" data-sbok ${ok?"":"disabled"}>${st.pay==="upi"?"✓ पैसा आ गया · सेटल करें":"✓ सेटल करें · "+rs(tot)}</button>
+    <button class="big ${st.pay==="upi"?"haldi":""}" data-sbok ${ok?"":"disabled"}>${st.pay==="upi"?"✓ पैसा आ गया · सेटल करें":udBtn?esc(udBtn):"✓ सेटल करें · "+rs(tot)}</button>
     <div class="sb-row"><button class="big ghost" data-sbedit2>✏️ बिल बदलें</button><button class="big ghost" data-sblater>⏳ बाद में</button></div>
     </div></div>`;
     if(st.pay==="upi"&&upiId()&&window.QRCode){const el=$("#sbqr");try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${tot.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+b.no)}`,width:124,height:124,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
   };
   draw();
   const sh=$("#sheet");
-  sh.oninput=e=>{if(e.target.id==="sbPq"){st.q=e.target.value;const pos=e.target.selectionStart;draw();const f=$("#sbPq");if(f){f.focus();try{f.setSelectionRange(pos,pos)}catch(x){}}}};
+  sh.oninput=e=>{if(e.target.id==="sbUph"){st.ph=e.target.value;return}if(e.target.id==="sbUwhy"){st.why=e.target.value;return}if(e.target.id==="sbPq"){st.q=e.target.value;const pos=e.target.selectionStart;draw();const f=$("#sbPq");if(f){f.focus();try{f.setSelectionRange(pos,pos)}catch(x){}}}};
   sh.onchange=e=>{if(e.target.id==="sbGiven"){st.given=e.target.value;draw()}if(e.target.id==="sbCash"){st.cashPart=e.target.value;draw()}};
   sh.onclick=async e=>{
     if(e.target.matches("[data-close]")||e.target.closest("[data-sblater]")){closeSheet();if(e.target.closest("[data-sblater]"))toast("⏳ बिल "+b.no+" का भुगतान बाकी — बिलिंग में ऊपर दिखेगा");try{renderPane()}catch(x){}return}
     const p=e.target.closest("[data-sbpay]");if(p){st.pay=p.dataset.sbpay;draw();return}
     const pp=e.target.closest("[data-sbp]");if(pp){st.partyId=pp.dataset.sbp;draw();return}
-    if(e.target.closest("[data-sbpch]")){st.partyId="";draw();return}
+    if(e.target.closest("[data-sbpch]")){st.partyId="";st.ph="";st.why="";draw();return}
     if(e.target.closest("[data-sbnewp]")){openNewParty(id=>{b._np=id;setTimeout(()=>SB.settleSheet(b),50)});return}
     if(e.target.closest("[data-sbedit2]")){SB.editSheet(b);return}
-    if(e.target.closest("[data-sbok]"))await doSettle(b,st);
+    if(e.target.closest("[data-sbok]")){
+      const party=S.parties.find(p=>p.id===st.partyId);
+      if((st.pay==="udhar"||st.pay==="split")&&party){const c=SB.udCheck(party,SB.udAmt(b,st));
+        if(st.pay==="split"&&!(SB.udAmt(b,st)>0)){toast("नकद पूरा मिल गया — 💵 नकद चुनें");return}
+        if(c.noPh&&SB.ph10(st.ph).length!==10){toast("📱 "+party.name+" का 10 अंक का मोबाइल नंबर डालें");const f=$("#sbUph");if(f)f.focus();return}
+        if((c.over||c.stale)&&String(st.why).trim().length<3){toast("⚠ उधार क्यों दिया — वजह लिखें");const f=$("#sbUwhy");if(f)f.focus();return}}
+      await doSettle(b,st)}
   };
+};
+/* ================= 📒 उधार का पक्का रास्ता ================= */
+SB.ph10=v=>String(v||"").replace(/\D/g,"").slice(-10);
+SB.udAmt=(b,st)=>st.pay==="udhar"?num(b.total):st.pay==="split"?Math.max(0,r2(num(b.total)-Math.min(num(b.total),num(st.cashPart)))):0;
+SB.udLimit=p=>+p.limit>0?+p.limit:(+(S.settings&&S.settings.udLimit)>0?+S.settings.udLimit:2000);
+SB.udCheck=function(p,amt){
+  const L=(S.ledger||[]).filter(l=>l.partyId===p.id);const before=bal(p.id),after=r2(before+num(amt)),lim=SB.udLimit(p);
+  const lj=L.filter(l=>l.type!=="udhar").sort((a,b)=>(b.ts||0)-(a.ts||0))[0];
+  const first=L.filter(l=>l.type==="udhar").sort((a,b)=>(a.ts||0)-(b.ts||0))[0];
+  const since=lj?lj.ts:(first?first.ts:0);const days=since?Math.floor((Date.now()-since)/864e5):0;
+  return {before,after,lim,lastJama:lj||null,days,noPh:SB.ph10(p.phone).length!==10,over:after>lim,stale:before>0&&days>30};
+};
+SB.udCheckHTML=function(p,amt,st){
+  const c=SB.udCheck(p,amt);
+  return `<div class="ud-chk ${c.over||c.stale?"bad":""}">
+    <div class="ud-h">📒 <b>${esc(p.name)}</b>${p.qtr?` <span class="note">· क्वार्टर ${esc(p.qtr)}</span>`:""}<button class="lnk" data-sbpch>बदलें</button></div>
+    <div class="ud-g"><span>अभी बाकी<b>${rs(c.before)}</b></span><span>+ यह उधार<b>${rs(amt)}</b></span><span>बिल के बाद<b class="${c.over?"red":""}">${rs(c.after)}</b></span></div>
+    <p class="note" style="margin:4px 0 0">💵 आख़िरी जमा: ${c.lastJama?`<b>${fdate(c.lastJama.date)}</b> (${c.days} दिन पहले) · ${rs(c.lastJama.amt)}`:`<b>कभी नहीं</b>${c.days?` · पहला उधार ${c.days} दिन पहले`:""}`} · सीमा ${rs(c.lim)}</p>
+    ${c.noPh?`<label class="fld" style="margin-top:6px">📱 मोबाइल नंबर (ज़रूरी — पर्ची इसी पर जाएगी)<input class="inp" id="sbUph" inputmode="tel" maxlength="14" placeholder="10 अंक" value="${esc(st.ph)}" autocomplete="off"></label>`:`<p class="note" style="margin:2px 0 0">📱 ${esc(p.phone)}</p>`}
+    ${c.over?`<p class="ud-w">⚠ बिल के बाद बाकी ${rs(c.after)} — सीमा ${rs(c.lim)} से ज़्यादा</p>`:""}
+    ${c.stale?`<p class="ud-w">⚠ ${c.lastJama?c.days+" दिन से कुछ जमा नहीं हुआ":"इन्होंने आज तक कुछ जमा नहीं किया"} — ${rs(c.before)} पहले से बाकी</p>`:""}
+    ${c.over||c.stale?`<label class="fld" style="margin-top:4px">फिर भी उधार क्यों दे रहे हैं? (विक्रम जी देखेंगे)<input class="inp" id="sbUwhy" placeholder="जैसे विक्रम जी ने हाँ कहा / कल पैसे देंगे" value="${esc(st.why)}" autocomplete="off"></label>`:""}
+  </div>`;
+};
+SB.udSendHTML=function(b){
+  const p=S.parties.find(x=>x.id===b.partyId);const ph=SB.ph10(p&&p.phone);
+  if(!(num(b.pay&&b.pay.udhar)>0)||!p)return "";
+  if(ph.length!==10)return `<div class="ud-send"><p class="ud-w" style="margin:0">⚠ ${esc(p.name)} का नंबर नहीं है — पर्ची नहीं जा सकती</p></div>`;
+  return `<div class="ud-send">${b.udSent?`<p class="note" style="margin:0 0 6px;color:#0b7a35;font-weight:700">✓ उधार की पर्ची ${ftime(b.udSent)} पर भेजी गई</p>`:`<p class="ud-w" style="margin:0 0 6px">ग्राहक को पर्ची ज़रूर भेजें — यही उधार का सबूत है</p>`}
+    <a class="big" data-udsend="${esc(b.no)}" style="background:#25d366;color:#04230f" target="_blank" rel="noopener" href="${waLink(receiptText(b),ph)}">💬 ${esc(p.name)} को उधार की पर्ची ${b.udSent?"फिर ":""}भेजें</a></div>`;
+};
+document.addEventListener("click",e=>{const a=e.target.closest("[data-udsend]");if(!a)return;const b=findBill(a.dataset.udsend)||SB._lastUd;if(b&&!b.udSent){patchBill(b,{udSent:Date.now()}).catch(()=>{})}});
+SB.udharHTML=function(){
+  if(!S.isOwner)return "";
+  const L=(S.dayBills||[]).filter(b=>!b.cancelled&&num(b.pay&&b.pay.udhar)>0);if(!L.length)return "";
+  const nos=L.filter(b=>!b.udSent).length,fl=L.filter(b=>b.udChk&&(b.udChk.over||b.udChk.stale)).length;
+  return `<div class="card2" style="border:2px solid var(--chili)"><h3>📒 आज का उधार — जाँच (${L.length} बिल · ${rs(r2(L.reduce((a,b)=>a+num(b.pay.udhar),0)))})</h3>
+  ${nos||fl?`<p class="ud-w" style="margin:0 0 6px">${nos?nos+" बिल की पर्ची ग्राहक को नहीं गई":""}${nos&&fl?" · ":""}${fl?fl+" बिल सीमा/पुराने बकाये के बाद भी दिए":""}</p>`:""}
+  ${L.map(b=>{const c=b.udChk||{};return `<div class="creq-row"><div><b>${esc(b.partyName||"")} · ${rs(b.pay.udhar)}</b><span class="note">${esc(b.no)} · ${ftime(b.ts)} · बिल ${esc(b.byName||"")}${c.after!=null?" · अब बाकी "+rs(c.after):""}</span>
+    <span>${b.udSent?"✅ पर्ची गई":"❌ पर्ची नहीं गई"}${c.over?" · ⚠ सीमा "+rs(c.lim)+" पार":""}${c.stale?" · ⚠ "+(c.days||"")+" दिन से जमा नहीं":""}${c.newPh?" · 📱 नंबर अभी डाला":""}</span>${c.why?`<span>📝 ${esc(c.why)}</span>`:""}</div></div>`}).join("")}</div>`;
 };
 async function doSettle(b,st){
   const tot=num(b.total);const pay={cash:0,upi:0,udhar:0};
   if(st.pay==="cash")pay.cash=tot;else if(st.pay==="upi")pay.upi=tot;else if(st.pay==="udhar")pay.udhar=tot;else{const cp=Math.min(tot,num(st.cashPart));pay.cash=r2(cp);pay.udhar=r2(tot-cp)}
   const party=S.parties.find(p=>p.id===st.partyId);
   const ch={pay,payMode:st.pay,settled:true,settleTs:Date.now()};
-  if(pay.udhar>0&&party){ch.mode="udhar";ch.partyId=party.id;ch.partyName=party.name}
+  if(pay.udhar>0&&party){ch.mode="udhar";ch.partyId=party.id;ch.partyName=party.name;
+    const c=SB.udCheck(party,pay.udhar),ph=SB.ph10(st.ph);
+    ch.udChk={before:c.before,after:c.after,lim:c.lim,days:c.days,over:c.over,stale:c.stale,...(c.over||c.stale?{why:String(st.why||"").trim()}:{}),...(c.noPh&&ph.length===10?{newPh:ph}:{})};
+    if(c.noPh&&ph.length===10){party.phone=ph;try{if(!S.demo&&S.db)await S.db.collection("parties").doc(party.id).update({phone:ph})}catch(x){}}}
   try{
     await patchBill(b,ch);
     if(pay.udhar>0&&party){const ent={ts:b.ts,date:b.date,partyId:party.id,partyName:party.name,type:"udhar",amt:pay.udhar,billNo:b.no,by:S.uid||"",byName:biller()};
       if(S.demo)S.ledger.push({id:b.no,...ent});else{const o=outboxGet();const inBox=o.some(x=>x.bill.no===b.no&&!(x.done&&x.done.l));if(!inBox)await S.db.collection("ledger").doc(b.no).set(ent);if(!S.ledger.find(x=>x.id===b.no))S.ledger.push({id:b.no,...ent})}}
+    if(pay.udhar>0)SB._lastUd=b;
     beep(true);showReceipt(b,true,b.pending);try{renderPane()}catch(x){}
   }catch(err){toast("सेटल नहीं हुआ: "+(err.code||err.message||""))}
 }
@@ -148,6 +199,7 @@ SB.pendingHTML=function(){
 SB.receiptActionsHTML=function(b){
   if(b.cancelled)return "";
   if(b.mode==="inst")return `<div data-icb="${esc(b.no)}">${SB.instContactsHTML(b)}</div>`;
+  if(b.settled!==false&&num(b.pay&&b.pay.udhar)>0)return SB.udSendHTML(b)+((b.edits&&b.edits.length&&S.isOwner)?`<div class="sb-ract"><p class="note" style="margin:0">✏️ सेव के बाद ${b.edits.length} बार बदला</p></div>`:"");
   if(b.settled===false)return `<div class="sb-ract"><span class="pill blue">⏳ भुगतान बाकी</span><div class="sb-row"><button class="big" data-sbopen="${esc(b.no)}">💰 सेटल करें</button><button class="big ghost" data-sbeditno="${esc(b.no)}">✏️ बिल बदलें</button></div></div>`;
   return (b.edits&&b.edits.length&&S.isOwner)?`<div class="sb-ract"><p class="note" style="margin:0">✏️ सेव के बाद ${b.edits.length} बार बदला: ${b.edits.map(x=>esc(x.byName)+" "+ftime(x.ts)+" · "+esc(x.diff)+" ("+rs(x.totalBefore)+" → "+rs(x.totalAfter)+")").join(" | ")}</p></div>`:"";
 };

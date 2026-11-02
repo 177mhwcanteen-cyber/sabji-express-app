@@ -447,6 +447,7 @@ main{padding-block:10px 120px}
 .ic-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-decoration:none;color:inherit;background:#e9f9ee;border:1.5px solid #25d366;border-radius:12px;padding:8px 10px;font:inherit;text-align:left;width:100%;cursor:pointer}.ic-btn span{display:grid;font-weight:800}.ic-btn small{font-weight:500;color:#4b5563}.ic-btn i{font-style:normal;font-weight:800;color:#0b7a35;white-space:nowrap}
 .ic-btn.off{background:transparent;border-style:dashed;border-color:#bbb}.ic-btn.off i{color:#888}
 .ic-grp{background:var(--surface);border-radius:14px;padding:8px 10px;margin:0 0 8px;box-shadow:var(--shadow)}.ic-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0;border-bottom:1px dashed #ccc}.ic-row select{grid-column:1/-1}
+.ud-chk{border:2px solid #f0b429;background:#fffbea;border-radius:14px;padding:10px 12px;margin:8px 0}.ud-chk.bad{border-color:var(--chili);background:#fff1f0}.ud-h{display:flex;align-items:center;gap:6px;font-size:17px}.ud-h .lnk{margin-left:auto}.ud-g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;text-align:center}.ud-g span{display:grid;font-size:12px;color:#555;background:#fff;border-radius:10px;padding:6px 2px}.ud-g b{font-size:16px;color:#111}.ud-g b.red{color:var(--chili)}.ud-w{color:var(--chili);font-weight:700;margin:4px 0 0}.ud-send{margin:10px 0 0;display:grid}.ud-send a.big{text-align:center;text-decoration:none}
 .ic-cost{display:flex;align-items:center;gap:4px;font-weight:700}.ic-cost .inp{width:5.5em;padding:8px;text-align:right}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:600;z-index:40;max-width:90%;text-align:center}
 /* v10 iOS-style skin: glass header, grouped surfaces, segmented control, floating capsule */
@@ -1371,7 +1372,7 @@ function renderReport(){
   const topC=[...S.customers].sort((a,b)=>(b.spent||0)-(a.spent||0)).slice(0,5);
   const waText=`*सब्ज़ी एक्सप्रेस · ${fdate(date)}*\nबिक्री: ${rs(salesTot)} (${sale.length} बिल)\nनकद ${rs(cash)} · UPI ${rs(upi)} · उधार ${rs(ud)}\nवसूली: ${rs(jc+ju)}\nखर्चा: ${rs(cc.khAll)}\nमुनाफ़ा (खर्चे के बाद): ${rs(net)}\nगल्ला: ${cc.diff==null?"गिना नहीं":Math.abs(cc.diff)<=5?"पूरा मिला":rs(cc.diff)}\nमाल में कमी: ${rs(shortTot)}\nरेट बदले/छूट: ${flags.length} बिल`;
   const rows=Object.values(items).sort((a,b)=>b.amt-a.amt);
-  $("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
+  $("#p-report").innerHTML=(window.SF?SF.cancelReqsHTML():"")+(window.SB?SB.editsHTML()+(SB.udharHTML?SB.udharHTML():""):"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
   <button class="big ghost" data-a4 style="margin-bottom:10px">🖨️ A4 रिपोर्ट प्रिंट / PDF</button>
   ${window.SF?SF.chartsHTML():""}
   <div class="kpis">

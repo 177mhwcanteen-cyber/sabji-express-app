@@ -334,6 +334,8 @@ rep(".toast{position:fixed;", """.sb-saving{display:flex;align-items:center;just
 .toast{position:fixed;""")
 
 # v30: संस्था का खरीद भाव हाथ से
+rep('(window.SB?SB.editsHTML():"")', '(window.SB?SB.editsHTML()+(SB.udharHTML?SB.udharHTML():""):"")')
+rep(".toast{position:fixed;", ".ud-chk{border:2px solid #f0b429;background:#fffbea;border-radius:14px;padding:10px 12px;margin:8px 0}.ud-chk.bad{border-color:var(--chili);background:#fff1f0}.ud-h{display:flex;align-items:center;gap:6px;font-size:17px}.ud-h .lnk{margin-left:auto}.ud-g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px;text-align:center}.ud-g span{display:grid;font-size:12px;color:#555;background:#fff;border-radius:10px;padding:6px 2px}.ud-g b{font-size:16px;color:#111}.ud-g b.red{color:var(--chili)}.ud-w{color:var(--chili);font-weight:700;margin:4px 0 0}.ud-send{margin:10px 0 0;display:grid}.ud-send a.big{text-align:center;text-decoration:none}\n.toast{position:fixed;")
 rep("free:!!l.free,...(l.note?{note:l.note}:{})}));", "free:!!l.free,...(l.note?{note:l.note}:{}),...(l.costTyped?{costTyped:l.costTyped}:{})}));")
 rep(".toast{position:fixed;", ".ic-cost{display:flex;align-items:center;gap:4px;font-weight:700}.ic-cost .inp{width:5.5em;padding:8px;text-align:right}\n.toast{position:fixed;")
 
