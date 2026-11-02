@@ -273,9 +273,20 @@ SE.receiptCanvas=function(b,o,widthPx){
   const sub=r2(b.sub!=null?b.sub:(b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
   if(b.disc){LR("जोड़",`₹${sub}`,fs(18));LR("छूट",`−₹${b.disc}`,fs(18))}
   LR("कुल रकम",`₹${b.total}`,fs(30),true);
-  if(b.pay&&o.paid!==false){const p=b.pay;const parts=[p.cash?"नकद ₹"+p.cash:"",p.upi?"UPI ₹"+p.upi:"",p.udhar?"उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T("भुगतान: "+parts.join(" · "),fs(16),"l")}
+  if(b.pay&&o.paid!==false&&!o.stampL){const p=b.pay;const parts=[p.cash?"नकद ₹"+p.cash:"",p.upi?"UPI ₹"+p.upi:"",p.udhar?"उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T("भुगतान: "+parts.join(" · "),fs(16),"l")}
   if(o.balance!=null)LR("खाते में कुल बाकी",`₹${o.balance}`,fs(18),true);
-  if(o.qr){DASH();T(o.qrLabel||"स्कैन करके भुगतान करें",fs(17),"c",true);const q=o.qr,s=Math.min(W*0.55,q.width*3);x.imageSmoothingEnabled=false;x.drawImage(q,(W-s)/2,y,s,s);y+=s+fs(4);if(o.upi)T(o.upi+(o.payee?" · "+o.payee:""),fs(14),"c")}
+  if(o.qr||o.stampL){DASH();if(o.qr)T(o.qrLabel||"स्कैन करके भुगतान करें",fs(17),"c",true);
+    const s=o.qr?Math.round(W*0.42):0,y0=y,sideW=Math.round((W-2*P-s)/2)-fs(8);
+    if(o.qr){x.imageSmoothingEnabled=false;x.drawImage(o.qr,(W-s)/2,y,s,s)}
+    const stamp=(st,x0,col)=>{if(!st)return;const L=[[st.l1,fs(19),800],[st.l2,fs(16),700],[st.l3,fs(13),500]].filter(l=>l[0]);
+      const lh=L.map(l=>Math.round(l[1]*1.3));const h=lh.reduce((a,b)=>a+b,0)+fs(16);const by=y0+Math.max(0,((s||h)-h)/2);
+      x.save();x.translate(x0+sideW/2,by+h/2);x.rotate(col==="l"?-0.06:0.06);x.lineWidth=Math.max(2,fs(2.5));x.strokeStyle="#000";
+      const rr=(a,b,w,hh,r)=>{x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+hh,r);x.arcTo(a+w,b+hh,a,b+hh,r);x.arcTo(a,b+hh,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();x.stroke()};
+      rr(-sideW/2,-h/2,sideW,h,fs(10));x.lineWidth=Math.max(1,fs(1));rr(-sideW/2+fs(4),-h/2+fs(4),sideW-fs(8),h-fs(8),fs(7));
+      let yy=-h/2+fs(8);L.forEach((l,k)=>{x.font=`${l[2]} ${l[1]}px ${F}`;for(const ln of wrapLines(x,l[0],sideW-fs(14)).slice(0,2)){const w=x.measureText(ln).width;x.fillStyle="#000";x.fillText(ln,-w/2,yy);yy+=lh[k]}});x.restore();
+      return by+h};
+    const e1=stamp(o.stampL,P,"l")||0,e2=stamp(o.stampR,W-P-sideW,"r")||0;
+    y=Math.max(y0+s,e1,e2)+fs(6);if(o.qr&&o.upi)T("UPI: "+o.upi,fs(14),"c")}
   const t=o.nutri!==false&&window.SN&&SN.ofBill(b);
   if(t){DASH();T("🥗 इस थैले में आपकी सेहत (लगभग)",fs(18),"c",true);
     const cells=SN.cells(t),half=(W-2*P)/2;x.font=`500 ${fs(15)}px ${F}`;
@@ -289,7 +300,7 @@ SE.receiptCanvas=function(b,o,widthPx){
   if(o.phone){const y0=y;y+=fs(8);T("📲 घर बैठे ताज़ी सब्ज़ी मँगाएँ",fs(18),"c",true);T("WhatsApp या कॉल करें",fs(15),"c");T(o.phone,fs(28),"c",true,FB);y+=fs(4);
     x.lineWidth=Math.max(2,fs(2));x.strokeRect(P,y0,W-2*P,y-y0);y+=fs(8)}
   T("🙏 धन्यवाद! फिर पधारें",fs(19),"c",true);
-  if(b.byName)T("बिलर: "+b.byName,fs(14),"c");
+  if(b.byName&&!o.stampR)T("बिलर: "+b.byName,fs(14),"c");
   y+=fs(24);
   const out=document.createElement("canvas");out.width=W;out.height=Math.ceil(y);out.getContext("2d").drawImage(c,0,0);return out;
 };

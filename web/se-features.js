@@ -845,11 +845,23 @@ SF.qrFor=function(b){
   if(due>0)return {amt:due,label:"खाते में कुल बाकी ₹"+due+" — इसी QR से चुकाएँ"};
   return {amt:0,label:"✓ भुगतान हो गया · अगली बार भी इसी QR से भुगतान करें"};
 };
+/* 🟢 दो ठप्पे — बाएँ: पैसा कैसे आया, दाएँ: बिल किसने बनाया (जिम्मेदारी) — मालिक का नाम कहीं नहीं */
+SF.stampPay=function(b,hint){
+  if(b.cancelled)return {cls:"red",l1:"❌ रद्द",l2:""};
+  const p=b.pay||{};
+  if(b.settled===false||!b.pay){const H={upi:["📱 UPI","स्कैन करें"],cash:["💵 नकद","लेना है"],udhar:["📒 उधार","खाते में"],split:["🔀 नकद+उधार",""]}[hint||"upi"]||["⏳ भुगतान","बाकी"];return {cls:"due",l1:H[0],l2:H[1]}}
+  const parts=[p.upi?"UPI ₹"+p.upi:"",p.cash?"नकद ₹"+p.cash:""].filter(Boolean);
+  if(!parts.length&&p.udhar)return {cls:"ud",l1:"📒 उधार",l2:"खाते में ₹"+p.udhar};
+  return {cls:"paid",l1:"✅ PAID",l2:(p.upi&&!p.cash?"by UPI":p.cash&&!p.upi?"नकद":"")+(parts.length>1||!(p.upi||p.cash)?parts.join(" + "):""),l3:p.udhar?"उधार ₹"+p.udhar:""};
+};
+SF.stampBy=function(b){return {cls:"by",l1:"🧑‍🌾 बिलिंग",l2:b.byName||"—",l3:ftime(b.ts||Date.now())}};
+const stampHTML=s=>`<div class="stmp ${s.cls}"><b>${esc(s.l1)}</b>${s.l2?`<span>${esc(s.l2)}</span>`:""}${s.l3?`<small>${esc(s.l3)}</small>`:""}</div>`;
+SF.stampHTML=stampHTML;
 SF.rcptOpts=function(b,withQr){
   const due=b.pay?(b.pay.udhar||0):b.total;
   const inst=b.mode==="inst";
   return {shop:"सब्ज़ी एक्सप्रेस",tag:inst?"माल चालान — "+(b.partyName||""):"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:inst?"":SF.fmtPh(SF.orderPh()),nutri:!inst,custTag:SF.custTag(b),vip:b.mode!=="inst"&&b.mode!=="udhar",
-    date:fdate(b.date||today())+"  "+ftime(b.ts||Date.now()),fq,qr:(q=>q?SF.qrCanvas(q.amt,b.no):null)(SF.qrFor(b)),qrLabel:(SF.qrFor(b)||{}).label||"",upi:upiId(),payee:UPI_FIXED.payee,
+    date:fdate(b.date||today())+"  "+ftime(b.ts||Date.now()),fq,qr:(q=>q?SF.qrCanvas(q.amt,b.no):null)(SF.qrFor(b)),qrLabel:(SF.qrFor(b)||{}).label||"",upi:upiId(),payee:"",stampL:b.mode==="inst"?null:SF.stampPay(b),stampR:b.mode==="inst"?null:SF.stampBy(b),
     balance:b.partyId?r2(bal(b.partyId)+(b.pay?0:0)):null,paid:!!b.pay};
 };
 SF.nutriHTML=function(b){
@@ -875,8 +887,9 @@ SF.compactPaperHTML=function(b,o){
   ${(b.lines||[]).map((l,i)=>`<tr${ed?` data-edit="${i}"`:o.tap?` data-sbrow="${i}" class="tap"`:""}><td>${i+1}</td><td>${esc(l.name)}${window.SN&&SN.en(l.name)?` <small class="pp-en">${esc(SN.en(l.name))}</small>`:""}${l.changed?' <span class="pp-chg">भाव बदला</span>':""}${l.free?' <span class="pp-chg">मुफ्त</span>':""}</td><td class="r">${fq(l.qty,l.unit).replace(" कि.ग्रा"," kg")}</td><td class="r">${l.free?"—":"₹"+l.rate}</td><td class="r"><b>₹${l.amt}</b></td>${ed?`<td><button class="pp-x" data-del="${i}" aria-label="${esc(l.name)} हटाएँ">✕</button></td>`:""}</tr>`).join("")}
   </tbody></table>
   ${b.disc?`<div class="pp-row"><span>जोड़ ₹${sub}</span><span>छूट −₹${b.disc}</span></div>`:""}
-  <div class="ppc-foot${qr?"":" noqr"}">${qr?`<div class="ppc-qr" id="${o.qrId||"ppqr"}"></div>`:""}
-    <div class="ppc-tot"><span>कुल रकम · ${(b.lines||[]).length} सामान</span><b>₹${b.total}</b>${qr?`<small>📱 स्कैन करके भुगतान<br><b>${esc(UPI_FIXED.payee)}</b><br>${esc(upiId())}</small>`:""}</div></div>
+  <div class="ppc-sum"><span>कुल रकम · ${(b.lines||[]).length} सामान</span><b>₹${b.total}</b></div>
+  ${b.mode==="inst"?"":`<div class="ppc-row3">${stampHTML(SF.stampPay(b,o.hint))}${qr?`<div class="ppc-qr" id="${o.qrId||"ppqr"}"></div>`:"<div></div>"}${stampHTML(SF.stampBy(b))}</div>
+  ${qr?`<div class="ppc-upi">📱 स्कैन करके भुगतान · UPI: ${esc(upiId())}</div>`:""}`}
   </div>`;
 };
 SF.paperHTML=function(b,o){
@@ -897,8 +910,9 @@ SF.paperHTML=function(b,o){
   ${b.disc?`<div class="pp-row"><span>जोड़</span><span>₹${sub}</span></div><div class="pp-row"><span>छूट</span><span>−₹${b.disc}</span></div>`:""}
   <div class="pp-total"><span>कुल रकम</span><b>₹${b.total}</b></div>
   <div class="pp-row note"><span>${(b.lines||[]).length} सामान</span><span>${b.partyId&&!ed?"खाते में कुल बाकी ₹"+r2(bal(b.partyId)):""}</span></div>
-  ${stamp?`<div class="pp-stamp${b.cancelled?" red":""}">${b.cancelled?"रद्द · "+esc(b.cancelReason||""):"✓ "+esc(stamp)}</div>`:""}
-  ${o.qr&&SF.qrFor(b)?`<div class="pp-qr"><div id="${o.qrId||"ppqr"}"></div><b>${esc(SF.qrFor(b).label)}</b><span>${esc(UPI_FIXED.payee)} · ${esc(upiId())}</span></div>`:""}
+  ${b.cancelled?`<div class="pp-stamp red">रद्द · ${esc(b.cancelReason||"")}</div>`:""}
+  ${b.mode==="inst"?"":`<div class="pp-row3">${stampHTML(SF.stampPay(b))}${o.qr&&SF.qrFor(b)?`<div class="pp-qrbox"><div id="${o.qrId||"ppqr"}"></div></div>`:"<div></div>"}${stampHTML(SF.stampBy(b))}</div>
+  ${o.qr&&SF.qrFor(b)?`<div class="pp-qr"><b>${esc(SF.qrFor(b).label)}</b><span>UPI: ${esc(upiId())}</span></div>`:""}`}
   <div class="pp-dash"></div>
   ${SF.nutriHTML(b)}
   ${SF.orderPh()?`<div class="pp-order"><b>📲 घर बैठे ताज़ी सब्ज़ी मँगाएँ</b><span>WhatsApp या कॉल करें</span><big>${SF.fmtPh(SF.orderPh())}</big></div>`:""}

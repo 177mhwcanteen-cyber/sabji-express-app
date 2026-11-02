@@ -43,10 +43,10 @@ SB.settleSheet=function(b,offline){
     const big=st.pay==="upi"?"✓ पैसा आ गया · सेव "+rs(tot):udBtn?udBtn:st.pay==="split"?"✓ सेव + सेटल · नकद "+rs(Math.min(tot,num(st.cashPart)))+" + उधार":"✓ सेव + सेटल "+rs(tot);
     $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px sb1" role="dialog" aria-label="बिल और भुगतान"><div class="grab"></div>
     <div class="sh-head ppc-sh"><h3>🧾 बिल <small class="note">· ${esc(b.no)}</small> <span class="sb-ok">${offline||b.pending?"📴 फोन में सेव":"✓ सेव"}</span></h3><button class="x" data-close aria-label="बंद करें">✕</button></div>
-    ${SF.compactPaperHTML(b,{qr:true,qrId:"sbqr",tap:true})}
+    ${SF.compactPaperHTML(b,{qr:true,qrId:"sbqr",tap:true,hint:st.pay})}
     <div class="paym paym4" role="group" aria-label="भुगतान का तरीका">${[["upi","📱","UPI"],["cash","💵","नकद"],["udhar","📒","उधार"],["split","🔀","नकद+उधार"]].map(([k,i,v])=>`<button data-sbpay="${k}" aria-pressed="${st.pay===k}"><i>${i}</i>${v}</button>`).join("")}</div>
     ${ui}
-    <div class="sb-act4"><button data-sbedit2><i>✏️</i>एडिट</button><button data-sbphoto><i>📷</i>फोटो${b.photoN?" ("+b.photoN+")":""}</button><button data-sbshare><i>📤</i>शेयर</button><button data-sbprint><i>🖨️</i>प्रिंट</button></div>
+    <div class="sb-act4"><button data-sbedit2><i>✏️</i>एडिट</button><button data-sbphoto><i>📷</i>फोटो${b.photoN?" ("+b.photoN+")":""}</button><button data-sbshare class="wa" aria-label="WhatsApp पर भेजें"><i class="wa-i"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#fff" d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path fill="#25d366" d="M7 9h10v1.6H7zM7 12h7v1.6H7z"/></svg></i>WhatsApp</button><button data-sbprint><i>🖨️</i>प्रिंट</button></div>
     <div class="sb-bot"><button class="big ghost" data-sblater>➕ नया ग्राहक</button><button class="big ${st.pay==="upi"?"haldi":""}" data-sbok ${ok?"":"disabled"}>${esc(big)}</button></div>
     </div></div>`;
     if(window.SF&&SF.drawPaperQR)SF.drawPaperQR(b,"sbqr",150);
@@ -339,7 +339,7 @@ SB.instText=function(b,p){
     t+=`${LN}\n💰 *कुल: ₹${b.total}* (खरीद भाव पर)\n\n✅ कृपया मिलान करके *"मिल गई ✓"* लिखकर जवाब दें। कुछ फर्क हो तो अभी बताएँ।\n`;
   }
   if((b.edits||[]).length)t+=`✏️ यह चालान सेव के बाद ${b.edits.length} बार बदला गया।\n`;
-  return t+`— विक्रम चारण, सब्ज़ी एक्सप्रेस 🙏`;
+  return t+`— सब्ज़ी एक्सप्रेस 🙏`;
 };
 const sentKey=b=>"se_isent_"+b.no;
 const sentGet=b=>{try{return JSON.parse(localStorage.getItem(sentKey(b))||"{}")}catch(e){return {}}};

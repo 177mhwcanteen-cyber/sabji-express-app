@@ -111,7 +111,8 @@ async def main():
         # ⚡ एक टैप शीट: 4 चिप एक लाइन, 4 बटन (एडिट/फोटो/शेयर/प्रिंट), नया ग्राहक + बड़ा बटन, सामान पर टैप = एडिट
         assert len(await pg.query_selector_all("#sheet .paym4 [data-sbpay]")) == 4 and len(await pg.query_selector_all("#sheet .sb-act4 button")) == 4
         assert await pg.query_selector("#sheet [data-sbrow='0']") and "पैसा आ गया · सेव" in await pg.inner_text("[data-sbok]") and "नया ग्राहक" in await pg.inner_text("[data-sblater]")
-        assert "VIKRAM CHARAN" in await pg.inner_text("#sheet .ppc-tot") and "@" in await pg.inner_text("#sheet .ppc-tot")
+        sht = await pg.inner_text("#sheet")
+        assert "VIKRAM" not in sht and "@okbizaxis" in sht and "बिलिंग" in await pg.inner_text("#sheet .stmp.by") and "कमल भाई" in await pg.inner_text("#sheet .stmp.by"), sht[:400]
         assert await pg.evaluate("S.cart.length") == 0, "cart should be cleared after auto-save"
         b0 = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")
         assert b0 and b0[0]["settled"] is False and b0[0]["pay"]["cash"] == 0, b0
@@ -139,7 +140,10 @@ async def main():
         await pg.evaluate(f"showReceipt(S.dayBills.find(b=>b.no==='{settled_no}'),false)"); await pg.wait_for_selector("#sheet .paper")
         assert await pg.query_selector("#sheet #ppqr canvas, #sheet #ppqr img") and "अगली बार" in await pg.inner_text("#sheet .pp-qr"), "QR on paid receipt"
         assert not await pg.query_selector("#sheet .paper .pp-edit"), "edit note must not show on customer bill"
-        rtx = await pg.evaluate(f"receiptText(S.dayBills.find(b=>b.no==='{settled_no}'))"); assert "UPI:" in rtx and "@" in rtx and "बदला" not in rtx, rtx
+        rtx = await pg.evaluate(f"receiptText(S.dayBills.find(b=>b.no==='{settled_no}'))"); assert "UPI:" in rtx and "@" in rtx and "बदला" not in rtx and "VIKRAM" not in rtx and "बिलिंग: *कमल भाई*" in rtx, rtx
+        assert "PAID" in await pg.inner_text("#sheet .stmp.paid") and "कमल भाई" in await pg.inner_text("#sheet .pp-row3 .stmp.by")
+        rcv = await pg.evaluate(f"(()=>{{const b=S.dayBills.find(x=>x.no==='{settled_no}');return SE.receiptCanvas(b,SF.rcptOpts(b,true),576).toDataURL()}})()")
+        open(f"{{SHOTS}}/29-paid-receipt.png".format(SHOTS=SHOTS),"wb").write(base64.b64decode(rcv.split(",")[1]))
         await pg.screenshot(path=f"{SHOTS}/5-receipt.png")
         await pg.click("[data-sharepdf]"); await pg.wait_for_selector("#shPh")
         await pg.screenshot(path=f"{SHOTS}/14-share-ask.png")
