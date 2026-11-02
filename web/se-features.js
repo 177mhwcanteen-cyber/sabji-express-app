@@ -341,17 +341,34 @@ function dayRows(){
   });
 }
 /* 🛒 खरीद बाकी? — जो सब्ज़ी (कल रात बचा + आज की खरीद) से ज़्यादा बिक गई, उसकी खरीद अभी नहीं जुड़ी */
-SF.missingBuy=function(){if(S.billsDate!==today()&&!S.isOwner)return [];return dayRows().filter(r=>r.active&&(r.saleQ+r.instQ)>0&&r.avail-(r.saleQ+r.instQ)<-(r.it.unit==="kg"?0.2:0.99)).map(r=>({it:r.it,need:r2((r.saleQ+r.instQ-r.avail)*1000)/1000,avail:r.avail}))};
+SF.missingBuy=function(){if(!S.isOwner)return [];/* सिर्फ़ मालिक — कर्मचारी को बिक्री की मात्रा नहीं दिखती */return dayRows().filter(r=>r.active&&(r.saleQ+r.instQ)>0&&r.avail-(r.saleQ+r.instQ)<-(r.it.unit==="kg"?0.2:0.99)).map(r=>({it:r.it,need:r2((r.saleQ+r.instQ-r.avail)*1000)/1000,avail:r.avail}))};
 SF.missingBuyHTML=function(){const M=SF.missingBuy();if(!M.length)return "";
-  return `<div class="card2 mbuy"><h3>🛒 खरीद बाकी? (${M.length})</h3><p class="note" style="margin:0 0 6px">ये सब्ज़ियाँ कल रात के बचे + आज की खरीद से ज़्यादा बिकीं — मंडी की खरीद अभी जोड़ दें (शाम/रात को भी चलेगा), हिसाब अपने-आप ठीक होगा।</p>
-  <div class="mbuy-l">${M.map(x=>`<span>${esc(x.it.name)} <b>+${fq(x.need,x.it.unit)}</b></span>`).join("")}</div>
-  <button class="big" data-gokharid style="margin-top:8px">🛒 अभी खरीद जोड़ें</button></div>`};
+  return `<div class="card2 mbuy"><h3>🛒 खरीद की एंट्री छूटी? (${M.length})</h3><p class="note" style="margin:0 0 6px">ये सब्ज़ियाँ (कल रात बचा + आज दर्ज खरीद) से ज़्यादा बिकीं — या तो खरीद की एंट्री छूटी है, या कल रात का स्टॉक कम लिखा गया। कर्मचारी को यह नहीं दिखता; पूछना हो तो सिर्फ़ "आज की खरीद पूरी डालें" कहें।</p>
+  <div class="mbuy-l">${M.map(x=>`<span>${esc(x.it.name)} <b>+${fq(x.need,x.it.unit)}</b></span>`).join("")}</div></div>`};
+/* 📊 विक्रम जी, आज का सार — खरीद कितनी दर्ज, बिक्री कितनी, रात का स्टॉक भरा या नहीं (सिर्फ़ मालिक) */
+SF.ownerBriefHTML=function(){
+  if(!S.isOwner)return "";const d=S.billsDate,B=S.dayBills.filter(b=>!b.cancelled),P=livePurch();
+  const sale=B.filter(b=>b.mode!=="inst"),sum=(L,f)=>r2(L.reduce((a,b)=>a+num(f(b)),0));
+  const tot=sum(sale,b=>b.total),upi=sum(sale,b=>b.pay&&b.pay.upi),cash=sum(sale,b=>b.pay&&b.pay.cash),ud=sum(sale,b=>b.pay&&b.pay.udhar),due=sum(sale.filter(b=>b.settled===false),b=>b.total),inst=sum(B.filter(b=>b.mode==="inst"),b=>b.total);
+  const buy=sum(P,p=>p.total),lastP=P.reduce((a,p)=>Math.max(a,p.ts||0),0),M=SF.missingBuy(),late=P.filter(p=>p.late).length;
+  return `<div class="card2 obrief"><h3>📊 विक्रम जी, ${d===today()?"आज":fdate(d)} का सार <small class="note">· ${ftime(Date.now())}</small></h3>
+  <div class="ob-g"><div><span>🛒 खरीद दर्ज</span><b>${rs(buy)}</b><small>${P.length?P.length+" पर्ची · आख़िरी "+ftime(lastP)+(late?" · "+late+" बाद में जोड़ी":""):"अभी कोई खरीद नहीं जुड़ी"}</small></div>
+  <div><span>🧾 बिक्री</span><b>${rs(tot)}</b><small>${sale.length} बिल · UPI ${rs(upi)} · नकद ${rs(cash)}${ud?" · उधार "+rs(ud):""}${due?" · ⏳ बाकी "+rs(due):""}</small></div>
+  <div><span>🏢 संस्था (खरीद भाव)</span><b>${rs(inst)}</b><small>${B.filter(b=>b.mode==="inst").length} चालान</small></div>
+  <div><span>🌙 रात का स्टॉक</span><b>${S.stock&&S.stock.nightTs?"✓ भरा":"— अभी नहीं"}</b><small>${S.stock&&S.stock.nightTs?esc(S.stock.nightBy||"")+" · "+ftime(S.stock.nightTs):"दुकान बंद होने पर"}</small></div></div>
+  ${M.length?`<p class="ud-w" style="margin:6px 0 0">⚠ ${M.length} सब्ज़ी स्टॉक से ज़्यादा बिकीं (खरीद की एंट्री छूटी?): ${M.map(x=>esc(x.it.name)+" +"+fq(x.need,x.it.unit)).join(", ")}</p>`:""}</div>`;
+};
 document.addEventListener("click",e=>{if(e.target.closest("[data-gokharid]")){closeSheet&&closeSheet();if(typeof setTab==="function")setTab("kharid");else{const t=document.querySelector('[data-tab="kharid"]');if(t)t.click()}}});
 SF.dayStockHTML=function(){
   const rows=dayRows().filter(r=>r.active);
   const flags=rows.filter(r=>r.flag);
   const P2=dayMoney(rows);
-  return `${S.isOwner?SF.liveStockHTML()+SF.nightReviewHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html:""}
+  if(!S.isOwner)return `${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
+  <div class="card2"><h3>🌙 रात का स्टॉक</h3><p class="note" style="margin:0">दुकान बंद करते समय गाड़ी में जो माल बचा है, तौलकर/गिनकर लिखें।</p>
+    <button class="big" data-night>🌙 रात का स्टॉक डालें</button>${S.stock&&S.stock.nightTs?`<p class="note" style="margin:6px 0 0">✓ ${esc(S.stock.nightBy||"")} ने ${ftime(S.stock.nightTs)} पर भरा — बदलना हो तो फिर से दबाएँ</p>`:""}</div>
+  <div class="card2"><h3>🛒 मंडी की खरीद</h3><p class="note" style="margin:0">सुबह न जुड़ पाई तो दोपहर, शाम या रात को "खरीद" में डाल दें। आधी रात के बाद हो तो वहाँ "कल" चुनें।</p>
+    <button class="big ghost" data-gokharid>🛒 खरीद डालें</button></div>`;
+  return `${SF.liveStockHTML()+SF.nightReviewHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html}
   ${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
   ${SF.missingBuyHTML()}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>

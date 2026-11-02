@@ -353,6 +353,16 @@ async def main():
         assert st["items"]["pyaj"]["close"] == 88 and st["nightBy"] == "कमल भाई", st["items"]["pyaj"]
         print("night count (no recheck) ok")
         await pg.screenshot(path=f"{SHOTS}/11-day.png", full_page=True)
+        # 🔒 कर्मचारी को बिक्री/कमी/होना चाहिए/गल्ले का हिसाब नहीं — सिर्फ़ खरीद, खर्चा, खराबी, रात की गिनती
+        if not await pg.evaluate("S.isOwner"):
+            dtx = await pg.inner_text("#p-day")
+            for w in ["बिका", "होना चाहिए", "कमी", "खरीद की एंट्री छूटी", "आज का सार"]:
+                assert w not in dtx, (w, dtx[:600])
+            assert await pg.query_selector("#p-day [data-night]") and await pg.query_selector("#p-day #dCount")
+            await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(300)
+            assert not await pg.query_selector("#grid .stk"), "staff must not see stock left on tiles"
+            await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300)
+            print("staff day view private ok")
         # बिल रद्द करने की अर्ज़ी (कर्मचारी)
         await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
         _bn = await pg.evaluate("[...document.querySelectorAll('#p-bills [data-bill]')].map(x=>x.dataset.bill).find(n=>!(S.cancelReqs||[]).some(r=>r.no===n)&&!(S.dayBills.find(b=>b.no===n)||{}).cancelled&&(S.dayBills.find(b=>b.no===n)||{}).settled!==false)")
@@ -385,6 +395,7 @@ async def main():
         await pg.evaluate("S.cart=[];refreshAfterCart()")
         await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(600)
         await pg.screenshot(path=f"{SHOTS}/12-owner-day.png", full_page=True)
+        assert await pg.query_selector("#p-day .obrief") and "खरीद दर्ज" in await pg.inner_text("#p-day .obrief"), "owner brief missing"
         txt = await pg.inner_text("#p-day")
         assert "असली मुनाफ़ा" in txt, txt[:300]
         assert "रात का मिलान" in txt and "प्याज" in txt, txt[:600]
