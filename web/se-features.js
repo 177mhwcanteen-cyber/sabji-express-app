@@ -651,7 +651,8 @@ ${(()=>{const W=(S.stock&&S.stock.wlog)||[];return W.length?TH(["समय","स
 ${(()=>{const I=(S.stock&&S.stock.items)||{};const R=rows.filter(r=>I[r.it.id]&&I[r.it.id].recount);return (S.stock&&S.stock.nightBy?"गिनती: "+S.stock.nightBy+" · "+ftime(S.stock.nightTs)+"\n":"⚠ रात की गिनती नहीं हुई\n")+(R.length?"दोबारा तौलने पर: "+R.map(r=>r.it.name+" पहली "+I[r.it.id].close1+" → दोबारा "+I[r.it.id].close).join("; ")+"\n":"")+(SF._rev&&SF._rev.date===d?"मालिक ने मिलान देखा: "+ftime(SF._rev.ts)+(SF._rev.note?" · नोट: "+SF._rev.note:""):"मालिक ने अभी मिलान नहीं देखा")})()}
 
 ## 5d. भाव बदलाव (बिक्री भाव)
-${(S.priceLog||[]).filter(l=>dOf(l.ts)===d).map(l=>"- "+ftime(l.ts)+" · "+l.name+" ₹"+l.old+" → ₹"+l.new+" · "+(l.byName||"")).join("\n")||"कोई भाव नहीं बदला"}
+${(S.priceLog||[]).filter(l=>dOf(l.ts)===d&&l.field!=="cost").map(l=>"- "+ftime(l.ts)+" · "+l.name+" ₹"+l.old+" → ₹"+l.new+" · "+(l.byName||"")).join("\n")||"कोई बिक्री भाव नहीं बदला"}
+${(()=>{const C=(S.priceLog||[]).filter(l=>dOf(l.ts)===d&&l.field==="cost");return C.length?"\n(खरीद भाव अपडेट — बिक्री भाव नहीं: "+C.length+" सब्ज़ी, "+(C[0].byName||"")+" "+ftime(C[0].ts)+")":""})()}
 
 ## 6. उधार (आज)
 ${(()=>{const L=(S.ledger||[]).filter(l=>l.date===d);return L.length?TH(["किसका","दिया/जमा","₹","कैसे","बिल","किसने"])+"\n"+T(L.map(l=>[l.partyName||"",l.type==="jama"?"जमा (वसूली)":"उधार दिया",num(l.amt),l.mode||"",l.billNo||"",l.byName||""])):"आज कोई उधार/वसूली नहीं"})()}
