@@ -1234,7 +1234,7 @@ async function guardBills(date,bills){
     if(!o){g.m[b.no]={fp,total:b.total,by:b.byName||"",ts:b.ts,c:b.cancelled?1:0};ch=true;continue}
     if(o.gone){o.gone=0;ch=true}
     if(o.fp!==fp){
-      const ownerCancel=(b.cancelled&&!o.c&&b.cancelledBy&&(b.cancelledBy===S.uid||!!b.cancelReason))||(!b.cancelled&&o.c&&b.restoredBy===S.uid);
+      const ownerCancel=(b.cancelled&&!o.c&&b.cancelledBy&&(b.cancelledBy===S.uid||!!b.cancelReason))||(!b.cancelled&&o.c&&b.restoredBy===S.uid)||(!!b.instConv&&b.instConv.fp===fp);
       if(!ownerCancel)await guardAlarm({kind:"bill",date,no:b.no,by:b.byName||"",msg:`बिल ${b.no} (${b.byName||""}) बदला गया: पहले ${rs(o.total)}, अब ${rs(b.total)}${b.cancelled&&!o.c?" · रद्द किया गया":""}`});
       Object.assign(o,{fp,total:b.total,c:b.cancelled?1:0});ch=true}
   }
@@ -1248,7 +1248,7 @@ async function guardLedger(){
     if(o.gone){o.gone=0;ch=true}
     if(o.fp!==fp){await guardAlarm({kind:"led",no:l.id,msg:`${o.party} के खाते की ${o.type==="udhar"?"उधार":"जमा"} एंट्री बदली गई: पहले ${rs(o.amt)}, अब ${rs(l.amt)}`});Object.assign(o,{fp,amt:l.amt});ch=true}
   }
-  for(const [id,o] of Object.entries(g.m)){if(!seen.has(id)&&!o.gone){o.gone=1;ch=true;if(!G.okdel.has(id)&&!Object.values(G.days).some(d=>d.m[id]&&d.m[id].c)&&!(S.dayBills||[]).some(b=>b.no===id&&b.cancelled))await guardAlarm({kind:"ledgone",no:id,msg:`${o.party} के खाते से ${rs(o.amt)} की ${o.type==="udhar"?"उधार":"जमा"} एंट्री मिटा दी गई (${o.by})`})}}
+  for(const [id,o] of Object.entries(g.m)){if(!seen.has(id)&&!o.gone){o.gone=1;ch=true;if(!G.okdel.has(id)&&!Object.values(G.days).some(d=>d.m[id]&&d.m[id].c)&&!(S.dayBills||[]).some(b=>b.no===id&&(b.cancelled||b.instConv)))await guardAlarm({kind:"ledgone",no:id,msg:`${o.party} के खाते से ${rs(o.amt)} की ${o.type==="udhar"?"उधार":"जमा"} एंट्री मिटा दी गई (${o.by})`})}}
   if(ch)await gset("g_ledger",g);
 }
 function guardHTML(){

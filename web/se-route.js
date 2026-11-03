@@ -238,6 +238,7 @@ SR.onDb=function(db){
   if(S.isOwner)db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.raw){R.day=dayFor();SR.renderRoute()}},()=>{});
   if(S.isOwner)setTimeout(()=>SR.autoOldUdhar(db),2500);
   if(S.isOwner)setTimeout(()=>SR.applyBoard(db),4500);
+  if(S.isOwner){setTimeout(()=>SR.applyInst(db),9000);setInterval(()=>{if(!SR._instDone)SR.applyInst(db)},5*60000)}
   if(S.isOwner)db.collection("live").onSnapshot(s=>{R.live=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route")SR.updateLive()},()=>{});
   else{setTimeout(SR.start,1500);setTimeout(SR.lockCheck,1200)}
 };
@@ -1065,6 +1066,50 @@ SR.applyBoard=async function(db){
       if(ch.length||add||off)toast((P.cost?"💰 खरीद भाव पक्के: ":"🪧 "+P.date.slice(8)+"-"+P.date.slice(5,7)+" के भाव: ")+ch.length+" बदले · "+add+" नई सब्ज़ी"+(off?" · "+off+" बंद":""));
     }
   }catch(e){SR._board=0}
+};
+/* 🏢 03-11: मुकेश भाई ने अपनी ही संस्थाओं को माल "उधार" (बिक्री भाव) में दिया — विक्रम जी के आदेश पर संस्था चालान (खरीद भाव) में बदलें।
+   उस दिन की मंडी खरीद चढ़ने के बाद ही चलता है (ताकि उसी दिन का असली खरीद भाव लगे); पुराना पूरा बिल bill.instConv.from में सुरक्षित, उधार एंट्री हटती है */
+const INST1={flag:"inst1",date:"2026-11-03",src:"विक्रम जी का आदेश 03-11: अपनी संस्था का माल उधार नहीं — खरीद भाव पर चालान",
+  bills:[["SE-79K9BE","रसोई"],["SE-H1GBDX","डोसा"],["SE-NSXQ9D","भैरव"],["SE-4CB77C","भैरव"],["SE-JYPDHZ","MH"]]};
+SR.INST1=INST1;
+SR.applyInst=async function(db,P){
+  P=P||INST1;if(!S.isOwner||S.demo||!db||SR._inst||SR._instDone)return;SR._inst=1;
+  try{
+    const fr=db.doc("ownerCfg/flags");const f=await fr.get();if(f.exists&&f.data()[P.flag]){SR._instDone=1;return}
+    const pq=await db.collection("purchases").where("date","==",P.date).get();
+    const purch=pq.docs.map(d=>({id:d.id,...d.data()})).filter(p=>!p.cancelled);
+    let night=false;try{const m=await db.doc("days/"+P.date+"/meta/stock").get();night=!!(m.exists&&m.data().nightTs)}catch(e){}
+    const ready=P.force||today()>P.date||(purch.length&&(night||new Date().getHours()>=21));
+    if(!ready)return;
+    const endTs=new Date(P.date+"T23:59:59+05:30").getTime();
+    const costFor=id=>{let q=0,a=0;purch.forEach(p=>(p.lines||[]).forEach(l=>{if(l.id===id){q+=num(l.qty);a+=num(l.amt)}}));if(q>0&&a>0)return r2(a/q);
+      let best=null;(S.purchHist||[]).forEach(p=>{if(p.cancelled||p.ts>endTs)return;(p.lines||[]).forEach(l=>{if(l.id===id&&num(l.rate)>0&&(!best||p.ts>best.ts))best={rate:num(l.rate),ts:p.ts}})});
+      if(best)return best.rate;const it=item(id);if(it&&it.lastBuy&&num(it.lastBuy.rate)>0)return num(it.lastBuy.rate);return it?num(it.cost):0};
+    const IN=insts(),now=Date.now(),out=[];
+    const lt=l=>l.name+" "+fq(l.qty,l.unit)+"×₹"+l.rate;
+    for(const [no,key] of P.bills){
+      const ref=db.doc("days/"+P.date+"/bills/"+no);const g=await ref.get();if(!g.exists)continue;const b=g.data();
+      if(b.mode==="inst"||b.cancelled||b.instConv)continue;
+      const inst=IN.find(n=>n.includes(key))||key;
+      const from={mode:b.mode||"",partyId:b.partyId||"",partyName:b.partyName||"",total:num(b.total),sub:num(b.sub),cost:num(b.cost),disc:num(b.disc),pay:b.pay||{},payMode:b.payMode||"",lines:b.lines||[]};
+      const lines=(b.lines||[]).map(l=>{const sale=num(l.rate),pr=costFor(l.id),rate=pr>0?r2(pr):sale;
+        const n={...l,saleRate:sale,rate,board:rate,cost:rate,changed:false,amt:l.free?0:r2(num(l.qty)*rate)};if(!(pr>0))n.noCost=true;return n});
+      const tot=r2(lines.reduce((a,l)=>a+num(l.amt),0));
+      const nb={...b,mode:"inst",partyId:"",partyName:inst,lines,sub:tot,total:tot,cost:tot,disc:0,
+        saleTotal:r2(lines.reduce((a,l)=>a+(l.free?0:num(l.qty)*num(l.saleRate)),0)),pay:{cash:0,upi:0,udhar:0},payMode:"inst",rateChanged:false,instRate:"purchase",settled:true};
+      const ed={ts:now,by:S.uid||"",byName:"विक्रम जी",before:from.lines.map(lt).join(", "),after:lines.map(lt).join(", "),
+        diff:"उधार खाता \""+from.partyName+"\" (बिक्री भाव ₹"+from.total+") → संस्था चालान "+inst+" (खरीद भाव ₹"+tot+")",totalBefore:from.total,totalAfter:tot,note:P.src};
+      nb.edits=[...(b.edits||[]),ed];nb.editCount=num(b.editCount)+1;
+      nb.instConv={ts:now,by:S.uid||"",src:P.src,from,fp:typeof fpBill==="function"?fpBill(nb):""};
+      await ref.set(nb);
+      if(num(from.pay.udhar)>0){try{G.okdel.add(no)}catch(x){}try{await db.doc("ledger/"+no).delete()}catch(x){}S.ledger=(S.ledger||[]).filter(l=>l.id!==no)}
+      const i=(S.dayBills||[]).findIndex(x=>x.no===no);if(i>-1&&S.billsDate===P.date)S.dayBills[i]=nb;
+      out.push({no,from:from.partyName,inst,before:from.total,after:tot});
+    }
+    await fr.set({[P.flag]:now,[P.flag+"List"]:out},{merge:true});SR._instDone=1;
+    if(out.length){const bf=r2(out.reduce((a,o)=>a+o.before,0)),af=r2(out.reduce((a,o)=>a+o.after,0));
+      toast("🏢 "+out.length+" उधार बिल अपनी संस्था के चालान बने (खरीद भाव): ₹"+bf+" → ₹"+af);try{renderPane()}catch(x){}}
+  }catch(e){}finally{SR._inst=0}
 };
 /* SF के साथ जोड़ */
 if(window.SF){const _o=SF.onDb;SF.onDb=function(db){_o(db);try{SR.onDb(db)}catch(e){}}}

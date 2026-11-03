@@ -503,6 +503,18 @@ async def main():
             await pg.wait_for_timeout(400)
             assert await pg.evaluate("(S.prevStock||{}).aloo&&S.prevStock.aloo.close") == 30, "02-11 night must be today's opening"
         print("board rates ok", bd, c1, p1)
+        # 🏢 अपनी संस्था को गया "उधार" बिल → खरीद भाव का संस्था चालान (एक बार, पुराना रूप सुरक्षित, उधार एंट्री हटे)
+        ic = await pg.evaluate("""(async()=>{const M=window.__MOCK__;const k='days/2026-11-03/bills';M[k]=M[k]||{};
+          M[k]['SE-79K9BE']={no:'SE-79K9BE',date:'2026-11-03',ts:Date.now()-3600e3,by:'u_mukesh',byName:'Mukesh Bhai Sub Ex',mode:'udhar',partyId:'p_mr',partyName:'marwar rasoi',
+            lines:[{id:'kheera',name:'खीरा',unit:'kg',qty:7,rate:50,amt:350},{id:'dhaniya',name:'धनिया',unit:'kg',qty:1,rate:180,amt:180}],sub:530,total:530,disc:0,pay:{cash:0,upi:0,udhar:530},payMode:'udhar',settled:true,cancelled:false};
+          M.ledger=M.ledger||{};M.ledger['SE-79K9BE']={ts:Date.now(),date:'2026-11-03',partyId:'p_mr',partyName:'marwar rasoi',type:'udhar',amt:530,billNo:'SE-79K9BE'};
+          M.purchases=M.purchases||{};M.purchases['pt_inst']={date:'2026-11-03',ts:Date.now(),lines:[{id:'kheera',qty:20,rate:30,amt:600}]};
+          delete M.ownerCfg.flags.inst1;SR._inst=0;SR._instDone=0;await SR.applyInst(S.db,{...SR.INST1,force:true});
+          const b=M[k]['SE-79K9BE'];const once=JSON.stringify(b);SR._instDone=0;await SR.applyInst(S.db,{...SR.INST1,force:true});
+          return [b.mode,b.partyName,b.lines[0].rate,b.lines[0].saleRate,b.lines[1].rate>0&&b.lines[1].rate<180,b.total===b.lines[0].amt+b.lines[1].amt,b.instConv.from.total,b.instConv.from.partyName,!M.ledger['SE-79K9BE'],M.ownerCfg.flags.inst1>0,JSON.stringify(M[k]['SE-79K9BE'])===once,b.edits.slice(-1)[0].diff]})()""")
+        assert ic[:11] == ["inst", "मारवाड़ रसोई (होटल)", 30, 50, True, True, 530, "marwar rasoi", True, True, True], ic
+        print("inst conversion ok", ic[11])
+
         await pg.evaluate("closeSheet()")
         assert not await pg.query_selector("[data-oldud]") or True
         # 📈 मालिक: टाइल पर मुनाफ़ा
