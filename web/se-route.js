@@ -237,6 +237,7 @@ const COLORS=["#22c55e","#f59e0b","#a855f7","#06b6d4","#ef4444"];
 SR.onDb=function(db){
   if(S.isOwner)db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.raw){R.day=dayFor();SR.renderRoute()}},()=>{});
   if(S.isOwner)setTimeout(()=>SR.autoOldUdhar(db),2500);
+  if(S.isOwner)setTimeout(()=>SR.autoOldUdhar2(db),6500);
   if(S.isOwner)setTimeout(()=>SR.applyBoard(db),4500);
   if(S.isOwner){setTimeout(()=>SR.applyInst(db),9000);setInterval(()=>{if(!SR._instDone)SR.applyInst(db)},5*60000)}
   if(S.isOwner)db.collection("live").onSnapshot(s=>{R.live=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route")SR.updateLive()},()=>{});
@@ -953,6 +954,46 @@ SR.autoOldUdhar=async function(db){
     if(n)toast("📥 कॉपी की पुरानी उधारी जुड़ गई: "+n+" एंट्री · "+rs(amt)+(skip.length?" ("+skip.length+" दिन पहले से ऐप में थे)":""));
     try{renderPane()}catch(x){}
   }catch(e){SR._oldAuto=0}
+};
+/* 📥 03-11: दूसरी किस्त — कमल भाई की रोज़ की कॉपी (13-10 से 02-11) की उधारी, जो विक्रम जी की उधार-किताब (ऊपर, 26-10 तक) में नहीं थी।
+   किताब वाले खातों में सिर्फ़ 27-10 के बाद की; बाकी खाते (किताब में नहीं) पूरे। जिस दिन ऐप-बिल का उधार पहले से है, वह दिन नहीं जुड़ता। */
+const OLD_UDHAR2=[
+  {pid:"officers-mess",name:"अफसर मेस",al:["अफसरमेस","अफ़सरमेस","ऑफिसरमेस","ऑफिसर्समेस","officersmess","officermess"],rows:[["2026-10-28",300],["2026-10-29",1180],["2026-10-30",500],["2026-10-31",220],["2026-11-02",500]]},
+  {pid:"jco-mess",name:"JCO मेस",al:["jcoमेस","jcomess","जेसीओमेस"],rows:[["2026-10-27",180],["2026-10-28",1480],["2026-10-30",1010],["2026-11-02",100]]},
+  {pid:"samosa-shop",name:"समोसा शॉप",al:["समोसा","samosa"],rows:[["2026-10-27",700]]},
+  {pid:"ajay-sir",name:"अजय सर",al:["अजयसर","ajaysir"],rows:[["2026-10-27",180]]},
+  {pid:"adm-commander",name:"एडम कमांडर",al:["एडम","admcommander","adamcommander"],rows:[["2026-10-13",470],["2026-10-14",240],["2026-10-16",470],["2026-10-17",460],["2026-10-21",140],["2026-10-22",70],["2026-10-23",360],["2026-10-24",190],["2026-10-25",220],["2026-11-02",535]]},
+  {pid:"mh-canteen",name:"MH",eq:["mh","एमएच"],rows:[["2026-10-13",1280],["2026-10-16",240],["2026-10-18",120],["2026-10-19",250],["2026-10-21",100],["2026-10-23",130],["2026-10-27",300],["2026-11-02",350]]},
+  {pid:"narpat",name:"नरपत भाई",al:["नरपत","narpat"],note:"अपनी टीम",rows:[["2026-10-22",700]]},
+  {pid:"ganesh",name:"गणेश",eq:["गणेश","गणेशभाई","ganesh"],note:"नारियल",rows:[["2026-10-17",60]]},
+  {pid:"mamu",name:"मामू",al:["मामू","mamu"],note:"10 नारियल",rows:[["2026-10-21",450]]},
+  {pid:"nepali-staff",name:"नेपाली स्टाफ",al:["नेपाली","nepali"],note:"पपीता",rows:[["2026-10-27",100]]},
+  {pid:"kesar-ji",name:"केसर जी",al:["केसर","kesar"],note:"अमरूद",rows:[["2026-11-02",25]]}];
+OLD_UDHAR2.forEach(g=>g.total=g.rows.reduce((a,r)=>a+r[1],0));
+SR.OLD_UDHAR2=OLD_UDHAR2;
+SR.autoOldUdhar2=async function(db){
+  if(!S.isOwner||S.demo||!db||SR._old2)return;SR._old2=1;
+  try{
+    const fr=db.doc("ownerCfg/flags");const f=await fr.get();if(f.exists&&f.data().oldUdhar2)return;
+    const [ps,ls]=await Promise.all([db.collection("parties").get(),db.collection("ledger").get()]);
+    const parties=ps.docs.map(d=>({id:d.id,...d.data()})),led=ls.docs.map(d=>({id:d.id,...d.data()}));
+    let n=0,amt=0;const skip=[];
+    const W=db.batch?db.batch():null;const put=(ref,d,o)=>W?W.set(ref,d,o):ref.set(d,o);
+    for(const g of OLD_UDHAR2){
+      let p=findP(parties,g);
+      if(!p){const d={name:g.name,phone:"",qtr:"",ts:Date.now(),by:S.uid||"",byName:biller()};await put(db.collection("parties").doc(g.pid),d,{merge:true});p={id:g.pid,...d};parties.push(p)}
+      for(const [i,r] of g.rows.entries()){
+        const id="o2_"+g.pid+"_"+r[0]+"_"+i;if(led.some(l=>l.id===id))continue;
+        if(led.some(l=>l.partyId===p.id&&l.date===r[0]&&l.type==="udhar")){skip.push(g.name+" "+fdate(r[0]).slice(0,5)+" ₹"+r[1]);continue}
+        const ent={ts:new Date(r[0]+"T12:00:00").getTime(),date:r[0],partyId:p.id,partyName:p.name,type:"udhar",opening:true,note:"कमल भाई की कॉपी से"+(g.note?" · "+g.note:""),amt:r[1],billNo:"",by:S.uid||"",byName:biller()};
+        await put(db.collection("ledger").doc(id),ent);led.push({id,...ent});n++;amt+=r[1];
+      }
+    }
+    await put(fr,{oldUdhar2:Date.now(),oldUdhar2N:n,oldUdhar2Amt:r2(amt),oldUdhar2Skip:skip},{merge:true});
+    if(W)await W.commit();
+    if(n)toast("📥 कॉपी (13-10 से 02-11) की बाकी उधारी जुड़ी: "+n+" एंट्री · "+rs(amt)+(skip.length?" ("+skip.length+" दिन पहले से ऐप में थे)":""));
+    try{renderPane()}catch(x){}
+  }catch(e){SR._old2=0}
 };
 /* ✏️ पुरानी (कॉपी वाली) उधार एंट्री बदलें/मिटाएँ — सिर्फ़ मालिक */
 SR.opEditBtn=function(l){return S.isOwner?` · <button class="lnk" data-opedit="${esc(l.id)}">✏️ बदलें</button>`:""};

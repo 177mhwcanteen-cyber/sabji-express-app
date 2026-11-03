@@ -497,6 +497,10 @@ async def main():
         print("auto imported", led, tot)
         assert led == 97 and tot == 33305, (led, tot)
         assert (await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar1")) > 0
+        await pg.wait_for_function("(window.__MOCK__.ownerCfg.flags||{}).oldUdhar2>0", timeout=15000)
+        o2 = await pg.evaluate("(()=>{const E=Object.entries(window.__MOCK__.ledger||{}).filter(([k])=>k.startsWith('o2_'));return [E.length,E.reduce((a,[k,v])=>a+v.amt,0),SR.OLD_UDHAR2.reduce((a,g)=>a+g.total,0),!!window.__MOCK__.parties['adm-commander'],E.filter(([k,v])=>v.partyName==='MH').length]})()")
+        print("old udhar 2", o2)
+        assert o2[0] + len(await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar2Skip||[]")) == 34 and o2[1] <= o2[2] == 13610 and o2[3] and o2[4] == 8, o2
         await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(500)
         assert not await pg.query_selector("[data-oldud]"), "manual import button should vanish"
         sid = await pg.evaluate("SR.findOldParty(S.parties,SR.OLD_UDHAR[0]).id")
