@@ -1197,8 +1197,11 @@ SF.copyDoc=null;
 SF.loadCopy=function(d){SF.copyDoc=null;if(!S.isOwner||S.demo||!S.db)return;S.db.doc("days/"+d+"/meta/copy").get().then(x=>{SF.copyDoc=x.exists?x.data():null;if(S.tab==="day")renderDay()}).catch(()=>{})};
 SF.copyCardHTML=function(){
   if(!S.isOwner)return "";const C=SF.copyDoc&&SF.copyDoc.day,N=SF.copyDoc&&SF.copyDoc.night;
+  const yd=dayAdd(today(),-1),d=S.billsDate;
   return `<div class="card2 cpy"><h3>🤖 कर्मचारी की कॉपी → AI → ऐप</h3>
-  <p class="note" style="margin:0 0 6px">कॉपी के पन्नों की फोटो किसी भी AI (Claude / ChatGPT / Gemini) में डालें, साथ में नीचे का प्रॉम्प्ट चिपकाएँ (तारीख भरें)। AI जो JSON दे, वह यहाँ चिपकाएँ — ऐप कॉपी बनाम ऐप का मिलान दिखाएगा। यह सिर्फ़ आपको दिखता है।</p>
+  <div class="cpd"><span>📅 पन्ना किस दिन का है?</span><div class="rt-chips">${[[today(),"आज"],[yd,"कल"]].map(([v,t])=>`<button class="chip" data-cpday="${v}" aria-pressed="${d===v}">${t} · ${fdate(v).slice(0,5)}</button>`).join("")}<input class="inp" type="date" id="cpyDate" value="${d}" aria-label="पन्ने की तारीख"></div>
+  <b class="cpd-now">अभी चुनी तारीख: ${fdate(d)}</b></div>
+  <p class="note" style="margin:6px 0">① ऊपर पन्ने की तारीख चुनें ② प्रॉम्प्ट कॉपी करें — उसमें यही तारीख अपने-आप लिखी होगी ③ AI (Claude / ChatGPT / Gemini) में पन्नों की फोटो + प्रॉम्प्ट ④ AI का JSON यहाँ चिपकाएँ — यह इसी तारीख में सेव होगा, पन्ने पर लिखी गलत तारीख से फर्क नहीं पड़ेगा। यह सिर्फ़ आपको दिखता है।</p>
   <div class="row2" style="margin:0"><button class="big ghost" data-cpp="day">📋 पूरे दिन का प्रॉम्प्ट</button><button class="big ghost" data-cpp="night">📋 सिर्फ़ रात का स्टॉक</button></div>
   <textarea class="inp" id="cpyIn" rows="3" placeholder="AI का जवाब (JSON) यहाँ चिपकाएँ" style="margin-top:8px;width:100%"></textarea>
   <button class="big" data-cpsave style="margin-top:6px">✓ पढ़ें और सेव करें</button>
@@ -1235,7 +1238,8 @@ SF.copyCompareHTML=function(C,N){
 };
 SF.copySave=async function(){
   const t=($("#cpyIn")||{}).value||"";let o;try{o=SF.parseCopy(t)}catch(e){toast("❌ "+e.message+" — AI का पूरा जवाब चिपकाएँ");return}
-  if(o.date&&o.date!==S.billsDate&&!confirm("AI की तारीख "+o.date+" है, ऐप में "+S.billsDate+" खुली है। फिर भी "+S.billsDate+" में सेव करें?"))return;
+  const aiDate=o.date;o.date=S.billsDate;/* तारीख हमेशा ऐप में चुनी हुई — पन्ने/AI की तारीख नहीं */
+  if(aiDate&&aiDate!==S.billsDate)toast("ℹ️ AI ने तारीख "+aiDate+" लिखी थी — "+fdate(S.billsDate)+" में सेव कर रहे हैं");
   const doc={...(SF.copyDoc||{}),ts:Date.now(),by:biller()};if(o.type==="sabji-night")doc.night=o;else doc.day=o;
   try{await S.db.doc("days/"+S.billsDate+"/meta/copy").set(doc);SF.copyDoc=doc;toast("✓ कॉपी का हिसाब सेव — नीचे मिलान देखें");renderDay()}catch(e){toast("सेव नहीं हुआ: "+(e.code||""))}
 };
@@ -1248,7 +1252,10 @@ SF.copyApplyNight=async function(){
   if(!S.stock.nightTs){S.stock.nightBy=by;S.stock.nightTs=now}
   await saveStock();renderDay();toast("🌙 "+n+" सब्ज़ी रात के स्टॉक में"+(w?" · "+w+" खराबी":"")+" चढ़ीं");
 };
+SF.setDayDate=function(d){if(!d||d===S.billsDate)return;S.billsDate=d;S.repDate=d;try{subBills()}catch(x){}setTimeout(()=>{try{renderDay()}catch(x){}},300)};
+document.addEventListener("change",e=>{if(e.target.id==="cpyDate"&&e.target.value)SF.setDayDate(e.target.value)});
 document.addEventListener("click",async e=>{
+  const cd=e.target.closest("[data-cpday]");if(cd){SF.setDayDate(cd.dataset.cpday);return}
   const p=e.target.closest("[data-cpp]");if(p){const t=(p.dataset.cpp==="day"?SF.PROMPT_DAY:SF.PROMPT_NIGHT).replace("तारीख = ____ (YYYY-MM-DD)","तारीख = "+S.billsDate);try{await navigator.clipboard.writeText(t);toast("📋 प्रॉम्प्ट कॉपी हुआ — AI में फोटो के साथ चिपकाएँ")}catch(x){const ta=$("#cpyIn");if(ta){ta.value=t;ta.select()}toast("प्रॉम्प्ट डिब्बे में है — कॉपी कर लें")}return}
   if(e.target.closest("[data-cpsave]")){SF.copySave();return}
   if(e.target.closest("[data-cpnight]")){SF.copyApplyNight();return}

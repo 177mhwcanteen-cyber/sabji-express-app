@@ -1006,7 +1006,24 @@ const PHOTO1={date:"2026-11-02",flag:"photo1",src:"विक्रम जी —
   photo:["parwal","harapyaj","moongfali","shakarkand","malta","kachchakela","mausami","semfali","haldi","sarson","lalaloo","sitafal","dragonfruit"],
   off:["moongfali","sitafal"],offNote:"13–31 अक्टूबर में कभी खरीदा नहीं गया — खरीदें तब चालू करें",
   stock:{date:"2026-11-01",note:"कमल भाई की कॉपी — 31-10 की रात का बचा माल (शुरुआती स्टॉक)",items:{seb:5,anar:7,amrood:7,malta:2.5,kiwi:15,nariyal:12,tarbooj:5,kaddu:15,kheera:5,bhindi:2.5,kela:7,adrak:1.5,lauki:3,harimirch:1,phoolgobhi:2,pattagobhi:2.5,nimbu:2.5,palak:2,makka:2,matar:2.5,gajar:1.5,shimla:1.7}}};
-const PACKS=[BOARD,BOARD2,COST1,PHOTO1];
+/* 03-11: कमल भाई की कॉपी (02-11) — रात का बचा माल + खराबी ऐप में, और कॉपी का पूरा हिसाब मिलान के लिए */
+const COPY1={date:"2026-11-02",flag:"copy1",src:"कमल भाई की कॉपी 02-11 (विक्रम जी की भेजी फोटो)",
+  night:{date:"2026-11-02",by:"कॉपी से (Claude) · विक्रम जी",
+    items:{amrood:2,seb:2,kiwi:10,nariyal:6,tarbooj:4,papita:3,pyaj:12,aloo:30,phoolgobhi:3,pattagobhi:2,gajar:0.5,beans:0.5,nimbu:2,chukandar:1,kheera:7,kaddu:3,anar:2,malta:1.5,shimla:0.5,sahjan:0.3},
+    zero:["tamatar","kela","dhaniya","adrak","harimirch","motimirch","bhindi","lauki","matar","palak","makka","podina"],
+    waste:{papita:2.5,matar:3,aloo:2,harimirch:3,seb:1,amrood:1,kaddu:2,gajar:0.5,tamatar:2,kela:3}},
+  copy:{day:{type:"sabji-copy",date:"2026-11-02",
+    kharid:[{name:"खीरा",qty:30,unit:"kg",rate:30,amount:900},{name:"धनिया",qty:5,unit:"kg",rate:50,amount:250},{name:"पोदीना",qty:1,unit:"kg",rate:50,amount:50},{name:"टमाटर",qty:30,unit:"kg",rate:15,amount:450},{name:"प्याज",qty:29.5,unit:"kg",rate:50,amount:1480},{name:"आलू",qty:53,unit:"kg",rate:13,amount:690},{name:"केला",qty:20,unit:"kg",rate:32.5,amount:650},{name:"पपीता",qty:8.5,unit:"kg",rate:50,amount:420},{name:"फूलगोभी",qty:8,unit:"kg",rate:35,amount:280},{name:"पत्तागोभी",qty:6,unit:"kg",rate:25,amount:150},{name:"गाजर",qty:3.5,unit:"kg",rate:54,amount:188},{name:"अदरक",qty:3.5,unit:"kg",rate:60,amount:210},{name:"निम्बू",qty:3,unit:"kg",rate:90,amount:270},{name:"बिन्स",qty:2,unit:"kg",rate:90,amount:180},{name:"मोटी मिर्च",qty:1,unit:"kg",rate:50,amount:50},{name:"G4",qty:5,unit:"kg",rate:50,amount:250},{name:"शिमला",qty:2.5,unit:"kg",rate:48,amount:120},{name:"चुकंदर",qty:1.5,unit:"kg",rate:40,amount:60}],
+    kharidTotalWritten:6700,
+    sanstha:[{to:"मारवाड़ रसोई",name:"खीरा",qty:5,unit:"kg",amount:150},{to:"मारवाड़ रसोई",name:"मोटी मिर्च",qty:1,unit:"kg",amount:50},{to:"मारवाड़ रसोई",name:"निम्बू",qty:1,unit:"kg",amount:90},{to:"मारवाड़ रसोई",name:"अदरक",qty:1,unit:"kg",amount:60},{to:"मारवाड़ रसोई",name:"धनिया",qty:1,unit:"kg",amount:50},{to:"मारवाड़ रसोई",name:"फूलगोभी",qty:2,unit:"kg",amount:70},{to:"मारवाड़ रसोई",name:"खीरा",qty:5,unit:"kg",amount:150}],
+    sale:{online:6665,cash:2150,udhar:[{name:"अफसर मेस",amount:500},{name:"JCO मेस",amount:100},{name:"MH",amount:350},{name:"एडम कमांडर",amount:535},{name:"केसर जी (अमरूद)",amount:25}],totalWritten:10325,bachatWritten:4245},
+    kharch:[{what:"टैक्सी किराया (MH)",amount:250}],
+    unclear:["प्याज का वज़न कॉपी में 20½ जैसा लिखा, ऐप में 29.5 kg — रकम ₹1,480 (ऐप ₹1,475)","गाजर से चुकंदर तक 8 लाइनों का जोड़ ₹1,328, ब्रैकेट में ₹1,380 लिखा (+₹52)","केला का वज़न कॉपी में नहीं — ऐप में 20 kg","धनिया: कॉपी 5 kg ₹250 + पोदीना ₹50, ऐप में धनिया 6 kg ₹450","तरबूज '4' — kg या नग साफ़ नहीं"]},
+   night:{type:"sabji-night",date:"2026-11-02",night:[],kharab:[],unclear:[]}}};
+const HN={amrood:"अमरूद",seb:"सेब",kiwi:"कीवी",nariyal:"नारियल",tarbooj:"तरबूज",papita:"पपीता",pyaj:"प्याज",aloo:"आलू",phoolgobhi:"फूलगोभी",pattagobhi:"पत्तागोभी",gajar:"गाजर",beans:"बिन्स",nimbu:"निम्बू",chukandar:"चुकंदर",kheera:"खीरा",kaddu:"कद्दू",anar:"अनार",malta:"नारंगी",shimla:"शिमला",sahjan:"सहजन",matar:"मटर",harimirch:"मिर्ची",tamatar:"टमाटर",kela:"केला"};
+COPY1.copy.night.night=Object.entries(COPY1.night.items).map(([id,q])=>({name:HN[id]||id,qty:q,unit:["kiwi","nariyal"].includes(id)?"pc":"kg"}));
+COPY1.copy.night.kharab=Object.entries(COPY1.night.waste).map(([id,q])=>({name:HN[id]||id,qty:q,unit:"kg"}));
+const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1];
 SR.BOARD=BOARD;SR.PACKS=PACKS;
 SR.applyBoard=async function(db){
   if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
@@ -1027,6 +1044,13 @@ SR.applyBoard=async function(db){
         await put(db.collection("priceLog").doc("rc"+id+now.toString(36)),{itemId:id,name:it.name,field:"cost",old:+it.cost||0,new:cost,ts:now,by:S.uid||"",byName:"विक्रम जी",note:src})}
       for(const id of (P.off||[])){const it=items.find(x=>x.id===id);if(it&&it.active!==false){await upd(db.collection("items").doc(id),{active:false,offNote:(P.offNote||"बिकता नहीं")+" — "+P.date});off++}}
       let ph=0;for(const id of (P.photo||[])){const it=items.find(x=>x.id===id);if(it&&!it.photo){await upd(db.collection("items").doc(id),{photo:"b"});ph++}}
+      let cpn=0;if(P.night){const ref=db.doc("days/"+P.night.date+"/meta/stock");const cur=await ref.get();const D0=cur.exists?cur.data():{};const I={...(D0.items||{})};const wl=(D0.wlog||[]).slice();const by=P.night.by;
+        const has=id=>I[id]&&I[id].close!==undefined&&I[id].close!=="";
+        Object.entries(P.night.items).forEach(([id,q])=>{if(!items.find(x=>x.id===id)||has(id))return;I[id]={...(I[id]||{}),close:q,closeBy:by,closeTs:now,src:"copy"};cpn++});
+        (P.night.zero||[]).forEach(id=>{if(!items.find(x=>x.id===id)||has(id))return;I[id]={...(I[id]||{}),close:0,closeBy:by+" (सूची में नहीं = खत्म)",closeTs:now,src:"copy"};cpn++});
+        Object.entries(P.night.waste||{}).forEach(([id,q])=>{const it=items.find(x=>x.id===id);if(!it||num(I[id]&&I[id].waste)>0)return;I[id]={...(I[id]||{}),waste:q,wasteSrc:"copy"};wl.push({id,name:it.name,unit:it.unit,qty:q,reason:"कॉपी में खराब लिखा",ts:now,by:S.uid||"",byName:by})});
+        await put(ref,{items:I,wlog:wl,nightBy:D0.nightBy||by,nightTs:D0.nightTs||now,nightSrc:"copy",ts:now,by:S.uid||"",byName:"विक्रम जी"},{merge:true});
+        if(P.copy)await put(db.doc("days/"+P.date+"/meta/copy"),{...P.copy,ts:now,by:"विक्रम जी (Claude से)"},{merge:true});}
       let stk=0;if(P.stock){const ref=db.doc("days/"+P.stock.date+"/meta/stock");const cur=await ref.get();const I=(cur.exists&&cur.data().items)||{};
         if(!Object.values(I).some(o=>o&&o.close!==undefined&&o.close!=="")){const items2={...I};for(const [id,q] of Object.entries(P.stock.items)){if(!items.find(x=>x.id===id))continue;items2[id]={...(I[id]||{}),close:q,closeBy:"विक्रम जी",closeTs:now,closeNote:P.stock.note};stk++}
           await put(ref,{items:items2,nightBy:"विक्रम जी",nightTs:now,openNote:P.stock.note,ts:now,by:S.uid||"",byName:"विक्रम जी"},{merge:true})}}
@@ -1036,6 +1060,7 @@ SR.applyBoard=async function(db){
         await put(db.collection("items").doc(a.id),d);add++}
       await put(fr,{[P.flag]:now,[P.flag+"Changed"]:ch,[P.flag+"Added"]:add},{merge:true});
       if(W)await W.commit();
+      if(cpn){toast("🌙 "+fdate(P.night.date)+" का रात का बचा माल ("+cpn+" सब्ज़ी) + खराबी ऐप में चढ़ी — कॉपी से");if(dayAdd(S.billsDate||today(),-1)===P.night.date)db.doc("days/"+P.night.date+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day"&&typeof renderDay==="function")renderDay()}).catch(()=>{});if(S.billsDate===P.date&&window.SF)SF.loadCopy(P.date);continue}
       if(ph||stk){toast("📸 "+ph+" फोटो लगीं"+(off?" · "+off+" सामान बंद (कभी खरीदा नहीं)":"")+(stk?" · 📦 "+stk+" सब्ज़ियों का शुरुआती स्टॉक चढ़ा":""));if(stk&&dayAdd(S.billsDate||today(),-1)===P.stock.date)db.doc("days/"+P.stock.date+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day"&&typeof renderDay==="function")renderDay()}).catch(()=>{});continue}
       if(ch.length||add||off)toast((P.cost?"💰 खरीद भाव पक्के: ":"🪧 "+P.date.slice(8)+"-"+P.date.slice(5,7)+" के भाव: ")+ch.length+" बदले · "+add+" नई सब्ज़ी"+(off?" · "+off+" बंद":""));
     }
