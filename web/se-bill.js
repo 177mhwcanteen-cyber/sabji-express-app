@@ -179,7 +179,7 @@ SB.editSheet=function(b){
   const E=(b.lines||[]).map(l=>({...l}));let q="";
   const step=l=>l.unit==="kg"?0.25:1;
   const draw=()=>{
-    const tot=sumLines(E);
+    const tot=Math.round(sumLines(E));
     const L=q?S.items.filter(i=>i.active!==false&&!i.virtual&&(+i.sale||0)>0&&(i.name+" "+(window.SN?SN.en(i):"")+" "+i.id).toLowerCase().includes(q.toLowerCase())).slice(0,12):[];
     $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिल बदलें"><div class="grab"></div>
     <div class="sh-head ppc-sh"><h3>✏️ बिल बदलें <small class="note">· ${esc(b.no)}</small></h3><button class="x" data-close aria-label="बंद करें">✕</button></div>
@@ -199,7 +199,7 @@ SB.editSheet=function(b){
   sh.oninput=e=>{
     if(e.target.id==="sbeQ"){q=e.target.value;draw();const f=$("#sbeQ");if(f){f.focus();try{f.setSelectionRange(q.length,q.length)}catch(x){}}return}
     const qi=e.target.closest("[data-sbq]");if(qi){setQ(+qi.dataset.sbq,num(qi.value));const row=qi.closest(".sbe-row");row.querySelector(".sbe-a").textContent="₹"+r2(E[+qi.dataset.sbq].amt);row.classList.toggle("gone",E[+qi.dataset.sbq].qty<=0);
-      const t=sumLines(E);sh.querySelector(".settle-sum b").textContent=rs(t);sh.querySelector("[data-sbsave]").textContent="💾 बदलाव सेव करें · "+rs(t)}
+      const t=Math.round(sumLines(E));sh.querySelector(".settle-sum b").textContent=rs(t);sh.querySelector("[data-sbsave]").textContent="💾 बदलाव सेव करें · "+rs(t)}
   };
   sh.onclick=async e=>{
     if(e.target.matches("[data-close]")){closeSheet();return}
@@ -218,13 +218,13 @@ async function saveEdit(b,E){
   if(!lines.length){toast("सारे सामान हटाने हैं तो बिल रद्द की अर्ज़ी भेजें");return}
   const sig=L=>L.map(l=>l.id+":"+(+l.qty).toFixed(3)).sort().join("|");
   if(sig(lines)===sig(before)){toast("कुछ नहीं बदला");SB.settleSheet(b);return}
-  const total=sumLines(lines),totalBefore=num(b.total);
+  const subX=sumLines(lines),total=Math.round(subX),totalBefore=num(b.total);/* कुल रकम पूरे रुपये में — राउंड ऑफ = total − sub */
   const diff=[];const bm=new Map(before.map(l=>[l.id+"|"+l.name,l]));
   lines.forEach(l=>{const o=bm.get(l.id+"|"+l.name);if(!o)diff.push("+ "+lineTxt(l));else if(Math.abs(o.qty-l.qty)>0.0005)diff.push(l.name+" "+fq(o.qty,l.unit)+" → "+fq(l.qty,l.unit));bm.delete(l.id+"|"+l.name)});
   bm.forEach(o=>diff.push("− "+o.name+" "+fq(o.qty,o.unit)+" हटाया"));
   const ed={ts:Date.now(),by:S.uid||"",byName:biller(),before:before.map(lineTxt).join(", "),after:lines.map(lineTxt).join(", "),diff:diff.join("; "),totalBefore,totalAfter:total};
   const edits=[...(b.edits||[]),ed];
-  const ch={lines,sub:total,total,cost:r2(lines.reduce((a,l)=>a+num(l.cost)*num(l.qty),0)),rateChanged:lines.some(l=>l.changed),edits,editCount:edits.length};
+  const ch={lines,sub:subX,total,cost:r2(lines.reduce((a,l)=>a+num(l.cost)*num(l.qty),0)),rateChanged:lines.some(l=>l.changed),edits,editCount:edits.length};
   try{
     // गिने हुए (पीस) सामान का स्टॉक: पुराना वापस, नया घटाओ
     const oldP=trackedPairs(b.lines||[],1),newP=trackedPairs(lines,-1);

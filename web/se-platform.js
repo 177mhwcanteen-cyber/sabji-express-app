@@ -272,6 +272,7 @@ SE.receiptCanvas=function(b,o,widthPx){
   DASH();
   const sub=r2(b.sub!=null?b.sub:(b.lines||[]).reduce((a,l)=>a+(l.amt||0),0));
   if(b.disc){LR("जोड़",`₹${sub}`,fs(18));LR("छूट",`−₹${b.disc}`,fs(18))}
+  {const ro=window.SF&&SF.roff?SF.roff(b):0;if(ro)LR("जोड़ ₹"+r2(b.sub!=null?b.sub:sub)+" · राउंड ऑफ",(ro>0?"+":"−")+"₹"+Math.abs(ro).toFixed(2),fs(14))}
   LR("कुल रकम",`₹${b.total}`,fs(30),true);
   if(b.pay&&o.paid!==false&&!o.stampL){const p=b.pay;const parts=[p.cash?"नकद ₹"+p.cash:"",p.upi?"UPI ₹"+p.upi:"",p.udhar?"उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T("भुगतान: "+parts.join(" · "),fs(16),"l")}
   if(o.balance!=null)LR("खाते में कुल बाकी",`₹${o.balance}`,fs(18),true);

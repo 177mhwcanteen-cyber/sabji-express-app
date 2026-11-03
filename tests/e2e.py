@@ -126,6 +126,10 @@ async def main():
         await pg.click("[data-sbsave]"); await pg.wait_for_selector("[data-sbok]"); await pg.wait_for_timeout(600)
         b0 = await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))")[0] if False else (await pg.evaluate("Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v))"))[0]
         assert b0.get("editCount") == 1 and "प्याज" in b0["edits"][0]["diff"] and b0["total"] > 85, b0
+        assert b0["total"] == round(b0["total"]) and abs(b0["total"] - b0["sub"]) < 1, (b0["total"], b0["sub"])
+        if abs(b0["total"] - b0["sub"]) >= 0.01:
+            assert "राउंड ऑफ" in await pg.inner_text("#sheet .ppc-sum"), await pg.inner_text("#sheet .ppc-sum")
+            await pg.screenshot(path=f"{SHOTS}/29-roundoff.png")
         print("edit after save ok:", b0["edits"][0]["diff"], b0["edits"][0]["totalBefore"], "->", b0["total"])
         await pg.click('[data-sbpay="cash"]'); await pg.wait_for_timeout(150)
         await pg.fill("#sbGiven", "200"); await pg.wait_for_timeout(100)

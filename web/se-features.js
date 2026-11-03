@@ -1006,7 +1006,7 @@ SF.compactPaperHTML=function(b,o){
   ${(b.lines||[]).map((l,i)=>`<tr${ed?` data-edit="${i}"`:o.tap?` data-sbrow="${i}" class="tap"`:""}><td>${i+1}</td><td>${esc(l.name)}${window.SN&&SN.en(l.name)?` <small class="pp-en">${esc(SN.en(l.name))}</small>`:""}${l.changed?' <span class="pp-chg">भाव बदला</span>':""}${l.free?' <span class="pp-chg">मुफ्त</span>':""}</td><td class="r">${fq(l.qty,l.unit).replace(" कि.ग्रा"," kg")}</td><td class="r">${l.free?"—":"₹"+l.rate}</td><td class="r"><b>₹${l.amt}</b></td>${ed?`<td><button class="pp-x" data-del="${i}" aria-label="${esc(l.name)} हटाएँ">✕</button></td>`:""}</tr>`).join("")}
   </tbody></table>
   ${b.disc?`<div class="pp-row"><span>जोड़ ₹${sub}</span><span>छूट −₹${b.disc}</span></div>`:""}
-  <div class="ppc-sum"><span>कुल रकम · ${(b.lines||[]).length} सामान</span><b>₹${b.total}</b></div>
+  <div class="ppc-sum"><span>कुल रकम · ${(b.lines||[]).length} सामान${SF.roff(b)?`<small class="roff">जोड़ ₹${r2(num(b.sub!=null?b.sub:sub))} · ${SF.roffTxt(SF.roff(b))}</small>`:""}</span><b>₹${b.total}</b></div>
   ${b.mode==="inst"?"":`<div class="ppc-row3">${stampHTML(SF.stampPay(b,o.hint))}${qr?`<div class="ppc-qr" id="${o.qrId||"ppqr"}"></div>`:"<div></div>"}${stampHTML(SF.stampBy(b))}</div>
   ${qr?`<div class="ppc-upi">📱 स्कैन करके भुगतान · UPI: ${esc(upiId())}</div>`:""}`}
   </div>`;
@@ -1027,6 +1027,7 @@ SF.paperHTML=function(b,o){
   </tbody></table>
   <div class="pp-dash"></div>
   ${b.disc?`<div class="pp-row"><span>जोड़</span><span>₹${sub}</span></div><div class="pp-row"><span>छूट</span><span>−₹${b.disc}</span></div>`:""}
+  ${SF.roff(b)?`<div class="pp-row roff"><span>जोड़ ₹${r2(num(b.sub!=null?b.sub:sub))}</span><span>${SF.roffTxt(SF.roff(b))}</span></div>`:""}
   <div class="pp-total"><span>कुल रकम</span><b>₹${b.total}</b></div>
   <div class="pp-row note"><span>${(b.lines||[]).length} सामान</span><span>${b.partyId&&!ed?"खाते में कुल बाकी ₹"+r2(bal(b.partyId)):""}</span></div>
   ${b.cancelled?`<div class="pp-stamp red">रद्द · ${esc(b.cancelReason||"")}</div>`:""}
@@ -1141,10 +1142,13 @@ SF.purchA4HTML=function(){
 SF.lineCost=function(l,date){const it=l.id?item(l.id):null;if(!it)return num(l.cost);
   const b=buyOf(it.id,S.purchHist.filter(p=>!p.cancelled&&p.date===(date||today())));if(b.q>0)return r2(b.a/b.q);
   if(num(l.cost)>0)return num(l.cost);return num(SF.costOf(it))};
+/* राउंड ऑफ: कुल रकम पूरे रुपये में, जोड़ और कुल का फर्क (संस्था में नहीं) */
+SF.roff=function(b){if(!b||b.mode==="inst")return 0;const sub=b.sub!=null?num(b.sub):(b.lines||[]).reduce((a,l)=>a+num(l.amt),0);const r=r2(num(b.total)-(sub-num(b.disc)));return Math.abs(r)>=0.01&&Math.abs(r)<1?r:0};
+SF.roffTxt=r=>"राउंड ऑफ "+(r>0?"+":"−")+"₹"+Math.abs(r).toFixed(2);
 SF.billProfit=function(b){
   if(!b||b.cancelled)return null;if(b.mode==="inst")return {p:0,pct:0,inst:true,miss:0};
   let p=0,miss=0;(b.lines||[]).forEach(l=>{if(l.id==="xyz"){p+=num(l.amt);return}const c=SF.lineCost(l,b.date);if(!(c>0))miss++;p+=(l.free?0:num(l.amt))-num(l.qty)*c});
-  p=r2(p-num(b.disc));return {p,pct:num(b.total)>0?Math.round(p/num(b.total)*100):0,miss}};
+  p=r2(p-num(b.disc)+SF.roff(b));return {p,pct:num(b.total)>0?Math.round(p/num(b.total)*100):0,miss}};
 SF.billProfitTag=function(b){const x=SF.billProfit(b);if(!x)return "";if(x.inst)return '<small class="pf z">खरीद भाव</small>';
   return `<small class="pf ${x.p<0?"neg":x.pct<20?"low":""}">${x.p<0?"घाटा":"फायदा"} ₹${Math.abs(Math.round(x.p))} · ${x.pct}%${x.miss?" *":""}</small>`};
 SF.profitKpiHTML=function(L){const P=L.map(SF.billProfit).filter(Boolean);const p=r2(P.reduce((a,x)=>a+x.p,0)),t=r2(L.filter(b=>b.mode!=="inst").reduce((a,b)=>a+num(b.total),0));
