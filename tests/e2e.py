@@ -466,6 +466,7 @@ async def main():
         import json as _j
         dj["date"] = await pg.evaluate("S.billsDate")
         await pg.fill("#cpyIn", "यह रहा:\n```json\n" + _j.dumps(dj, ensure_ascii=False) + "\n```"); await pg.click("[data-cpsave]"); await pg.wait_for_timeout(800)
+        await pg.wait_for_function("(document.querySelector('#p-day .cpy')||{}).innerText?.includes('खरीद — कॉपी बनाम ऐप')", timeout=6000)
         ctx2 = await pg.inner_text("#p-day .cpy"); assert "बिक्री — कॉपी बनाम ऐप" in ctx2 and "खरीद — कॉपी बनाम ऐप" in ctx2 and "संस्था — कॉपी" in ctx2 and "पढ़ी नहीं" in ctx2, ctx2[:600]
         nj = {"type":"sabji-night","date":dj["date"],"night":[{"name":"सेब","qty":2,"unit":"kg"},{"name":"तरबुज","qty":4,"unit":"kg"},{"name":"G4","qty":1,"unit":"kg"},{"name":"प्याज","qty":12,"unit":"kg"}],"kharab":[{"name":"पपीता","qty":2.5,"unit":"kg"}],"unclear":[]}
         await pg.fill("#cpyIn", _j.dumps(nj, ensure_ascii=False)); await pg.click("[data-cpsave]"); await pg.wait_for_selector("[data-cpnight]")

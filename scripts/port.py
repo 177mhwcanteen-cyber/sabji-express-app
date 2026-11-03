@@ -390,6 +390,8 @@ rep('<a class="big ghost" style="margin-top:8px" target="_blank" rel="noopener" 
 rep('data-remone="1">🟢 WhatsApp पर बकाया याद दिलाएँ</a>', 'data-remone="1">🟢 WhatsApp पर बकाया याद दिलाएँ</a>${p.hide?"-->":""}')
 rep('placeholder="जैसे 5000"></label>`:""}', 'placeholder="जैसे 5000"></label><button class="big ghost" data-phide="${esc(p.id)}" style="margin-top:8px">${p.hide?"👁 रकम फिर दिखाएँ (वसूली वाला खाता)":"🔒 रकम छिपाएँ — वसूली नहीं, सिर्फ़ नोट"}</button>`:""}')
 rep('  if(b.partyId){t+=`📒 खाते में कुल बाकी: *₹${r2(bal(b.partyId))}*\\n`}', '  if(b.partyId&&bal(b.partyId)>0){t+=`📒 खाते में कुल बाकी: *₹${r2(bal(b.partyId))}*\\n`}')
+# v37: नया लोगो — ऊपर कोने में भी
+s = s.replace('<i class="lg" aria-hidden="true" title="सब्ज़ी एक्सप्रेस · जालीपा कैंट">🥬</i>', '<i class="lg" aria-hidden="true" title="सब्ज़ी एक्सप्रेस · जालीपा कैंट"><img src="icon.png" alt="" style="width:100%;height:100%;border-radius:9px;display:block"></i>', 1)
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")
