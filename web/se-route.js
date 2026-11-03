@@ -237,7 +237,7 @@ const COLORS=["#22c55e","#f59e0b","#a855f7","#06b6d4","#ef4444"];
 SR.onDb=function(db){
   if(S.isOwner)db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.raw){R.day=dayFor();SR.renderRoute()}},()=>{});
   if(S.isOwner)setTimeout(()=>SR.autoOldUdhar(db),2500);
-  if(S.isOwner)setTimeout(async()=>{await SR.autoOldUdhar2(db);await SR.autoOldUdhar3(db)},6500);
+  if(S.isOwner)setTimeout(async()=>{await SR.autoOldUdhar2(db);await SR.autoOldUdhar3(db);await SR.autoInst2(db)},6500);
   if(S.isOwner)setTimeout(()=>SR.applyBoard(db),4500);
   if(S.isOwner){setTimeout(()=>SR.applyInst(db),9000);setInterval(()=>{if(!SR._instDone)SR.applyInst(db)},5*60000)}
   if(S.isOwner)db.collection("live").onSnapshot(s=>{R.live=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route")SR.updateLive()},()=>{});
@@ -1197,6 +1197,84 @@ SR.applyInst=async function(db,P){
     if(out.length){const bf=r2(out.reduce((a,o)=>a+o.before,0)),af=r2(out.reduce((a,o)=>a+o.after,0));
       toast("🏢 "+out.length+" उधार बिल अपनी संस्था के चालान बने (खरीद भाव): ₹"+bf+" → ₹"+af);try{renderPane()}catch(x){}}
   }catch(e){}finally{SR._inst=0}
+};
+/* =============== 🏢 अपनी संस्थाएँ उधार में नहीं (03-11, विक्रम जी) =============== */
+const INST_K=[[/रसोई|rasoi|मारवाड़\s*रसोई/i,"रसोई","मारवाड़ रसोई (होटल)"],[/डोसा|dosa|रामविनायक/i,"डोसा","रामविनायक डोसा पॉइंट"],[/भैरव|bhrev|bhairav|bherav|jasai|जसाई/i,"भैरव","15 भैरव कैंटीन (जसाई)"],[/mh\s*(wet\s*)?canteen|एमएच|177\s*mh|mh\s*(वेट\s*)?कैंटीन|^\s*mh\s*$/i,"MH","177 MH कैंटीन"]];
+SR.instOf=function(name){const n=String(name||"");for(const [re,key,def] of INST_K)if(re.test(n)){const IN=typeof insts==="function"?insts():[];return IN.find(x=>x.includes(key))||def}return ""};
+const devId=()=>{try{let d=localStorage.getItem("se_dev");if(!d){d="d"+Math.random().toString(36).slice(2,9);localStorage.setItem("se_dev",d)}return d}catch(e){return "d?"}};
+const devTxt=()=>{const u=navigator.userAgent||"";const m=u.match(/Android[^;)]*;\s*([^;)]+)/);return (m?m[1]:/iPhone/.test(u)?"iPhone":/Windows/.test(u)?"Windows कंप्यूटर":"ब्राउज़र").trim().slice(0,40)};
+/* किसी उधार-बिल को संस्था चालान (खरीद भाव) में बदलो — पुराना पूरा रूप bill.instConv.from में */
+SR.costForDay=async function(db,date){
+  let purch=[];try{const pq=await db.collection("purchases").where("date","==",date).get();purch=pq.docs.map(d=>({id:d.id,...d.data()})).filter(p=>!p.cancelled)}catch(e){}
+  const endTs=new Date(date+"T23:59:59+05:30").getTime();
+  const f=id=>{let q=0,a=0;purch.forEach(p=>(p.lines||[]).forEach(l=>{if(l.id===id){q+=num(l.qty);a+=num(l.amt)}}));if(q>0&&a>0)return r2(a/q);
+    let best=null;(S.purchHist||[]).forEach(p=>{if(p.cancelled||p.ts>endTs)return;(p.lines||[]).forEach(l=>{if(l.id===id&&num(l.rate)>0&&(!best||p.ts>best.ts))best={rate:num(l.rate),ts:p.ts}})});
+    if(best)return best.rate;const it=item(id);if(it&&it.lastBuy&&num(it.lastBuy.rate)>0)return num(it.lastBuy.rate);return it?num(it.cost):0};
+  f.purch=purch;return f};
+SR.convToInst=async function(db,date,no,inst,src,costFor){
+  const ref=db.doc("days/"+date+"/bills/"+no);const g=await ref.get();if(!g.exists)return null;const b=g.data();
+  if(b.mode==="inst"||b.cancelled||b.instConv)return null;
+  const now=Date.now(),lt=l=>l.name+" "+fq(l.qty,l.unit)+"×₹"+l.rate;
+  const from={mode:b.mode||"",partyId:b.partyId||"",partyName:b.partyName||"",total:num(b.total),sub:num(b.sub),cost:num(b.cost),disc:num(b.disc),pay:b.pay||{},payMode:b.payMode||"",lines:b.lines||[]};
+  const lines=(b.lines||[]).map(l=>{const sale=num(l.rate),pr=costFor(l.id),rate=pr>0?r2(pr):sale;const n={...l,saleRate:sale,rate,board:rate,cost:rate,changed:false,amt:l.free?0:r2(num(l.qty)*rate)};if(!(pr>0))n.noCost=true;return n});
+  const tot=r2(lines.reduce((a,l)=>a+num(l.amt),0));
+  const nb={...b,mode:"inst",partyId:"",partyName:inst,lines,sub:tot,total:tot,cost:tot,disc:0,saleTotal:r2(lines.reduce((a,l)=>a+(l.free?0:num(l.qty)*num(l.saleRate)),0)),pay:{cash:0,upi:0,udhar:0},payMode:"inst",rateChanged:false,instRate:"purchase",settled:true};
+  const ed={ts:now,by:S.uid||"",byName:"विक्रम जी",before:from.lines.map(lt).join(", "),after:lines.map(lt).join(", "),diff:"उधार खाता \""+from.partyName+"\" (बिक्री भाव ₹"+from.total+") → संस्था चालान "+inst+" (खरीद भाव ₹"+tot+")",totalBefore:from.total,totalAfter:tot,note:src};
+  nb.edits=[...(b.edits||[]),ed];nb.editCount=num(b.editCount)+1;nb.instConv={ts:now,by:S.uid||"",src,from,fp:typeof fpBill==="function"?fpBill(nb):""};
+  await ref.set(nb);
+  if(num(from.pay.udhar)>0){try{G.okdel.add(no)}catch(x){}try{await db.doc("ledger/"+no).delete()}catch(x){}S.ledger=(S.ledger||[]).filter(l=>l.id!==no)}
+  const i=(S.dayBills||[]).findIndex(x=>x.no===no);if(i>-1&&S.billsDate===date)S.dayBills[i]=nb;
+  return {no,date,from:from.partyName,inst,before:from.total,after:tot};
+};
+/* खाता हटाना (सिर्फ़ मालिक) — असल में मिटता नहीं: "हटाया गया" निशान, कौन/कब/किस फ़ोन से, नीचे की सूची में दिखता है */
+SR.delParty=async function(p,why,extra){
+  const d={deleted:true,deletedBy:S.uid||"",deletedByName:"विक्रम जी (मालिक)",deletedTs:Date.now(),deletedDev:devId(),deletedDevTxt:devTxt(),deleteWhy:why||"",oldBal:typeof balRaw==="function"?balRaw(p.id):bal(p.id),...(extra||{})};
+  if(window.SR&&SR.locNow&&SR.locNow())d.deletedLoc=SR.locNow();
+  if(!S.demo)await S.db.collection("parties").doc(p.id).set(d,{merge:true});
+  Object.assign(p,d);S.parties=(S.parties||[]).filter(x=>x.id!==p.id);S.partiesDel=[...(S.partiesDel||[]).filter(x=>x.id!==p.id),p];
+  try{const seen=JSON.parse(localStorage.getItem("se_pdel")||"{}");seen[p.id]=d.deletedTs;localStorage.setItem("se_pdel",JSON.stringify(seen))}catch(e){}
+};
+SR.delListHTML=function(){const L=(S.partiesDel||[]).slice().sort((a,b)=>num(b.deletedTs)-num(a.deletedTs));if(!L.length)return "";
+  return `<details class="pdel"><summary>🗑️ हटाए गए खाते (${L.length})</summary>${L.map(p=>`<div class="pdel-r"><div><b>${esc(p.name)}</b><span>मालिक ने हटाया · ${p.deletedTs?fdate(new Date(p.deletedTs).toISOString().slice(0,10))+" "+ftime(p.deletedTs):""}${p.movedTo?" · 🏢 संस्था में भेजा: "+esc(p.movedTo):""}${S.isOwner&&p.deleteWhy?" · "+esc(p.deleteWhy):""}${S.isOwner&&num(p.oldBal)?" · बाकी था "+rs(p.oldBal):""}${S.isOwner&&p.deletedDevTxt?" · 📱 "+esc(p.deletedDevTxt):""}</span></div>${S.isOwner?`<button class="lnk" data-pundel="${esc(p.id)}">↩ वापस लाएँ</button>`:""}</div>`).join("")}</details>`};
+/* मालिक की ID से किसी दूसरे फ़ोन पर खाता हटे → इस फ़ोन पर तुरंत 🚨 सूचना (पहरेदार में दर्ज) */
+SR.watchDel=function(L){if(!S.isOwner)return;let seen={};try{seen=JSON.parse(localStorage.getItem("se_pdel")||"null")}catch(e){}
+  const first=!seen;seen=seen||{};let ch=false;
+  (L||[]).forEach(p=>{const t=num(p.deletedTs);if(!t||seen[p.id]===t)return;seen[p.id]=t;ch=true;if(first||p.deletedDev===devId())return;
+    const msg=`उधार खाता "${p.name}" हटाया गया — आपकी (मालिक) ID से, ${ftime(t)} पर, फ़ोन: ${p.deletedDevTxt||"पता नहीं"}${num(p.oldBal)?" · बाकी था "+rs(p.oldBal):""}`;
+    try{if(typeof guardAlarm==="function"&&G.ready)guardAlarm({kind:"pdel",no:p.id,msg});else{toast("🚨 "+msg);beep(false)}}catch(e){toast("🚨 "+msg)}});
+  if(ch)try{localStorage.setItem("se_pdel",JSON.stringify(seen))}catch(e){}};
+document.addEventListener("change",async e=>{if(e.target.id!=="pName"||!S.isOwner)return;const p=(S.parties||[]).find(x=>x.id===e.target.dataset.pid);const v=e.target.value.trim();if(!p||!v||v===p.name)return;
+  if(SR.instOf(v)){toast("🏢 यह अपनी संस्था का नाम है — उधार खाता इस नाम से नहीं रखें");e.target.value=p.name;return}
+  const old=p.name,now=Date.now();try{if(!S.demo){await S.db.collection("parties").doc(p.id).set({name:v,nameHist:[...(p.nameHist||[]),{old,new:v,ts:now,by:S.uid||""}]},{merge:true});
+    for(const l of (S.ledger||[]).filter(l=>l.partyId===p.id)){try{await S.db.collection("ledger").doc(l.id).set({partyName:v},{merge:true})}catch(x){}}}
+    p.name=v;(S.ledger||[]).forEach(l=>{if(l.partyId===p.id)l.partyName=v});toast("✏️ नाम बदला: "+old+" → "+v);try{renderPane()}catch(x){}}catch(err){toast("नाम नहीं बदला: "+(err.code||""))}});
+document.addEventListener("click",async e=>{
+  const d=e.target.closest("[data-pdel]");
+  if(d&&S.isOwner){const p=(S.parties||[]).find(x=>x.id===d.dataset.pdel);if(!p)return;const b=typeof balRaw==="function"?balRaw(p.id):bal(p.id);
+    if(!d.dataset.sure){d.dataset.sure="1";d.textContent="⚠ पक्का हटाएँ?"+(b>0?" (₹"+b+" बाकी है — कुल बकाया से निकल जाएगा)":"")+" — फिर दबाएँ";return}
+    try{await SR.delParty(p,"");closeSheet();toast("🗑️ "+p.name+" का खाता हटाया — नीचे 'हटाए गए खाते' में दिखेगा");try{renderPane()}catch(x){}
+      const ph=String(S.settings.ownerPh||"").replace(/\D/g,"").slice(-10);if(ph.length===10&&window.SB&&SB.waNotice)setTimeout(()=>SB.waNotice(`🗑️ *उधार खाता हटाया*\nसब्ज़ी एक्सप्रेस\n━━━━━━━━━━━━\n👤 ${p.name}\n💰 बाकी था: ₹${b}\n🕐 ${fdate(today())} ${ftime(Date.now())}\n📱 ${devTxt()}`,ph),400)}catch(err){toast("नहीं हटा: "+(err.code||""))}
+    return}
+  const u=e.target.closest("[data-pundel]");
+  if(u&&S.isOwner){const p=(S.partiesDel||[]).find(x=>x.id===u.dataset.pundel);if(!p)return;
+    try{if(!S.demo)await S.db.collection("parties").doc(p.id).set({deleted:false,restoredTs:Date.now(),restoredBy:S.uid||""},{merge:true});p.deleted=false;S.partiesDel=S.partiesDel.filter(x=>x.id!==p.id);S.parties=[...S.parties,p];toast("↩ "+p.name+" का खाता वापस");try{renderPane()}catch(x){}}catch(err){toast("नहीं हुआ: "+(err.code||""))}}
+});
+/* एक बार (मालिक के फोन पर): कर्मचारी के बनाए "अपनी संस्था" वाले उधार खाते → उनके बिल संस्था चालान में, खाता हटाया (नीचे "हटाए गए" में) */
+SR.autoInst2=async function(db){
+  if(!S.isOwner||S.demo||!db||SR._inst2)return;SR._inst2=1;
+  try{
+    const fr=db.doc("ownerCfg/flags");const f=await fr.get();if(f.exists&&f.data().inst2)return;
+    const [ps,ls]=await Promise.all([db.collection("parties").get(),db.collection("ledger").get()]);
+    const parties=ps.docs.map(d=>({id:d.id,...d.data()})),led=ls.docs.map(d=>({id:d.id,...d.data()}));
+    const src="विक्रम जी का आदेश 03-11: अपनी संस्था उधार में नहीं — खरीद भाव पर चालान, उधार खाता हटाया";const out=[],conv=[],cache={};const t=today();
+    for(const p of parties){if(p.deleted)continue;const inst=p.id==="mh-canteen"?SR.instOf("177 MH canteen"):SR.instOf(p.name);if(!inst)continue;
+      for(const l of led.filter(l=>l.partyId===p.id&&l.type==="udhar"&&l.billNo&&l.date&&l.date<t)){
+        try{const cf=cache[l.date]||(cache[l.date]=await SR.costForDay(db,l.date));const r=await SR.convToInst(db,l.date,l.billNo,inst,src,cf);if(r)conv.push(r)}catch(x){}}
+      const sp=(S.parties||[]).find(x=>x.id===p.id)||p;await SR.delParty(sp,"अपनी संस्था — उधार नहीं",{movedTo:inst,autoBy:"inst2"});out.push({id:p.id,name:p.name,inst})}
+    await fr.set({inst2:Date.now(),inst2List:out,inst2Conv:conv},{merge:true});
+    if(out.length)toast("🏢 "+out.length+" उधार खाते अपनी संस्था के थे — संस्था में भेजे, उधार सूची से हटाए"+(conv.length?" · "+conv.length+" पुराने बिल चालान बने":""));
+    try{renderPane()}catch(x){}
+  }catch(e){SR._inst2=0}
 };
 /* SF के साथ जोड़ */
 if(window.SF){const _o=SF.onDb;SF.onDb=function(db){_o(db);try{SR.onDb(db)}catch(e){}}}

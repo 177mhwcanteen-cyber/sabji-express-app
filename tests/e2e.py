@@ -383,6 +383,21 @@ async def main():
             await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(200)
             mine = await pg.evaluate("(document.querySelector('.mine')||{}).innerText||''")
             assert "₹" not in mine, mine
+            # 🛒 खरीद की याद (कर्मचारी) + "आज खरीद नहीं हुई"
+            ng = await pg.evaluate("(()=>{const o=S.purch;S.purch=[];SF.nobuy=null;const r=SF.buyNag(true);S.purch=o;return [r,!!document.getElementById('buyNag')]})()")
+            assert ng == [True, True], ng
+            await pg.click('[data-nag="none"]'); await pg.wait_for_timeout(300)
+            nb = await pg.evaluate("[!document.getElementById('buyNag'),!!((window.__MOCK__['days/'+today()+'/meta']||{}).nobuy),SF.buyNag(true)]")
+            assert nb == [True, True, False], nb
+            # उधार: कुल बकाया नहीं; अपनी संस्था का खाता नहीं बनता
+            await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300)
+            utx = await pg.inner_text("#p-udhar")
+            assert "कुल बकाया" not in utx and "आज वसूली" not in utx, utx[:300]
+            await pg.click("[data-newparty]"); await pg.wait_for_selector("#npName")
+            await pg.fill("#npName", "marwar rasoi"); await pg.click("#sheet [data-ok]"); await pg.wait_for_timeout(400)
+            assert not await pg.evaluate("Object.values(window.__MOCK__.parties||{}).some(p=>/rasoi/i.test(p.name))"), "institution udhar account must be blocked"
+            await pg.evaluate("closeSheet()")
+            print("staff buy-nag + udhar private ok")
             await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(200)
             await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300)
             assert not await pg.query_selector("#p-day .cpy"), "staff must not see copy card"
@@ -504,6 +519,31 @@ async def main():
         await pg.wait_for_function("(window.__MOCK__.ownerCfg.flags||{}).oldUdhar3>0", timeout=15000)
         o3 = await pg.evaluate("""(()=>{const M=window.__MOCK__,E=Object.entries(M.ledger||{}).filter(([k])=>k.startsWith('o3_'));return [E.length,E.reduce((a,[k,v])=>a+v.amt,0),SR.OLD_UDHAR3.reduce((a,g)=>a+g.total,0),M.parties['mh-canteen'].name,M.parties['adm-commander'].hide,M.parties['manoj-ghar'].hide,bal('adm-commander'),balRaw('adm-commander')>0,Object.values(M.ledger).filter(v=>v.partyId==='mh-canteen').every(v=>v.partyName==='177 MH वेट कैंटीन')]})()""")
         print("old udhar 3", o3)
+        # 🏢 कर्मचारी के बनाए "अपनी संस्था" उधार खाते → संस्था चालान + खाता हटाया (नीचे दिखे)
+        i2 = await pg.evaluate("""(async()=>{const M=window.__MOCK__;const d='2026-10-30',k='days/'+d+'/bills';M[k]=M[k]||{};
+          M.parties['p_jb']={name:'jasai bhrev',phone:'',ts:Date.now()};
+          M[k]['SE-JB0001']={no:'SE-JB0001',date:d,ts:new Date(d+'T11:00:00+05:30').getTime(),by:'u_m',byName:'Mukesh Bhai Sub Ex',mode:'udhar',partyId:'p_jb',partyName:'jasai bhrev',lines:[{id:'pyaj',name:'प्याज',unit:'kg',qty:5,rate:60,amt:300}],sub:300,total:300,disc:0,pay:{cash:0,upi:0,udhar:300},payMode:'udhar',settled:true,cancelled:false};
+          M.ledger['SE-JB0001']={ts:Date.now(),date:d,partyId:'p_jb',partyName:'jasai bhrev',type:'udhar',amt:300,billNo:'SE-JB0001'};
+          delete M.ownerCfg.flags.inst2;SR._inst2=0;await SR.autoInst2(S.db);await new Promise(r=>setTimeout(r,400));
+          const b=M[k]['SE-JB0001'],p=M.parties['p_jb'],mh=M.parties['mh-canteen'];
+          return [b.mode,b.partyName,b.lines[0].rate<60,!M.ledger['SE-JB0001'],p.deleted,p.movedTo,!!mh.deleted,!S.parties.some(x=>x.id==='p_jb'),S.partiesDel.some(x=>x.id==='p_jb'),!!M.parties['jco-mess'].deleted]})()""")
+        print("inst2", i2)
+        assert i2 == ["inst", "15 भैरव कैंटीन (जसाई)", True, True, True, "15 भैरव कैंटीन (जसाई)", True, True, True, False], i2
+        # ✏️ नाम बदलें + 🗑️ खाता हटाएँ (सिर्फ़ मालिक) — नीचे "हटाए गए" में
+        await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300)
+        await pg.click('[data-party="nepali-staff"]'); await pg.wait_for_selector("#pName")
+        await pg.fill("#pName", "नेपाली स्टाफ (कैंटीन)"); await pg.dispatch_event("#pName", "change"); await pg.wait_for_timeout(500)
+        assert (await pg.evaluate("window.__MOCK__.parties['nepali-staff'].name")) == "नेपाली स्टाफ (कैंटीन)"
+        await pg.evaluate("closeSheet()"); await pg.wait_for_timeout(200)
+        await pg.click('[data-party="nepali-staff"]'); await pg.wait_for_selector("[data-pdel]")
+        await pg.click("[data-pdel]"); await pg.wait_for_timeout(150); await pg.click("[data-pdel]"); await pg.wait_for_timeout(600)
+        dl = await pg.evaluate("[window.__MOCK__.parties['nepali-staff'].deleted,window.__MOCK__.parties['nepali-staff'].deletedByName,!document.querySelector('[data-party=\"nepali-staff\"]')]")
+        assert dl == [True, "विक्रम जी (मालिक)", True], dl
+        await pg.evaluate("closeSheet()"); await pg.wait_for_timeout(200)
+        await pg.evaluate("document.querySelector('#p-udhar .pdel').open=true")
+        pdt = await pg.inner_text("#p-udhar .pdel"); assert "नेपाली स्टाफ (कैंटीन)" in pdt and "मालिक ने हटाया" in pdt and "संस्था में भेजा" in pdt, pdt
+        await pg.screenshot(path=f"{SHOTS}/38-udhar-deleted.png", full_page=True)
+        print("party rename/delete ok")
         assert o3[0] == 36 and o3[1] == o3[2] == 21405 and o3[3:7] == ["177 MH वेट कैंटीन", "nopay", "home", 0] and o3[7] and o3[8], o3
         assert o2[0] + len(await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar2Skip||[]")) == 34 and o2[1] <= o2[2] == 13610 and o2[3] and o2[4] == 8, o2
         await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(500)

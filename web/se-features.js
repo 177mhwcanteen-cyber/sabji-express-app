@@ -38,7 +38,7 @@ SF.onDate=function(d){
   if(S.isOwner){SF._rev=null;if(SF._unRev)try{SF._unRev()}catch(e){}SF._unRev=S.db.doc("ownerCfg/rev_"+d).onSnapshot(x=>{SF._rev=x.exists?x.data():null;if(S.tab==="day")renderDay()},()=>{});
     if(SF._unN)try{SF._unN()}catch(e){}SF._nt=undefined;
     if(d===today())SF._unN=S.db.doc("days/"+d+"/meta/stock").onSnapshot(x=>{const v=x.exists?x.data():null;const nt=v&&v.nightTs;if(SF._nt!==undefined&&nt&&nt!==SF._nt&&v.by!==S.uid)setTimeout(()=>{const D=nightDiffs(),tot=r2(D.filter(y=>y.r.short>0).reduce((a,y)=>a+y.val,0));toast("🌙 "+(v.nightBy||"कर्मचारी")+" ने रात का स्टॉक लिखा"+(D.length?" · "+D.length+" में फर्क"+(tot>0?" · लगभग "+rs(tot):"")+" — दिन का हिसाब देखें":" · हिसाब मिल गया 👍"))},900);SF._nt=nt||null},()=>{})}
-  S.prevStock={};SF.loadCopy(d);SF.loadGpay(d);SF.watchClose(d);
+  S.prevStock={};SF.loadCopy(d);SF.loadGpay(d);SF.watchClose(d);SF.loadNobuy(d);
   S.db.doc("days/"+dayAdd(d,-1)+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day")renderDay()}).catch(()=>{});
 };
 const livePurch=()=>S.purch.filter(p=>!p.cancelled);
@@ -352,7 +352,7 @@ SF.ownerBriefHTML=function(){
   const tot=sum(sale,b=>b.total),upi=sum(sale,b=>b.pay&&b.pay.upi),cash=sum(sale,b=>b.pay&&b.pay.cash),ud=sum(sale,b=>b.pay&&b.pay.udhar),due=sum(sale.filter(b=>b.settled===false),b=>b.total),inst=sum(B.filter(b=>b.mode==="inst"),b=>b.total);
   const buy=sum(P,p=>p.total),lastP=P.reduce((a,p)=>Math.max(a,p.ts||0),0),M=SF.missingBuy(),late=P.filter(p=>p.late).length;
   return `<div class="card2 obrief"><h3>📊 विक्रम जी, ${d===today()?"आज":fdate(d)} का सार <small class="note">· ${ftime(Date.now())}</small></h3>
-  <div class="ob-g"><div><span>🛒 खरीद दर्ज</span><b>${rs(buy)}</b><small>${P.length?P.length+" पर्ची · आख़िरी "+ftime(lastP)+(late?" · "+late+" बाद में जोड़ी":""):"अभी कोई खरीद नहीं जुड़ी"}</small></div>
+  <div class="ob-g"><div><span>🛒 खरीद दर्ज</span><b>${rs(buy)}</b><small>${P.length?P.length+" पर्ची · आख़िरी "+ftime(lastP)+(late?" · "+late+" बाद में जोड़ी":""):SF.nobuy?"आज खरीद नहीं हुई — "+esc(SF.nobuy.byName||"")+" ने बताया":"अभी कोई खरीद नहीं जुड़ी"}</small></div>
   <div><span>🧾 बिक्री</span><b>${rs(tot)}</b><small>${sale.length} बिल · UPI ${rs(upi)} · नकद ${rs(cash)}${ud?" · उधार "+rs(ud):""}${due?" · ⏳ बाकी "+rs(due):""}</small></div>
   <div><span>🏢 संस्था (खरीद भाव)</span><b>${rs(inst)}</b><small>${B.filter(b=>b.mode==="inst").length} चालान</small></div>
   <div><span>🌙 रात का स्टॉक</span><b>${S.stock&&S.stock.nightTs?"✓ भरा":"— अभी नहीं"}</b><small>${S.stock&&S.stock.nightTs?esc(S.stock.nightBy||"")+" · "+ftime(S.stock.nightTs):"दुकान बंद होने पर"}</small></div>${SF.gallaTileHTML()}</div>
@@ -1352,5 +1352,24 @@ SF.watchClose=function(d){if(SF._unC)try{SF._unC()}catch(e){}SF._ct=undefined;if
     SF._ct=k},()=>{})};
 SF.gallaTileHTML=function(){if(!S.isOwner)return "";const c=cashCalc(S.billsDate);
   return `<div><span>💵 गल्ला गिनती</span><b>${c.counted==null?"— अभी नहीं":rs(c.counted)}</b><small>होना चाहिए ${rs(c.expected)}${c.diff!=null?" · "+(c.diff===0?"✅ ठीक":c.diff>0?"+"+rs(c.diff):"🚨 "+rs(Math.abs(c.diff))+" कम"):""}${S.close&&S.close.byName&&c.counted!=null?" · "+esc(S.close.byName):""}</small></div>`};
+/* 🛒 कर्मचारी को छोटी याद: आज की मंडी खरीद ऐप में नहीं डली (पहली 15 मिनट बाद, फिर हर 45 मिनट; 9 से 10 बजे रात तक) */
+SF.nobuy=null;
+SF.loadNobuy=function(d){SF.nobuy=null;if(S.demo||!S.db)return;S.db.doc("days/"+d+"/meta/nobuy").get().then(x=>{SF.nobuy=x.exists?x.data():null}).catch(()=>{})};
+SF.buyNag=function(force){
+  if(S.isOwner||!S.db||!biller()||S.billsDate!==today())return false;
+  const h=new Date().getHours();if(!force&&(h<9||h>=22))return false;
+  if(livePurch().length||SF.nobuy)return false;
+  if(document.querySelector("#sheet .scrim")||document.getElementById("buyNag"))return false;
+  const k="se_nag_"+today();let last=0;try{last=+localStorage.getItem(k)||0}catch(e){}
+  if(!force&&Date.now()-last<45*60000)return false;
+  try{localStorage.setItem(k,String(Date.now()))}catch(e){}
+  const el=document.createElement("div");el.id="buyNag";el.className="buynag";el.setAttribute("role","status");
+  el.innerHTML=`<b>🛒 आज की मंडी खरीद अभी ऐप में नहीं डली</b><span>${esc(biller())} जी, जब भी फ्री हों — मंडी से खरीदी सब्ज़ी "खरीद" में डाल दें 🙏</span><div><button class="nag-go" data-nag="go">🛒 अभी डालें</button><button data-nag="later">⏰ बाद में</button><button data-nag="none">आज खरीद नहीं हुई</button></div>`;
+  document.body.appendChild(el);return true;
+};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-nag]");if(!b)return;const k=b.dataset.nag;const el=document.getElementById("buyNag");if(el)el.remove();
+  if(k==="go"){const t=document.querySelector('[data-tab="kharid"]');if(t)t.click()}
+  if(k==="none"){const d={by:S.uid||"",byName:biller(),ts:Date.now()};SF.nobuy=d;if(!S.demo&&S.db)S.db.doc("days/"+today()+"/meta/nobuy").set(d).catch(()=>{});toast("ठीक है — आज खरीद की याद नहीं आएगी")}});
+setTimeout(()=>{try{SF.buyNag()}catch(e){}},15*60000);setInterval(()=>{try{SF.buyNag()}catch(e){}},5*60000);
 SF.bindKharid();SF.bindLabel();SF.bindDay();SF.bindLabelSettings();
 })();
