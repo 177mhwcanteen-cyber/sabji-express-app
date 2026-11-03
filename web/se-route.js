@@ -237,7 +237,7 @@ const COLORS=["#22c55e","#f59e0b","#a855f7","#06b6d4","#ef4444"];
 SR.onDb=function(db){
   if(S.isOwner)db.collection("places").onSnapshot(s=>{SR.places=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route"&&R.raw){R.day=dayFor();SR.renderRoute()}},()=>{});
   if(S.isOwner)setTimeout(()=>SR.autoOldUdhar(db),2500);
-  if(S.isOwner)setTimeout(()=>SR.autoOldUdhar2(db),6500);
+  if(S.isOwner)setTimeout(async()=>{await SR.autoOldUdhar2(db);await SR.autoOldUdhar3(db)},6500);
   if(S.isOwner)setTimeout(()=>SR.applyBoard(db),4500);
   if(S.isOwner){setTimeout(()=>SR.applyInst(db),9000);setInterval(()=>{if(!SR._instDone)SR.applyInst(db)},5*60000)}
   if(S.isOwner)db.collection("live").onSnapshot(s=>{R.live=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="route")SR.updateLive()},()=>{});
@@ -995,6 +995,52 @@ SR.autoOldUdhar2=async function(db){
     try{renderPane()}catch(x){}
   }catch(e){SR._old2=0}
 };
+/* 📥 03-11 (विक्रम जी की राय के बाद): पुराने रजिस्टर पेज (26-09 से 04-10) + कॉपी की बची एंट्री; MH = 177 MH वेट कैंटीन;
+   एडम कमांडर = वसूली नहीं (रकम छिपी, सिर्फ़ नोट); मनोज जी = मालिक के घर की सब्ज़ी (अलग खाता, रकम छिपी) */
+const OLD_UDHAR3=[
+  {pid:"officers-mess",name:"अफसर मेस",al:["अफसरमेस","अफ़सरमेस","ऑफिसरमेस","ऑफिसर्समेस","officersmess","officermess"],rows:[["2026-10-27",290,"कमल भाई की कॉपी से"],["2026-09-27",800,"पुराना रजिस्टर पेज"],["2026-10-03",1150,"पुराना रजिस्टर पेज"],["2026-10-04",460,"पुराना रजिस्टर पेज"]]},
+  {pid:"jco-mess",name:"JCO मेस",al:["jcoमेस","jcomess","जेसीओमेस"],rows:[["2026-09-27",209],["2026-09-30",900],["2026-10-02",6467],["2026-10-03",1500]].map(r=>[...r,"पुराना रजिस्टर पेज"])},
+  {pid:"samosa-shop",name:"समोसा शॉप",al:["समोसा","samosa"],rows:[["2026-09-27",390,"पुराना रजिस्टर पेज"],["2026-10-03",800,"पुराना रजिस्टर पेज"],["2026-10-20",388,"कमल भाई की कॉपी से"]]},
+  {pid:"ajay-sir",name:"अजय सर",al:["अजयसर","ajaysir"],rows:[["2026-10-22",40,"कमल भाई की कॉपी से"]]},
+  {pid:"adm-commander",name:"एडम कमांडर",al:["एडम","admcommander","adamcommander"],hide:"nopay",rows:[["2026-10-28",620],["2026-10-29",130],["2026-10-30",320]].map(r=>[...r,"कमल भाई की कॉपी से"])},
+  {pid:"mh-canteen",name:"177 MH वेट कैंटीन",eq:["mh","एमएच"],rename:true,rows:[["2026-09-26",390],["2026-09-27",490],["2026-09-28",444],["2026-09-30",680],["2026-10-01",130],["2026-10-02",127],["2026-10-03",290]].map(r=>[...r,"पुराना रजिस्टर पेज"]).concat([["2026-10-23",280,"कमल भाई की कॉपी से"]])},
+  {pid:"kapil",name:"कपिल बाबूजी (स्टेशन HQ)",eq:["कपिल","कपिलजी","कपिलबाबूजी","kapil"],rename:true,rows:[["2026-09-27",130],["2026-09-28",96],["2026-09-30",182],["2026-10-03",160]].map(r=>[...r,"पुराना रजिस्टर पेज"])},
+  {pid:"naresh",name:"नरेश (अपनी टीम)",al:["नरेश","naresh"],rows:[["2026-09-30",140,"पुराना रजिस्टर पेज · नारियल"]]},
+  {pid:"guard-line",name:"गार्ड लाइन",al:["गार्डलाइन","guardline"],rows:[["2026-09-27",500,"पुराना रजिस्टर पेज"]]},
+  {pid:"kamal-ghar",name:"कमल भाई (घर की सब्ज़ी)",al:["कमलभाई(घर","कमलभाईघर"],rows:[["2026-09-28",550,"पुराना रजिस्टर पेज · कमल भाई ने अपने घर भेजी"]]},
+  {pid:"manoj-ghar",name:"मनोज जी (मालिक का घर)",al:["मनोजजी(मालिक","मनोजजी(घर"],hide:"home",rows:[["2026-10-03",167,"पुराना रजिस्टर पेज"],["2026-10-13",540,"कॉपी · 160 + मौसमी 380"],["2026-10-19",800,"कॉपी · घर की सब्ज़ी"],["2026-10-22",295,"कॉपी"],["2026-10-23",200,"कॉपी · सरसों"],["2026-10-30",350,"कॉपी · मौसमी"]]}];
+OLD_UDHAR3.forEach(g=>g.total=g.rows.reduce((a,r)=>a+r[1],0));
+SR.OLD_UDHAR3=OLD_UDHAR3;
+SR.autoOldUdhar3=async function(db){
+  if(!S.isOwner||S.demo||!db||SR._old3)return;SR._old3=1;
+  try{
+    const fr=db.doc("ownerCfg/flags");const f=await fr.get();if(f.exists&&f.data().oldUdhar3)return;
+    const [ps,ls]=await Promise.all([db.collection("parties").get(),db.collection("ledger").get()]);
+    const parties=ps.docs.map(d=>({id:d.id,...d.data()})),led=ls.docs.map(d=>({id:d.id,...d.data()}));
+    let n=0,amt=0;const skip=[];
+    const W=db.batch?db.batch():null;const put=(ref,d,o)=>W?W.set(ref,d,o):ref.set(d,o);
+    for(const g of OLD_UDHAR3){
+      let p=findP(parties,g);
+      if(!p){const d={name:g.name,phone:"",qtr:"",ts:Date.now(),by:S.uid||"",byName:biller(),...(g.hide?{hide:g.hide}:{})};await put(db.collection("parties").doc(g.pid),d,{merge:true});p={id:g.pid,...d};parties.push(p)}
+      else{const ch={};if(g.rename&&p.name!==g.name){ch.name=g.name;ch.oldName=p.name}if(g.hide&&p.hide!==g.hide)ch.hide=g.hide;
+        if(Object.keys(ch).length){await put(db.collection("parties").doc(p.id),ch,{merge:true});Object.assign(p,ch);const sp=(S.parties||[]).find(x=>x.id===p.id);if(sp)Object.assign(sp,ch)}
+        if(ch.name)for(const l of led.filter(l=>l.partyId===p.id&&l.partyName!==ch.name)){await put(db.collection("ledger").doc(l.id),{partyName:ch.name},{merge:true});l.partyName=ch.name}}
+      for(const [i,r] of g.rows.entries()){
+        const id="o3_"+g.pid+"_"+r[0]+"_"+i;if(led.some(l=>l.id===id))continue;
+        if(led.some(l=>l.partyId===p.id&&l.date===r[0]&&l.type==="udhar"&&!l.opening&&num(l.amt)===r[1])){skip.push(g.name+" "+fdate(r[0]).slice(0,5)+" ₹"+r[1]);continue}
+        const ent={ts:new Date(r[0]+"T12:00:00").getTime(),date:r[0],partyId:p.id,partyName:p.name,type:"udhar",opening:true,note:r[2]||"",amt:r[1],billNo:"",by:S.uid||"",byName:biller()};
+        await put(db.collection("ledger").doc(id),ent);led.push({id,...ent});n++;amt+=r[1];
+      }
+    }
+    await put(fr,{oldUdhar3:Date.now(),oldUdhar3N:n,oldUdhar3Amt:r2(amt),oldUdhar3Skip:skip},{merge:true});
+    if(W)await W.commit();
+    if(n)toast("📥 पुराने पेज + कॉपी की बची उधारी जुड़ी: "+n+" एंट्री · एडम कमांडर और घर का खाता छिपे");
+    try{renderPane()}catch(x){}
+  }catch(e){SR._old3=0}
+};
+/* 🔒 मालिक: किसी खाते की रकम छिपाएँ/दिखाएँ (वसूली नहीं, सिर्फ़ नोट) */
+document.addEventListener("click",async e=>{const b=e.target.closest("[data-phide]");if(!b||!S.isOwner)return;const p=(S.parties||[]).find(x=>x.id===b.dataset.phide);if(!p)return;
+  const v=p.hide?"":"nopay";try{if(!S.demo)await S.db.collection("parties").doc(p.id).set({hide:v},{merge:true});p.hide=v;toast(v?"🔒 "+p.name+" की रकम छिपी — कुल बकाया में नहीं जुड़ेगी":"👁 "+p.name+" की रकम फिर दिखेगी");openParty(p.id);try{renderPane()}catch(x){}}catch(err){toast("नहीं हुआ: "+(err.code||""))}});
 /* ✏️ पुरानी (कॉपी वाली) उधार एंट्री बदलें/मिटाएँ — सिर्फ़ मालिक */
 SR.opEditBtn=function(l){return S.isOwner?` · <button class="lnk" data-opedit="${esc(l.id)}">✏️ बदलें</button>`:""};
 SR.opEditSheet=function(id){

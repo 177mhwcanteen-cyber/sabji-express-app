@@ -900,7 +900,7 @@ function receiptText(b){
   b.lines.forEach((l,i)=>t+=l.free?`${i+1}. ${SN.withEn(l.name)} ${fq(l.qty,l.unit)} — 🎁 मुफ्त\n`:`${i+1}. ${SN.withEn(l.name)}\n    ${fq(l.qty,l.unit)} × ₹${l.rate} = *₹${l.amt}*\n`);
   t+=`${L}\n`;if(b.disc)t+=`🏷️ छूट: −₹${b.disc}\n`;{const ro=window.SF&&SF.roff?SF.roff(b):0;if(ro)t+=`_जोड़ ₹${r2(b.sub!=null?b.sub:b.lines.reduce((a,l)=>a+(+l.amt||0),0))} · ${SF.roffTxt(ro)}_\n`}t+=`💰 *कुल रकम: ₹${b.total}*\n`;
   if(b.pay.cash)t+=`✅ नकद मिला: ₹${b.pay.cash}\n`;if(b.pay.upi)t+=`✅ UPI मिला: ₹${b.pay.upi}\n`;if(b.pay.udhar)t+=`📒 उधार में: ₹${b.pay.udhar}\n`;
-  if(b.partyId){t+=`📒 खाते में कुल बाकी: *₹${r2(bal(b.partyId))}*\n`}
+  if(b.partyId&&bal(b.partyId)>0){t+=`📒 खाते में कुल बाकी: *₹${r2(bal(b.partyId))}*\n`}
   {const nt=SN.ofBill(b);if(nt){t+=`${L}\n🥗 *इस थैले में आपकी सेहत* _(लगभग)_\n`;const cs=SN.cells(nt);for(let i=0;i<cs.length;i+=2)t+=cs.slice(i,i+2).map(c=>`${c[0]} ${c[1]} *${c[2]}*`).join("  ·  ")+"\n";
     const hl=SN.headline(nt);if(hl)t+=`${hl}\n`;SN.top(nt,3).forEach(x=>t+=`⭐ ${x.name} (${x.en}): ${x.why}\n`);if(SN.cheer(nt))t+=SN.cheer(nt)+"\n";t+=`_${SN.note}_\n`}}
   {const q=window.SF&&SF.qrFor&&SF.qrFor(b);if(q)t+=`${L}\n📱 *UPI:* ${upiId()}\n${q.label}\n`}if(b.byName&&b.mode!=='inst')t+=`🧑‍🌾 बिलिंग: *${b.byName}*\n`;t+=`${L}\n🙏 धन्यवाद! फिर पधारें\n`;
@@ -947,14 +947,15 @@ function showReceipt(b,fresh,offline){
 }
 
 /* ---------- people / udhar ---------- */
-function bal(pid){return r2(S.ledger.filter(l=>l.partyId===pid).reduce((a,l)=>a+(l.type==="udhar"?l.amt:-l.amt),0))}
+function balRaw(pid){return r2(S.ledger.filter(l=>l.partyId===pid).reduce((a,l)=>a+(l.type==="udhar"?l.amt:-l.amt),0))}
+function bal(pid){const p=(S.parties||[]).find(x=>x.id===pid);return p&&p.hide?0:balRaw(pid)}
 function renderUdhar(){
   const rows=S.parties.map(p=>({...p,b:bal(p.id)})).sort((a,b)=>b.b-a.b);
   const total=r2(rows.reduce((a,r)=>a+Math.max(0,r.b),0));
   $("#p-udhar").innerHTML=`<h2 class="sec">उधार खाता</h2>
   <div class="kpis"><div class="kpi hero"><span>कुल बकाया (सबका मिलाकर)</span><b>${rs(total)}</b></div></div>
   ${window.SR?SR.udharTopHTML():""}
-  <div class="list">${rows.length?rows.map(r=>`<button class="li" data-party="${esc(r.id)}"><div class="mid"><b>${esc(r.name)}</b><span>${r.qtr?"क्वार्टर "+esc(r.qtr)+" · ":""}${r.phone?esc(r.phone):"नंबर नहीं"}${r.b>0&&udharAge(r.id)!=null?` · <span class="pill ${udharAge(r.id)>15?"red":"blue"}">${udharAge(r.id)} दिन से बाकी</span>`:""}${+r.limit>0?` · सीमा ${rs(r.limit)}`:""}</span></div><div class="rt" style="color:${r.b>0?"var(--chili)":"var(--leaf)"}">${rs(r.b)}<small>${r.b>0?"बाकी":"साफ़"}</small></div></button>`).join(""):`<div class="empty"><b>कोई खाता नहीं</b>नीचे बटन से पहला खाता जोड़ें।</div>`}</div>
+  <div class="list">${rows.length?rows.map(r=>`<button class="li" data-party="${esc(r.id)}"><div class="mid"><b>${esc(r.name)}</b><span>${r.qtr?"क्वार्टर "+esc(r.qtr)+" · ":""}${r.phone?esc(r.phone):"नंबर नहीं"}${r.b>0&&udharAge(r.id)!=null?` · <span class="pill ${udharAge(r.id)>15?"red":"blue"}">${udharAge(r.id)} दिन से बाकी</span>`:""}${+r.limit>0?` · सीमा ${rs(r.limit)}`:""}</span></div>${r.hide?`<div class="rt" style="color:var(--muted,#888)">${r.hide==="home"?"🏠":"🔒"}<small>${r.hide==="home"?"घर का खाता":"सिर्फ़ नोट"}</small></div>`:`<div class="rt" style="color:${r.b>0?"var(--chili)":"var(--leaf)"}">${rs(r.b)}<small>${r.b>0?"बाकी":"साफ़"}</small></div>`}</button>`).join(""):`<div class="empty"><b>कोई खाता नहीं</b>नीचे बटन से पहला खाता जोड़ें।</div>`}</div>
   <button class="big ghost" data-newparty ${S.demo?"":""}>+ नया उधार खाता</button>`;
 }
 $("#p-udhar").addEventListener("click",e=>{
@@ -986,17 +987,17 @@ function openParty(pid){
   const draw=()=>{
     $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="${esc(p.name)} का खाता"><div class="grab"></div>
     <div class="sh-head"><div><h3>${esc(p.name)}</h3><span class="note">${p.qtr?"क्वार्टर "+esc(p.qtr)+" · ":""}${p.phone?esc(p.phone):"नंबर नहीं"}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
-    <div class="amtline"><span>कुल बाकी</span><b style="color:${b>0?"var(--chili)":"var(--leaf)"}">${rs(b)}</b></div>
+    ${p.hide?`<div class="amtline"><span>${p.hide==="home"?"🏠 मालिक के घर का खाता — सिर्फ़ नोट":"🔒 छिपा खाता — सिर्फ़ नोट, कुल बकाया में नहीं जुड़ता"}</span><b>${S.isOwner?rs(balRaw(pid)):"—"}</b></div>`:`<div class="amtline"><span>कुल बाकी</span><b style="color:${b>0?"var(--chili)":"var(--leaf)"}">${rs(b)}</b></div>`}
     <h4 style="margin:4px 0 6px">पैसा जमा करें</h4>
     <div class="row2"><label class="fld">रकम (₹)<input class="inp" id="jAmt" inputmode="decimal" placeholder="${b>0?b:""}"></label>
     <div class="paym" style="margin:18px 0 0;grid-template-columns:1fr 1fr"><button data-jm="cash" aria-pressed="${st.mode==="cash"}">नकद</button><button data-jm="upi" aria-pressed="${st.mode==="upi"}">UPI</button></div></div>
     <div id="jqr"></div>
     <button class="big" data-jama>जमा दर्ज करें</button>
-    <a class="big ghost" style="margin-top:8px" target="_blank" rel="noopener" href="${waLink(window.SR?SR.remindText(p,b):`नमस्ते ${p.name} जी, सब्ज़ी एक्सप्रेस का आपका बाकी हिसाब ₹${b} है। UPI: ${upiId()} 🙏`,p.phone)}" data-remone="1">🟢 WhatsApp पर बकाया याद दिलाएँ</a>
+    ${p.hide?"<!--":""}<a class="big ghost" style="margin-top:8px" target="_blank" rel="noopener" href="${waLink(window.SR?SR.remindText(p,b):`नमस्ते ${p.name} जी, सब्ज़ी एक्सप्रेस का आपका बाकी हिसाब ₹${b} है। UPI: ${upiId()} 🙏`,p.phone)}" data-remone="1">🟢 WhatsApp पर बकाया याद दिलाएँ</a>${p.hide?"-->":""}
     ${window.SR?SR.openingHTML(p):""}
-    ${S.isOwner&&!S.demo?`<label class="fld" style="margin-top:12px">उधार सीमा ₹ (इससे ज़्यादा होने पर बिलर को चेतावनी)<input class="inp" id="pLimit" inputmode="decimal" value="${+p.limit||""}" placeholder="जैसे 5000"></label>`:""}
+    ${S.isOwner&&!S.demo?`<label class="fld" style="margin-top:12px">उधार सीमा ₹ (इससे ज़्यादा होने पर बिलर को चेतावनी)<input class="inp" id="pLimit" inputmode="decimal" value="${+p.limit||""}" placeholder="जैसे 5000"></label><button class="big ghost" data-phide="${esc(p.id)}" style="margin-top:8px">${p.hide?"👁 रकम फिर दिखाएँ (वसूली वाला खाता)":"🔒 रकम छिपाएँ — वसूली नहीं, सिर्फ़ नोट"}</button>`:""}
     <h4 style="margin:16px 0 6px">पूरा हिसाब</h4>
-    <div class="list">${ents.length?ents.map(l=>`<div class="li"><div class="mid"><b>${l.type==="udhar"?(l.opening?"📜 पुराना बाकी"+(l.note?" · "+esc(l.note):""):"उधार · बिल "+esc(l.billNo||"")):"जमा · "+(l.mode==="upi"?"UPI":"नकद")}</b><span>${fdate(l.date)} ${ftime(l.ts)} · ${esc(l.byName||"")}${l.opening&&window.SR?SR.opEditBtn(l):""}</span></div><div class="rt" style="color:${l.type==="udhar"?"var(--chili)":"var(--leaf)"}">${l.type==="udhar"?"+":"−"}${rs(l.amt)}</div></div>`).join(""):`<div class="empty">अभी कोई एंट्री नहीं</div>`}</div>
+    <div class="list">${ents.length?ents.map(l=>`<div class="li"><div class="mid"><b>${l.type==="udhar"?(l.opening?"📜 पुराना बाकी"+(l.note?" · "+esc(l.note):""):"उधार · बिल "+esc(l.billNo||"")):"जमा · "+(l.mode==="upi"?"UPI":"नकद")}</b><span>${fdate(l.date)} ${ftime(l.ts)} · ${esc(l.byName||"")}${l.opening&&window.SR?SR.opEditBtn(l):""}</span></div><div class="rt" style="color:${l.type==="udhar"?"var(--chili)":"var(--leaf)"}">${p.hide&&!S.isOwner?"•••":(l.type==="udhar"?"+":"−")+rs(l.amt)}</div></div>`).join(""):`<div class="empty">अभी कोई एंट्री नहीं</div>`}</div>
     </div></div>`;
   };
   draw();

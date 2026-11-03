@@ -498,11 +498,18 @@ async def main():
         assert led == 97 and tot == 33305, (led, tot)
         assert (await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar1")) > 0
         await pg.wait_for_function("(window.__MOCK__.ownerCfg.flags||{}).oldUdhar2>0", timeout=15000)
-        o2 = await pg.evaluate("(()=>{const E=Object.entries(window.__MOCK__.ledger||{}).filter(([k])=>k.startsWith('o2_'));return [E.length,E.reduce((a,[k,v])=>a+v.amt,0),SR.OLD_UDHAR2.reduce((a,g)=>a+g.total,0),!!window.__MOCK__.parties['adm-commander'],E.filter(([k,v])=>v.partyName==='MH').length]})()")
+        o2 = await pg.evaluate("(()=>{const E=Object.entries(window.__MOCK__.ledger||{}).filter(([k])=>k.startsWith('o2_'));return [E.length,E.reduce((a,[k,v])=>a+v.amt,0),SR.OLD_UDHAR2.reduce((a,g)=>a+g.total,0),!!window.__MOCK__.parties['adm-commander'],E.filter(([k,v])=>v.partyId==='mh-canteen').length]})()")
         print("old udhar 2", o2)
+        await pg.wait_for_function("(window.__MOCK__.ownerCfg.flags||{}).oldUdhar3>0", timeout=15000)
+        o3 = await pg.evaluate("""(()=>{const M=window.__MOCK__,E=Object.entries(M.ledger||{}).filter(([k])=>k.startsWith('o3_'));return [E.length,E.reduce((a,[k,v])=>a+v.amt,0),SR.OLD_UDHAR3.reduce((a,g)=>a+g.total,0),M.parties['mh-canteen'].name,M.parties['adm-commander'].hide,M.parties['manoj-ghar'].hide,bal('adm-commander'),balRaw('adm-commander')>0,Object.values(M.ledger).filter(v=>v.partyId==='mh-canteen').every(v=>v.partyName==='177 MH वेट कैंटीन')]})()""")
+        print("old udhar 3", o3)
+        assert o3[0] == 36 and o3[1] == o3[2] == 21405 and o3[3:7] == ["177 MH वेट कैंटीन", "nopay", "home", 0] and o3[7] and o3[8], o3
         assert o2[0] + len(await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar2Skip||[]")) == 34 and o2[1] <= o2[2] == 13610 and o2[3] and o2[4] == 8, o2
         await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(500)
         assert not await pg.query_selector("[data-oldud]"), "manual import button should vanish"
+        await pg.evaluate("renderUdhar()")
+        adm = await pg.inner_text('[data-party="adm-commander"]')
+        assert "🔒" in adm and "₹" not in adm, adm
         sid = await pg.evaluate("SR.findOldParty(S.parties,SR.OLD_UDHAR[0]).id")
         await pg.click(f'[data-party="{sid}"]'); await pg.wait_for_selector("[data-opedit]")
         await pg.screenshot(path=f"{SHOTS}/22-old-udhar.png")

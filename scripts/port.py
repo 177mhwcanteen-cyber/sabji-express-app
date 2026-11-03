@@ -378,6 +378,18 @@ rep('''<input class="inp" type="date" id="billsDate" value="${S.billsDate}" aria
 rep('''${S.isOwner&&window.SF&&SF.billProfitTag&&!b.cancelled?SF.billProfitTag(b):""}</div></button>''', '''${S.isOwner&&window.SF&&SF.billProfitTag&&!b.cancelled?SF.billProfitTag(b):""}${S.isOwner&&window.SF&&SF.gpTag?SF.gpTag(b):""}</div></button>''')
 rep('''<span>👤 ${esc(biller())} — आज आपके बिल</span><span>${t.n} · ${rs(t.amt)}</span>''', '''<span>👤 ${esc(biller())} — आज आपके बिल</span><span>${t.n}</span>''')
 s = s.replace(".ppc-sum small.roff{", ".gp-tag{display:block;font-size:11px;color:var(--leaf,#2e7d32);font-weight:600}.gp-tag.bad{color:var(--chili,#c62828)}.gpc .gp-file{display:block;text-align:center;cursor:pointer}.gp-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}.gp-sum>div{background:var(--surface2,#f5f5f0);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;min-width:0}.gp-sum span,.gp-sum small{font-size:11px;opacity:.8}.gp-sum b{font-size:16px}.gp-l{display:flex;flex-direction:column;gap:2px;margin:6px 0;padding:8px;border-radius:10px;background:var(--surface2,#f5f5f0);font-size:13px}.gp-l.bad{border:1.5px solid var(--chili,#c62828)}.gp-l small{opacity:.8}.ppc-sum small.roff{",1)
+# v36: छिपे खाते (एडम कमांडर = वसूली नहीं, मनोज जी = मालिक का घर) — रकम कहीं नहीं दिखती, कुल बकाया में नहीं जुड़ती; मालिक खाते के अंदर देख सकते हैं
+rep('function bal(pid){return r2(S.ledger.filter(l=>l.partyId===pid).reduce((a,l)=>a+(l.type==="udhar"?l.amt:-l.amt),0))}',
+    'function balRaw(pid){return r2(S.ledger.filter(l=>l.partyId===pid).reduce((a,l)=>a+(l.type==="udhar"?l.amt:-l.amt),0))}\nfunction bal(pid){const p=(S.parties||[]).find(x=>x.id===pid);return p&&p.hide?0:balRaw(pid)}')
+rep('<div class="rt" style="color:${r.b>0?"var(--chili)":"var(--leaf)"}">${rs(r.b)}<small>${r.b>0?"बाकी":"साफ़"}</small></div>',
+    '${r.hide?`<div class="rt" style="color:var(--muted,#888)">${r.hide==="home"?"🏠":"🔒"}<small>${r.hide==="home"?"घर का खाता":"सिर्फ़ नोट"}</small></div>`:`<div class="rt" style="color:${r.b>0?"var(--chili)":"var(--leaf)"}">${rs(r.b)}<small>${r.b>0?"बाकी":"साफ़"}</small></div>`}')
+rep('<div class="amtline"><span>कुल बाकी</span><b style="color:${b>0?"var(--chili)":"var(--leaf)"}">${rs(b)}</b></div>',
+    '${p.hide?`<div class="amtline"><span>${p.hide==="home"?"🏠 मालिक के घर का खाता — सिर्फ़ नोट":"🔒 छिपा खाता — सिर्फ़ नोट, कुल बकाया में नहीं जुड़ता"}</span><b>${S.isOwner?rs(balRaw(pid)):"—"}</b></div>`:`<div class="amtline"><span>कुल बाकी</span><b style="color:${b>0?"var(--chili)":"var(--leaf)"}">${rs(b)}</b></div>`}')
+rep('">${l.type==="udhar"?"+":"−"}${rs(l.amt)}</div></div>`).join("")', '">${p.hide&&!S.isOwner?"•••":(l.type==="udhar"?"+":"−")+rs(l.amt)}</div></div>`).join("")')
+rep('<a class="big ghost" style="margin-top:8px" target="_blank" rel="noopener" href="${waLink(window.SR?SR.remindText', '${p.hide?"<!--":""}<a class="big ghost" style="margin-top:8px" target="_blank" rel="noopener" href="${waLink(window.SR?SR.remindText')
+rep('data-remone="1">🟢 WhatsApp पर बकाया याद दिलाएँ</a>', 'data-remone="1">🟢 WhatsApp पर बकाया याद दिलाएँ</a>${p.hide?"-->":""}')
+rep('placeholder="जैसे 5000"></label>`:""}', 'placeholder="जैसे 5000"></label><button class="big ghost" data-phide="${esc(p.id)}" style="margin-top:8px">${p.hide?"👁 रकम फिर दिखाएँ (वसूली वाला खाता)":"🔒 रकम छिपाएँ — वसूली नहीं, सिर्फ़ नोट"}</button>`:""}')
+rep('  if(b.partyId){t+=`📒 खाते में कुल बाकी: *₹${r2(bal(b.partyId))}*\\n`}', '  if(b.partyId&&bal(b.partyId)>0){t+=`📒 खाते में कुल बाकी: *₹${r2(bal(b.partyId))}*\\n`}')
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")

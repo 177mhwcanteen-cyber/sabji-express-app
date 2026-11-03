@@ -1032,7 +1032,7 @@ SF.paperHTML=function(b,o){
   ${b.disc?`<div class="pp-row"><span>जोड़</span><span>₹${sub}</span></div><div class="pp-row"><span>छूट</span><span>−₹${b.disc}</span></div>`:""}
   ${SF.roff(b)?`<div class="pp-row roff"><span>जोड़ ₹${r2(num(b.sub!=null?b.sub:sub))}</span><span>${SF.roffTxt(SF.roff(b))}</span></div>`:""}
   <div class="pp-total"><span>कुल रकम</span><b>₹${b.total}</b></div>
-  <div class="pp-row note"><span>${(b.lines||[]).length} सामान</span><span>${b.partyId&&!ed?"खाते में कुल बाकी ₹"+r2(bal(b.partyId)):""}</span></div>
+  <div class="pp-row note"><span>${(b.lines||[]).length} सामान</span><span>${b.partyId&&!ed&&bal(b.partyId)>0?"खाते में कुल बाकी ₹"+r2(bal(b.partyId)):""}</span></div>
   ${b.cancelled?`<div class="pp-stamp red">रद्द · ${esc(b.cancelReason||"")}</div>`:""}
   ${b.mode==="inst"?"":`<div class="pp-row3">${stampHTML(SF.stampPay(b))}${o.qr&&SF.qrFor(b)?`<div class="pp-qrbox"><div id="${o.qrId||"ppqr"}"></div></div>`:"<div></div>"}${stampHTML(SF.stampBy(b))}</div>
   ${o.qr&&SF.qrFor(b)?`<div class="pp-qr"><b>${esc(SF.qrFor(b).label)}</b><span>UPI: ${esc(upiId())}</span></div>`:""}`}
