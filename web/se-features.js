@@ -38,7 +38,7 @@ SF.onDate=function(d){
   if(S.isOwner){SF._rev=null;if(SF._unRev)try{SF._unRev()}catch(e){}SF._unRev=S.db.doc("ownerCfg/rev_"+d).onSnapshot(x=>{SF._rev=x.exists?x.data():null;if(S.tab==="day")renderDay()},()=>{});
     if(SF._unN)try{SF._unN()}catch(e){}SF._nt=undefined;
     if(d===today())SF._unN=S.db.doc("days/"+d+"/meta/stock").onSnapshot(x=>{const v=x.exists?x.data():null;const nt=v&&v.nightTs;if(SF._nt!==undefined&&nt&&nt!==SF._nt&&v.by!==S.uid)setTimeout(()=>{const D=nightDiffs(),tot=r2(D.filter(y=>y.r.short>0).reduce((a,y)=>a+y.val,0));toast("🌙 "+(v.nightBy||"कर्मचारी")+" ने रात का स्टॉक लिखा"+(D.length?" · "+D.length+" में फर्क"+(tot>0?" · लगभग "+rs(tot):"")+" — दिन का हिसाब देखें":" · हिसाब मिल गया 👍"))},900);SF._nt=nt||null},()=>{})}
-  S.prevStock={};SF.loadCopy(d);
+  S.prevStock={};SF.loadCopy(d);SF.loadGpay(d);SF.watchClose(d);
   S.db.doc("days/"+dayAdd(d,-1)+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day")renderDay()}).catch(()=>{});
 };
 const livePurch=()=>S.purch.filter(p=>!p.cancelled);
@@ -355,7 +355,7 @@ SF.ownerBriefHTML=function(){
   <div class="ob-g"><div><span>🛒 खरीद दर्ज</span><b>${rs(buy)}</b><small>${P.length?P.length+" पर्ची · आख़िरी "+ftime(lastP)+(late?" · "+late+" बाद में जोड़ी":""):"अभी कोई खरीद नहीं जुड़ी"}</small></div>
   <div><span>🧾 बिक्री</span><b>${rs(tot)}</b><small>${sale.length} बिल · UPI ${rs(upi)} · नकद ${rs(cash)}${ud?" · उधार "+rs(ud):""}${due?" · ⏳ बाकी "+rs(due):""}</small></div>
   <div><span>🏢 संस्था (खरीद भाव)</span><b>${rs(inst)}</b><small>${B.filter(b=>b.mode==="inst").length} चालान</small></div>
-  <div><span>🌙 रात का स्टॉक</span><b>${S.stock&&S.stock.nightTs?"✓ भरा":"— अभी नहीं"}</b><small>${S.stock&&S.stock.nightTs?esc(S.stock.nightBy||"")+" · "+ftime(S.stock.nightTs):"दुकान बंद होने पर"}</small></div></div>
+  <div><span>🌙 रात का स्टॉक</span><b>${S.stock&&S.stock.nightTs?"✓ भरा":"— अभी नहीं"}</b><small>${S.stock&&S.stock.nightTs?esc(S.stock.nightBy||"")+" · "+ftime(S.stock.nightTs):"दुकान बंद होने पर"}</small></div>${SF.gallaTileHTML()}</div>
   ${M.length?`<p class="ud-w" style="margin:6px 0 0">⚠ ${M.length} सब्ज़ी स्टॉक से ज़्यादा बिकीं (खरीद की एंट्री छूटी?): ${M.map(x=>esc(x.it.name)+" +"+fq(x.need,x.it.unit)).join(", ")}</p>`:""}</div>`;
 };
 document.addEventListener("click",e=>{if(e.target.closest("[data-gokharid]")){closeSheet&&closeSheet();if(typeof setTab==="function")setTab("kharid");else{const t=document.querySelector('[data-tab="kharid"]');if(t)t.click()}}});
@@ -368,7 +368,7 @@ SF.dayStockHTML=function(){
     <button class="big" data-night>🌙 रात का स्टॉक डालें</button>${S.stock&&S.stock.nightTs?`<p class="note" style="margin:6px 0 0">✓ ${esc(S.stock.nightBy||"")} ने ${ftime(S.stock.nightTs)} पर भरा — बदलना हो तो फिर से दबाएँ</p>`:""}</div>
   <div class="card2"><h3>🛒 मंडी की खरीद</h3><p class="note" style="margin:0">सुबह न जुड़ पाई तो दोपहर, शाम या रात को "खरीद" में डाल दें। आधी रात के बाद हो तो वहाँ "कल" चुनें।</p>
     <button class="big ghost" data-gokharid>🛒 खरीद डालें</button></div>`;
-  return `${SF.liveStockHTML()+SF.nightReviewHTML()+SF.copyCardHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html}
+  return `${SF.liveStockHTML()+SF.nightReviewHTML()+SF.copyCardHTML()+SF.gpayCardHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html}
   ${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
   ${SF.missingBuyHTML()}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>
@@ -640,6 +640,9 @@ ${S.purch.filter(p=>p.cancelled).length?"\nरद्द खरीद: "+S.purch.
 
 ## 4b. 🔐 UPI भुगतान मिलान (स्क्रीनशॉट से — असली पाने वाला)
 ${window.SP?SP.auditText(d):"—"}
+
+## 4c. 📱 Google Pay मिलान (मालिक की डाली फ़ाइल से)
+${SF.gpAuditText()}
 
 ## 5. खर्च
 ${S.kharch&&S.kharch.length?TH(["क्या","₹","कैसे","किसने"])+"\n"+T(S.kharch.map(k=>[k.what||k.note||k.name||"",num(k.amt),k.mode==="upi"?"UPI":"नकद",k.byName||""])):"कोई खर्च नहीं लिखा"}
@@ -1266,5 +1269,88 @@ document.addEventListener("click",async e=>{
 });
 SF.copyAuditText=function(){const C=SF.copyDoc;if(!C)return "";const D=C.day||{},N=C.night||{};const cs=D.sale||{};
   return `\n## 12. कर्मचारी की कॉपी (AI से पढ़ी — मिलान के लिए)\n- बिक्री (कॉपी): ऑनलाइन ₹${num(cs.online)} · नकद ₹${num(cs.cash)} · उधार ${(cs.udhar||[]).map(x=>x.name+" ₹"+num(x.amount)).join(", ")||"—"} · लिखा कुल ₹${num(cs.totalWritten)}\n- खरीद (कॉपी): ${(D.kharid||[]).map(x=>x.name+" "+x.qty+"×"+x.rate+"="+x.amount).join("; ")||"—"} · लिखा कुल ₹${num(D.kharidTotalWritten)}\n- संस्था (कॉपी): ${(D.sanstha||[]).map(x=>(x.to||"")+" "+x.name+" ₹"+x.amount).join("; ")||"—"}\n- रात का बचा (कॉपी): ${((N.night)||D.night||[]).map(x=>x.name+" "+x.qty+(x.unit==="pc"?"नग":"kg")).join(", ")||"—"}\n- खराब (कॉपी): ${((N.kharab)||D.kharab||[]).map(x=>x.name+" "+x.qty).join(", ")||"—"}\n- खर्च (कॉपी): ${(D.kharch||[]).map(x=>x.what+" ₹"+x.amount).join(", ")||"—"}\n- AI को साफ़ नहीं: ${(D.unclear||[]).concat(N.unclear||[]).join("; ")||"—"}\n`};
+/* =============== 📱 Google Pay मिलान (सिर्फ़ मालिक) — GPay Business की CSV फ़ाइल → हर पेमेंट किस बिल का =============== */
+/* 1) नोट में बिल नंबर (बिल वाला QR) 2) वही रकम, बिल से 15 मिनट पहले से 25 मिनट बाद तक 3) ₹1 से कम का फर्क = "लगभग" */
+SF.gp=null;
+SF.loadGpay=function(d){SF.gp=null;if(!S.isOwner||S.demo||!S.db)return;S.db.doc("ownerCfg/gpay_"+d).get().then(x=>{SF.gp=x.exists?x.data():null;if(S.billsDate===d&&(S.tab==="day"||S.tab==="bills"))renderPane()}).catch(()=>{})};
+function csvRows(t){const R=[];let row=[],f="",q=false;t=String(t||"").replace(/^﻿/,"");
+  for(let i=0;i<t.length;i++){const c=t[i];if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===","){row.push(f);f=""}else if(c==="\n"||c==="\r"){if(c==="\r"&&t[i+1]==="\n")i++;row.push(f);f="";if(row.some(x=>x.trim()))R.push(row);row=[]}else f+=c}
+  row.push(f);if(row.some(x=>x.trim()))R.push(row);return R}
+const noKey=n=>String(n||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+SF.parseGpay=function(text){
+  const R=csvRows(text);if(!R.length)return [];const H=R[0].map(h=>h.trim().toLowerCase());
+  const ix=k=>H.findIndex(h=>h.includes(k));const iN=ix("payer"),iT=ix("creation"),iX=ix("transaction id"),iA=H.findIndex(h=>h==="amount"),iS=ix("status"),iO=ix("notes"),iY=H.findIndex(h=>h==="type"),iV=ix("paid via");
+  if(iT<0||iA<0)return [];
+  return R.slice(1).map(r=>{const tm=(r[iT]||"").trim(),note=(r[iO]||"").trim(),m=noKey(note).match(/BILLNO(SE[A-Z0-9]{6})/);
+    return {name:(r[iN]||"").trim(),ts:new Date(tm.replace(" ","T")+"+05:30").getTime(),date:tm.slice(0,10),txn:(r[iX]||"").trim(),amt:num(r[iA]),ok:iS<0||/success/i.test(r[iS]||""),note,via:((iV>-1?r[iV]:"")+" "+(iY>-1?r[iY]:"")).trim(),bill:m?m[1]:""}})
+    .filter(p=>p.ok&&p.amt>0&&p.ts>0);
+};
+/* मिलान — बिल हर बार ताज़ा (नए/बदले बिल भी गिने जाते हैं) */
+SF.gpMatch=function(pays,bills){
+  const B=(bills||[]).filter(b=>!b.cancelled&&b.mode!=="inst"&&num(b.pay&&b.pay.upi)>0);const used=new Set(),out=pays.map(p=>({p,b:null,how:""}));
+  const byK={};B.forEach(b=>byK[noKey(b.no)]=b);
+  out.forEach(o=>{const b=o.p.bill&&byK[o.p.bill];if(b&&!used.has(b.no)){used.add(b.no);o.b=b;o.how=Math.abs(num(b.pay.upi)-o.p.amt)<0.01?"नोट":"नोट (रकम अलग)"}});
+  const pass=(tol,how)=>out.forEach(o=>{if(o.b)return;const c=B.filter(b=>!used.has(b.no)&&Math.abs(num(b.pay.upi)-o.p.amt)<tol&&o.p.ts-b.ts>=-15*60000&&o.p.ts-b.ts<=25*60000).sort((x,y)=>Math.abs(o.p.ts-x.ts)-Math.abs(o.p.ts-y.ts));
+    if(c.length){used.add(c[0].no);o.b=c[0];o.how=how}});
+  pass(0.01,"रकम+समय");pass(1.01,"लगभग");
+  return {rows:out,free:out.filter(o=>!o.b),miss:B.filter(b=>!used.has(b.no)),upiApp:r2(B.reduce((a,b)=>a+num(b.pay.upi),0)),gp:r2(pays.reduce((a,p)=>a+p.amt,0))};
+};
+SF.gpNow=function(){if(!SF.gp||!(SF.gp.pays||[]).length)return null;return SF.gpMatch(SF.gp.pays,S.dayBills)};
+const gpNear=o=>o.how==="लगभग"||o.how==="नोट (रकम अलग)";
+SF.gpTag=function(b){if(!S.isOwner)return "";const M=SF.gpNow();if(!M)return "";const o=M.rows.find(x=>x.b&&x.b.no===b.no);
+  if(o)return `<small class="gp-tag">📱 ${esc(o.p.name)}${gpNear(o)?" · ₹"+o.p.amt:""}</small>`;
+  const last=M.rows.reduce((a,x)=>Math.max(a,x.p.ts),0);
+  return num(b.pay&&b.pay.upi)>0&&!b.cancelled&&b.mode!=="inst"&&b.ts<=last?`<small class="gp-tag bad">🚨 UPI नहीं आया</small>`:""};
+SF.gpayCardHTML=function(){
+  if(!S.isOwner)return "";const M=SF.gpNow(),d=S.billsDate;
+  const head=`<div class="card2 gpc"><h3>📱 Google Pay मिलान <small class="note">· सिर्फ़ आपको</small></h3>
+  <p class="note" style="margin:0 0 6px">Google Pay Business → Transactions → डाउनलोड (CSV) → यहाँ फ़ाइल चुनें। हर पेमेंट अपने बिल से मिलेगा, बिल पर भरने वाले का नाम जुड़ेगा।</p>
+  <label class="big ghost gp-file">📂 Google Pay फ़ाइल चुनें<input type="file" id="gpFile" accept=".csv,text/csv,text/plain" hidden></label>`;
+  if(!M)return head+`<p class="note" style="margin:6px 0 0">${fdate(d)} की कोई फ़ाइल अभी नहीं डाली।</p></div>`;
+  const ok=M.rows.filter(o=>o.b),near=ok.filter(gpNear),fr=r2(M.free.reduce((a,o)=>a+o.p.amt,0)),ms=r2(M.miss.reduce((a,b)=>a+num(b.pay.upi),0));
+  const last=M.rows.reduce((a,o)=>Math.max(a,o.p.ts),0),df=r2(M.gp-M.upiApp);
+  return head+`<div class="gp-sum"><div><span>Google Pay में आया</span><b>${rs(M.gp)}</b><small>${M.rows.length} पेमेंट · ${ftime(last)} तक</small></div><div><span>बिलों में UPI</span><b>${rs(M.upiApp)}</b><small>फर्क ${df>=0?"+":"−"}${rs(Math.abs(df))}</small></div><div><span>✅ बिल से मिले</span><b>${ok.length}</b><small>${near.length?near.length+" लगभग":"सब पक्के"}</small></div></div>
+  ${M.free.length?`<div class="gp-l bad"><b>⚠ पैसा आया, पर बिल नहीं मिला — ${M.free.length} · ${rs(fr)}</b>${M.free.map(o=>`<span>${ftime(o.p.ts)} · ${esc(o.p.name)} · <b>${rs(o.p.amt)}</b>${o.p.bill?" · नोट में बिल "+esc(o.p.bill):""}</span>`).join("")}<small>पूछें: किस चीज़ का पैसा है? (पुरानी उधारी, बिना बिल की बिक्री?)</small></div>`:""}
+  ${M.miss.length?`<div class="gp-l bad"><b>🚨 बिल में UPI लिखा, पर पैसा नहीं आया — ${M.miss.length} · ${rs(ms)}</b>${M.miss.map(b=>`<span>${ftime(b.ts)} · ${esc(b.no)} · ${esc(b.byName||"")} · <b>${rs(b.pay.upi)}</b>${b.ts>last?" · (फ़ाइल के बाद का बिल)":""}</span>`).join("")}<small>या तो नकद लिया गया, या पैसा आया ही नहीं — कर्मचारी से पूछें।</small></div>`:""}
+  ${near.length?`<div class="gp-l"><b>≈ लगभग मिले (रकम में थोड़ा फर्क)</b>${near.map(o=>`<span>${esc(o.b.no)} बिल ${rs(o.b.pay.upi)} · आया ${rs(o.p.amt)} · ${esc(o.p.name)}</span>`).join("")}</div>`:""}
+  ${!M.free.length&&!M.miss.length?`<p class="ok" style="margin:6px 0 0">✅ हर UPI बिल का पैसा आया, हर पेमेंट का बिल मिला</p>`:""}</div>`;
+};
+SF.gpAuditText=function(){const M=SF.gpNow();if(!M)return "Google Pay फ़ाइल नहीं डाली गई।";
+  const ok=M.rows.filter(o=>o.b);
+  return `- Google Pay में आया: ₹${M.gp} (${M.rows.length} पेमेंट) · ऐप के बिलों में UPI: ₹${M.upiApp} · फर्क ₹${r2(M.gp-M.upiApp)}
+- बिल से मिले: ${ok.length} (${ok.filter(o=>o.how==="नोट").length} बिल नंबर से, ${ok.filter(o=>o.how==="रकम+समय").length} रकम+समय से, ${ok.filter(gpNear).length} लगभग)
+- पैसा आया पर बिल नहीं: ${M.free.length?M.free.map(o=>ftime(o.p.ts)+" "+o.p.name+" ₹"+o.p.amt).join("; "):"कोई नहीं"}
+- बिल में UPI पर पैसा नहीं आया: ${M.miss.length?M.miss.map(b=>b.no+" "+ftime(b.ts)+" "+(b.byName||"")+" ₹"+num(b.pay.upi)).join("; "):"कोई नहीं"}
+- लगभग: ${ok.filter(gpNear).map(o=>o.b.no+" बिल ₹"+num(o.b.pay.upi)+" आया ₹"+o.p.amt).join("; ")||"—"}`};
+SF.importGpay=async function(text){
+  if(!S.isOwner)return;const P=SF.parseGpay(text);if(!P.length){toast("इस फ़ाइल में Google Pay के पेमेंट नहीं मिले — सही CSV फ़ाइल चुनें");return}
+  const by={};P.forEach(p=>(by[p.date]=by[p.date]||[]).push(p));const dates=Object.keys(by).sort();let named=0;
+  for(const d of dates){
+    let old=[];if(d===S.billsDate&&SF.gp)old=SF.gp.pays||[];else if(!S.demo&&S.db){try{const x=await S.db.doc("ownerCfg/gpay_"+d).get();old=(x.exists&&x.data().pays)||[]}catch(e){}}
+    const seen=new Set(old.map(p=>p.txn));const pays=[...old,...by[d].filter(p=>!seen.has(p.txn))].sort((a,b)=>b.ts-a.ts);
+    let bills=d===S.billsDate?S.dayBills:null;
+    if(!bills&&!S.demo&&S.db){try{const q=await S.db.collection("days/"+d+"/bills").get();bills=q.docs.map(x=>x.data())}catch(e){bills=[]}}
+    const M=SF.gpMatch(pays,bills||[]);
+    const doc={date:d,pays,ts:Date.now(),by:S.uid||"",n:pays.length};
+    if(!S.demo&&S.db){try{await S.db.doc("ownerCfg/gpay_"+d).set(doc)}catch(e){toast("सेव नहीं हुआ: "+(e.code||""));return}}
+    for(const o of M.rows){if(!o.b||(o.b.upiPayer&&o.b.upiPayer.txn===o.p.txn))continue;const up={name:o.p.name,txn:o.p.txn,amt:o.p.amt,ts:o.p.ts,how:o.how};o.b.upiPayer=up;named++;
+      if(!S.demo&&S.db)try{await S.db.doc("days/"+d+"/bills/"+o.b.no).update({upiPayer:up})}catch(e){}}
+    if(d===S.billsDate)SF.gp=doc;
+  }
+  const d=dates[dates.length-1];
+  if(d!==S.billsDate&&SF.setDayDate)SF.setDayDate(d);else renderPane();
+  const M=SF.gpNow();
+  toast("📱 "+P.length+" पेमेंट पढ़े · "+named+" बिलों पर नाम जुड़ा"+(M&&(M.free.length||M.miss.length)?" · ⚠ "+(M.free.length+M.miss.length)+" बेमेल":""));
+};
+document.addEventListener("change",e=>{if(e.target.id!=="gpFile")return;const f=e.target.files&&e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>SF.importGpay(String(r.result||""));r.readAsText(f);e.target.value=""});
+/* 💵 रात की गल्ला गिनती — मालिक को अपने-आप नतीजा (कर्मचारी को "होना चाहिए" कभी नहीं दिखता) */
+SF.watchClose=function(d){if(SF._unC)try{SF._unC()}catch(e){}SF._ct=undefined;if(!S.isOwner||S.demo||!S.db||d!==today())return;
+  SF._unC=S.db.doc("days/"+d+"/meta/close").onSnapshot(x=>{const v=x.exists?x.data():null;const k=v&&v.counted!=null&&v.counted!==""?String(v.counted)+"|"+(v.ts||""):"";
+    if(SF._ct!==undefined&&k&&k!==SF._ct&&v.by!==S.uid)setTimeout(()=>{S.close=v;const c=cashCalc(d);const bad=c.diff!=null&&c.diff<-5;
+      toast((bad?"🚨 ":"💵 ")+(v.byName||"कर्मचारी")+" ने ₹"+c.counted+" गिना · होना चाहिए ₹"+c.expected+" → "+(c.diff===0?"ठीक":(c.diff>0?"+₹"+c.diff+" ज़्यादा":"₹"+Math.abs(c.diff)+" कम")));if(bad)try{beep(false)}catch(e){}},900);
+    SF._ct=k},()=>{})};
+SF.gallaTileHTML=function(){if(!S.isOwner)return "";const c=cashCalc(S.billsDate);
+  return `<div><span>💵 गल्ला गिनती</span><b>${c.counted==null?"— अभी नहीं":rs(c.counted)}</b><small>होना चाहिए ${rs(c.expected)}${c.diff!=null?" · "+(c.diff===0?"✅ ठीक":c.diff>0?"+"+rs(c.diff):"🚨 "+rs(Math.abs(c.diff))+" कम"):""}${S.close&&S.close.byName&&c.counted!=null?" · "+esc(S.close.byName):""}</small></div>`};
 SF.bindKharid();SF.bindLabel();SF.bindDay();SF.bindLabelSettings();
 })();

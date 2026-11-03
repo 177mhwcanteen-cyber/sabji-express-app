@@ -367,6 +367,17 @@ rep('"नकद+उधार":"उधार"}</small></div></button>', '"नक�
 # v34: राउंड ऑफ
 rep('$("#cartt").textContent=rs(cartTotal());', '$("#cartt").textContent=rs(S.mode==="inst"?cartTotal():Math.round(cartTotal()));')
 rep(r'if(b.disc)t+=`🏷️ छूट: −₹${b.disc}\n`;t+=`💰 *कुल रकम: ₹${b.total}*\n`;', r'if(b.disc)t+=`🏷️ छूट: −₹${b.disc}\n`;{const ro=window.SF&&SF.roff?SF.roff(b):0;if(ro)t+=`_जोड़ ₹${r2(b.sub!=null?b.sub:b.lines.reduce((a,l)=>a+(+l.amt||0),0))} · ${SF.roffTxt(ro)}_\n`}t+=`💰 *कुल रकम: ₹${b.total}*\n`;')
+# v35: कर्मचारी को नकद/UPI/उधार का जोड़ कभी नहीं — सिर्फ़ मालिक; कर्मचारी को आख़िरी 2 घंटे के बिल (और बाकी भुगतान वाले)
+rep('''  const bills=[...S.dayBills].sort((a,b)=>b.ts-a.ts);
+  const live=bills.filter(b=>!b.cancelled);''', '''  const bills=[...S.dayBills].sort((a,b)=>b.ts-a.ts).filter(b=>S.isOwner||b.settled===false||b.pending||(b.date===today()&&Date.now()-b.ts<2*3600e3));
+  const live=bills.filter(b=>!b.cancelled);''')
+rep('''<input class="inp" type="date" id="billsDate" value="${S.billsDate}" aria-label="तारीख"></div>
+  <div class="kpis"><div class="kpi"><span>बिल</span><b>${live.length}</b></div><div class="kpi"><span>नकद</span><b>${rs(sum("cash"))}</b></div><div class="kpi blue"><span>UPI</span><b>${rs(sum("upi"))}</b></div><div class="kpi red"><span>उधार</span><b>${rs(sum("udhar"))}</b></div></div>''',
+    '''${S.isOwner?`<input class="inp" type="date" id="billsDate" value="${S.billsDate}" aria-label="तारीख">`:""}</div>
+  ${S.isOwner?`<div class="kpis"><div class="kpi"><span>बिल</span><b>${live.length}</b></div><div class="kpi"><span>नकद</span><b>${rs(sum("cash"))}</b></div><div class="kpi blue"><span>UPI</span><b>${rs(sum("upi"))}</b></div><div class="kpi red"><span>उधार</span><b>${rs(sum("udhar"))}</b></div></div>`:`<p class="note" style="margin:0 0 8px">🧾 आख़िरी 2 घंटे के बिल — गलती सुधारने या ग्राहक को दोबारा भेजने के लिए</p>`}''')
+rep('''${S.isOwner&&window.SF&&SF.billProfitTag&&!b.cancelled?SF.billProfitTag(b):""}</div></button>''', '''${S.isOwner&&window.SF&&SF.billProfitTag&&!b.cancelled?SF.billProfitTag(b):""}${S.isOwner&&window.SF&&SF.gpTag?SF.gpTag(b):""}</div></button>''')
+rep('''<span>👤 ${esc(biller())} — आज आपके बिल</span><span>${t.n} · ${rs(t.amt)}</span>''', '''<span>👤 ${esc(biller())} — आज आपके बिल</span><span>${t.n}</span>''')
+s = s.replace(".ppc-sum small.roff{", ".gp-tag{display:block;font-size:11px;color:var(--leaf,#2e7d32);font-weight:600}.gp-tag.bad{color:var(--chili,#c62828)}.gpc .gp-file{display:block;text-align:center;cursor:pointer}.gp-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}.gp-sum>div{background:var(--surface2,#f5f5f0);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;min-width:0}.gp-sum span,.gp-sum small{font-size:11px;opacity:.8}.gp-sum b{font-size:16px}.gp-l{display:flex;flex-direction:column;gap:2px;margin:6px 0;padding:8px;border-radius:10px;background:var(--surface2,#f5f5f0);font-size:13px}.gp-l.bad{border:1.5px solid var(--chili,#c62828)}.gp-l small{opacity:.8}.ppc-sum small.roff{",1)
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")

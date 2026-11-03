@@ -378,6 +378,12 @@ async def main():
             await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300)
             await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
             assert not await pg.query_selector("#p-bills .pf") and not await pg.query_selector("#p-bills .pfk"), "staff must not see profit"
+            assert not await pg.query_selector("#p-bills .kpis") and not await pg.query_selector("#billsDate"), "staff must not see cash/UPI totals or other days"
+            assert not await pg.query_selector("#p-bills .gp-tag"), "staff must not see Google Pay names"
+            await pg.click('[data-tab="bill"]'); await pg.wait_for_timeout(200)
+            mine = await pg.evaluate("(document.querySelector('.mine')||{}).innerText||''")
+            assert "₹" not in mine, mine
+            await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(200)
             await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300)
             assert not await pg.query_selector("#p-day .cpy"), "staff must not see copy card"
             print("staff day view private ok")
@@ -431,6 +437,25 @@ async def main():
         assert await pg.query_selector("#p-bills .pfk") and await pg.query_selector("#p-bills .rt small.pf"), "owner profit tags"
         pft = await pg.inner_text("#p-bills .pfk"); assert "फायदा" in pft, pft
         await pg.screenshot(path=f"{SHOTS}/36-bills-profit.png")
+        # 📱 Google Pay फ़ाइल → बिल से मिलान (सिर्फ़ मालिक)
+        csv = await pg.evaluate("""(()=>{const u=S.dayBills.filter(b=>!b.cancelled&&b.mode!=='inst'&&+((b.pay||{}).upi)>0);if(!u.length)return '';const p=t=>{const d=new Date(t);const z=new Date(d.getTime()+5.5*3600e3);return z.toISOString().slice(0,19).replace('T',' ')};
+          let c='Payer/Receiver,Paid via,Type,Creation time,Transaction ID,Amount,Processing fee,Net amount,Status,Update time,Notes\\n';
+          c+='TEST A,Google Pay,UPI,'+p(u[0].ts+60000)+',TX1,'+u[0].pay.upi+',0.00,'+u[0].pay.upi+',Success,'+p(u[0].ts+60000)+',"Sabji Express | Bill No '+u[0].no+'"\\n';
+          c+='BINA BILL,Unknown app,UPI,'+p(u[0].ts+120000)+',TX2,777.00,0.00,777.00,Success,'+p(u[0].ts+120000)+',Payment from PhonePe\\n';
+          c+='FAIL X,Unknown app,UPI,'+p(u[0].ts+130000)+',TX3,50.00,0.00,50.00,Failed,'+p(u[0].ts+130000)+',\\n';return c})()""")
+        assert csv, "need an UPI bill for Google Pay test"
+        await pg.click('[data-tab="day"]'); await pg.wait_for_selector("#p-day .gpc")
+        await pg.set_input_files("#gpFile", files=[{"name": "gpay.csv", "mimeType": "text/csv", "buffer": csv.encode("utf8")}])
+        await pg.wait_for_timeout(900)
+        gpt = await pg.inner_text("#p-day .gpc")
+        assert "पैसा आया, पर बिल नहीं मिला" in gpt and "BINA BILL" in gpt and "777" in gpt and "FAIL X" not in gpt, gpt
+        gm = await pg.evaluate("""(()=>{const u=S.dayBills.filter(b=>!b.cancelled&&b.mode!=='inst'&&+((b.pay||{}).upi)>0)[0];const k='days/'+S.billsDate+'/bills';const mb=(window.__MOCK__[k]||{})[u.no]||{};return [(mb.upiPayer||{}).name,(mb.upiPayer||{}).how,!!window.__MOCK__.ownerCfg['gpay_'+S.billsDate],SF.gpNow().rows.length]})()""")
+        assert gm == ["TEST A", "नोट", True, 2], gm
+        await pg.locator("#p-day .gpc").screenshot(path=f"{SHOTS}/37-gpay.png")
+        await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(300)
+        assert "TEST A" in await pg.inner_text("#p-bills"), "payer name on owner bill list"
+        assert "Google Pay मिलान" in await pg.evaluate("SF.auditPack()")
+        print("gpay ok", gm)
         # 🤖 कॉपी → AI JSON → मिलान + रात का स्टॉक चढ़ाना
         await pg.click('[data-tab="day"]'); await pg.wait_for_selector("#p-day .cpy")
         await pg.click('[data-cpp="day"]'); await pg.wait_for_timeout(300)
