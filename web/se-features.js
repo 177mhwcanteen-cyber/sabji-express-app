@@ -379,11 +379,12 @@ SF.dayStockHTML=function(){
   <div class="card2"><h3>🌙 रात का स्टॉक</h3><p class="note" style="margin:0">दुकान बंद करते समय गाड़ी में जो माल बचा है, तौलकर/गिनकर लिखें।</p>
     <button class="big" data-night>🌙 रात का स्टॉक डालें</button>${S.stock&&S.stock.nightTs?`<p class="note" style="margin:6px 0 0">✓ ${esc(S.stock.nightBy||"")} ने ${ftime(S.stock.nightTs)} पर भरा — बदलना हो तो फिर से दबाएँ</p>`:""}</div>
   <div class="card2"><h3>🛒 मंडी की खरीद</h3><p class="note" style="margin:0">सुबह न जुड़ पाई तो दोपहर, शाम या रात को "खरीद" में डाल दें। आधी रात के बाद हो तो वहाँ "कल" चुनें।</p>
-    <button class="big ghost" data-gokharid>🛒 खरीद डालें</button></div>`;
+    <button class="big ghost" data-gokharid>🛒 खरीद डालें</button></div>
+  <div class="card2"><h3>🖼️ आज का भाव-पोस्टर</h3><p class="note" style="margin:0">सब्ज़ियों की फोटो और आज के भाव वाली सुंदर तस्वीर — WhatsApp ग्रुप या स्टेटस पर डालें।</p><button class="big ghost" data-sxposter>🖼️ पोस्टर बनाएँ और भेजें</button></div>`;
   return `<div data-ds="sar">${P2.html}${SF.xyzWarnHTML()}${window.SR&&SR.miniMapHTML?SR.miniMapHTML():""}</div>
   <div data-ds="paisa">${SF.gpayCardHTML()}</div>
   <div data-ds="ai">${SF.copyCardHTML()+SF.auditCardHTML()}</div>
-  <div data-ds="maal">${SF.liveStockHTML()+SF.nightReviewHTML()}
+  <div data-ds="maal">${window.SX?SX.mandiHTML()+SX.priceHTML():""}${SF.liveStockHTML()+SF.nightReviewHTML()}
   ${SF.missingBuyHTML()}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>
     <p class="note" style="margin:0">दुकान बंद करते समय बचा माल तौलकर डालें। "होना चाहिए" = कल रात का + आज की खरीद − बिका − संस्था।</p>
@@ -1478,5 +1479,6 @@ SF.udFilter=function(rows){const f=SF.uf,q=f.q.trim().toLowerCase();let L=rows.f
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ufm]");if(!b)return;SF.uf.mode=b.dataset.ufm;renderUdhar()});
 document.addEventListener("change",e=>{if(e.target.id==="ufS"){SF.uf.sort=e.target.value;renderUdhar()}});
 document.addEventListener("input",e=>{if(e.target.id!=="ufQ")return;SF.uf.q=e.target.value;clearTimeout(SF._ufT);SF._ufT=setTimeout(()=>{const pos=e.target.selectionStart;renderUdhar();const x=$("#ufQ");if(x){x.focus();try{x.setSelectionRange(pos,pos)}catch(y){}}},250)});
+SF.dayRows=dayRows;SF.lastRate=lastRate;SF.livePurch=livePurch;
 SF.bindKharid();SF.bindLabel();SF.bindDay();SF.bindLabelSettings();
 })();

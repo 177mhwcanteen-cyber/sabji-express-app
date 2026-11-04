@@ -56,6 +56,17 @@ document.querySelectorAll('body *').forEach(el=>{if(!el.offsetParent)return;if(e
 LATIN_JS = r"""(()=>{const W=new Map();const tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while(n=tw.nextNode()){const el=n.parentElement;if(!el||!el.offsetParent||el.closest('script,style,svg'))continue;
  (n.textContent.match(/[A-Za-z][A-Za-z.\-]{2,}/g)||[]).forEach(w=>W.set(w,(W.get(w)||0)+1))}return [...W.keys()]})()"""
 
+def fs_enc(v):
+    """Firestore REST टाइप वाला रूप (h.html/o.html टेस्ट के लिए)"""
+    if isinstance(v, bool): return {"booleanValue": v}
+    if isinstance(v, int): return {"integerValue": str(v)}
+    if isinstance(v, float): return {"doubleValue": v}
+    if isinstance(v, str): return {"stringValue": v}
+    if v is None: return {"nullValue": None}
+    if isinstance(v, list): return {"arrayValue": {"values": [fs_enc(x) for x in v]}}
+    if isinstance(v, dict): return {"mapValue": {"fields": {k: fs_enc(x) for k, x in v.items()}}}
+    return {"stringValue": str(v)}
+
 async def gallery(pg, who):
     """GALLERY=1 हो तो हर टैब की फोटो — रोशनी और अँधेरे (dark) दोनों में"""
     if not os.environ.get("GALLERY"): return
@@ -662,6 +673,80 @@ async def main():
         assert jq and all("JCO" in x for x in jq), jq
         await pg.fill("#ufQ", ""); await pg.wait_for_timeout(400)
         print("supplier suggest + udhar filter ok", sv, hid)
+        # ===== नए काम (se-plus) =====
+        await pg.evaluate("window.__oA4=SE.printA4;window.__oSh=SX.shareBlob;window.__oOp=window.open;window.__opened=[];window.open=(u)=>{window.__opened.push(u);return null};window.__shared=[];SX.shareBlob=async(b,n,e,m,t)=>{const o={n,e,m,size:b.size,txt:e==='png'?'':await b.text().catch(()=>'')};if(e==='png')o.url=await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)});window.__shared.push(o)};window.__a4=null;SE.printA4=async(t,h)=>{window.__a4={t,h}}")
+        # 1) कल की मंडी सूची
+        await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300); await pg.click('[data-dseg="maal"]'); await pg.wait_for_timeout(200)
+        await pg.click('[data-sxo="mandi"]'); await pg.wait_for_function("document.querySelector('#p-day .sxc table.rrt')", timeout=10000)
+        mt = await pg.evaluate("SX.mandiText()"); assert "कल की मंडी सूची" in mt and "रोज़" not in mt and "₹" not in mt, mt
+        await pg.click("[data-sxmandiwa]"); assert "wa.me" in (await pg.evaluate("window.__opened.slice(-1)[0]")) or "whatsapp" in (await pg.evaluate("window.__opened.slice(-1)[0]")).lower()
+        await pg.evaluate("SF.dseg='all';SF.dsegApply()")
+        # 2) भाव की सलाह
+        await pg.evaluate("(()=>{const it=item('kheera');it.sale=32;window.__MOCK__.items.kheera.sale=32;renderDay()})()"); await pg.wait_for_timeout(300)
+        sxr = await pg.query_selector('[data-sxrate^="kheera|"]'); assert sxr, "price advice for kheera"
+        sug = int((await sxr.get_attribute("data-sxrate")).split("|")[1])
+        await sxr.click(); await pg.wait_for_timeout(100); await pg.click('[data-sxrate^="kheera|"]'); await pg.wait_for_timeout(500)
+        assert (await pg.evaluate("window.__MOCK__.items.kheera.sale")) == sug and sug > 32, sug
+        # 3) समय-जगह
+        sl = await pg.evaluate("(async()=>{const r=await SX.calcSlots(7);return [r.n>0,Object.keys(r.hr).length>0,SX.slotHTML().includes('समय और जगह')]})()")
+        assert sl == [True, True, True], sl
+        # 4) खराबी रिपोर्ट + 14/15/16 औज़ार
+        await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(300)
+        await pg.click('[data-sxo="waste"]'); await pg.wait_for_function("(document.querySelector('[data-sxo=waste]')||{}).closest&&!document.body.innerText.includes('30 दिन की खराबी देखी जा रही')", timeout=15000)
+        await pg.click('[data-sxmonth]'); await pg.wait_for_function("window.__a4", timeout=15000)
+        a4 = await pg.evaluate("window.__a4"); assert "असली मुनाफ़ा" in a4["h"] and "दिन-वार" in a4["h"], a4["t"]
+        await pg.click('[data-sxvy="sale"]'); await pg.wait_for_function("window.__shared.length>=1", timeout=10000)
+        await pg.click('[data-sxvy="buy"]'); await pg.wait_for_function("window.__shared.length>=2", timeout=10000)
+        sh = await pg.evaluate("window.__shared"); assert sh[0]["e"] == "csv" and "Invoice No" in sh[0]["txt"] and "Bill No" in sh[1]["txt"], sh
+        await pg.click("[data-sxbk]"); await pg.wait_for_function("window.__shared.length>=3", timeout=30000)
+        bk = await pg.evaluate("JSON.parse(window.__shared[2].txt)"); assert bk["items"] and bk["parties"] and "days" in bk, list(bk.keys())
+        assert '"pin"' not in (await pg.evaluate("window.__shared[2].txt")), "backup must not hold PINs"
+        await pg.evaluate("localStorage.removeItem('sx_bk');SX.autoBackup()"); await pg.wait_for_timeout(1500)
+        assert await pg.evaluate("!!(window.__MOCK__.ownerCfg||{})['bk_'+dayAdd2(today(),-1)]".replace("dayAdd2(today(),-1)", "(()=>{const x=new Date(today()+'T12:00:00');x.setDate(x.getDate()-1);return today(x)})()")), "daily backup"
+        # 8) भाव-पोस्टर
+        await pg.click("[data-sxposter]"); await pg.wait_for_function("window.__shared.length>=4", timeout=20000)
+        ps = await pg.evaluate("window.__shared[3]"); assert ps["e"] == "png" and ps["size"] > 30000, ps["size"]
+        import base64; open(f"{SHOTS}/43-poster.png", "wb").write(base64.b64decode(ps["url"].split(",")[1]))
+        # 5) हिसाब-लिंक + h.html
+        await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300); await pg.click('[data-party="jco-mess"]'); await pg.wait_for_selector("[data-sxhl]")
+        await pg.click("[data-sxhl]"); await pg.wait_for_timeout(800)
+        tok = await pg.evaluate("window.__MOCK__.parties['jco-mess'].pubToken"); pubd = await pg.evaluate(f"window.__MOCK__.pub['{tok}']")
+        assert tok and pubd["type"] == "hisab" and pubd["bal"] > 0 and len(pubd["entries"]) > 5, (tok, pubd and pubd.get("bal"))
+        assert ("h.html?t=" + tok) in (await pg.evaluate("decodeURIComponent(window.__opened.slice(-1)[0])"))
+        await pg.evaluate("closeSheet()")
+        rates = await pg.evaluate("(window.__MOCK__.pub||{}).rates") or None
+        hp = await pg.context.new_page()
+        async def fsr(route):
+            u = route.request.url
+            if "/pub/" + tok in u: await route.fulfill(json={"fields": fs_enc(pubd)["mapValue"]["fields"]})
+            elif "/pub/rates" in u: await route.fulfill(json={"fields": fs_enc(rates)["mapValue"]["fields"]} if rates else {}, status=200 if rates else 404)
+            elif u.split("?")[0].endswith("/orders") and route.request.method == "POST": UPLOADS.append(("order", route.request.post_data)); await route.fulfill(json={"name": "x"})
+            else: await route.fulfill(status=404, body="{}")
+        await hp.route("https://firestore.googleapis.com/**", fsr)
+        await hp.goto(URL.replace("index.html", "h.html?t=" + tok)); await hp.wait_for_function("document.body.innerText.includes('तारीख-वार हिसाब')", timeout=8000)
+        htx = await hp.inner_text("body"); assert "JCO मेस" in htx and "UPI से अभी चुकाएँ" in htx, htx[:300]
+        await hp.screenshot(path=f"{SHOTS}/41-hisab-link.png")
+        # 7) ऑर्डर पेज + ऐप में ऑर्डर
+        await pg.evaluate("SX.pubRates(true)"); await pg.wait_for_timeout(600)
+        rates = await pg.evaluate("window.__MOCK__.pub.rates"); assert rates and len(rates["items"]) > 10
+        await hp.goto(URL.replace("index.html", "o.html")); await hp.wait_for_selector("[data-p]")
+        await hp.screenshot(path=f"{SHOTS}/42a-order-grid.png")
+        await hp.click('[data-p="aloo"]'); await hp.click('[data-p="aloo"]'); await hp.click('[data-p="tamatar"]'); await hp.click("#go"); await hp.wait_for_selector("#nm")
+        await hp.fill("#nm", "टेस्ट ग्राहक"); await hp.fill("#ph", "98290 12345"); await hp.fill("#ad", "12/B JCO लाइन"); await hp.click("#go")
+        await hp.wait_for_function("document.body.innerText.includes('ऑर्डर मिल गया')", timeout=8000)
+        await hp.screenshot(path=f"{SHOTS}/42-order-page.png")
+        ob = json.loads([u for u in UPLOADS if isinstance(u, tuple) and u[0] == "order"][-1][1])["fields"]
+        assert ob["phone"]["stringValue"] == "9829012345" and ob["status"]["stringValue"] == "new" and len(ob["items"]["arrayValue"]["values"]) == 2, ob
+        assert set(ob.keys()) <= {"name", "phone", "addr", "note", "items", "ts", "status", "src"}, ob.keys()
+        await hp.close()
+        await pg.evaluate("""(()=>{const M=window.__MOCK__;M.orders=M.orders||{};M.orders['o_t1']={name:'टेस्ट ग्राहक',phone:'9829012345',addr:'12/B',note:'',ts:Date.now(),status:'new',src:'web',items:[{id:'aloo',n:'आलू',q:0.5,u:'kg',s:20},{id:'tamatar',n:'टमाटर',q:0.25,u:'kg',s:20}]};SX._oUn&&SX._oUn();SX._oUn=null;SX.watchOrders()})()""")
+        await pg.wait_for_selector("#sxOrd", timeout=8000); await pg.click("#sxOrd"); await pg.wait_for_selector("[data-sxobill]")
+        await pg.click('[data-sxobill="o_t1"]'); await pg.wait_for_timeout(600)
+        oc = await pg.evaluate("[S.cart.map(l=>l.id),S.cust.phone,window.__MOCK__.orders.o_t1.status]")
+        assert "aloo" in oc[0] and "tamatar" in oc[0] and oc[1] == "9829012345" and oc[2] == "billing", oc
+        await pg.evaluate("S.cart=[];S.sxOrder=null;refreshAfterCart()")
+        await pg.evaluate("SE.printA4=window.__oA4;SX.shareBlob=window.__oSh;window.open=window.__oOp")
+        print("se-plus ok: mandi, rate, slot, waste, a4, vyapar, backup, poster, hisab-link, order")
         assert o3[0] == 36 and o3[1] == o3[2] == 21405 and o3[3:7] == ["177 MH वेट कैंटीन", "nopay", "home", 0] and o3[7] and o3[8], o3
         assert o2[0] + len(await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar2Skip||[]")) == 34 and o2[1] <= o2[2] == 13610 and o2[3] and o2[4] == 8, o2
         await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(500)
@@ -856,4 +941,8 @@ async def main():
     print("errors:", bad)
     print("ALL OK" if not bad else "ERRORS")
 
-asyncio.run(main())
+try:
+    asyncio.run(main())
+except Exception:
+    print("errors-at-fail:", errs[:8])
+    raise

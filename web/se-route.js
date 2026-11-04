@@ -435,6 +435,7 @@ SR.renderRoute=function(){
   <div class="card2"><h3>🏆 जगह की कमाई</h3><p class="note" style="margin:0">कहाँ कितना समय, कितने बिल, कितनी बिक्री। ₹ प्रति घंटा से पता चलेगा कि कहाँ ज़्यादा रुकना है।</p>
     <div class="ragg"><button class="big ghost" data-ragg="1">इस दिन</button><button class="big ghost" data-ragg="7">7 दिन</button><button class="big ghost" data-ragg="30">30 दिन</button></div>
     <div id="rAgg">${R.agg?aggHTML(R.agg):""}</div></div>
+  ${window.SX?SX.slotHTML():""}
   ${custHTML()}`;
   SR.drawMap();
 };

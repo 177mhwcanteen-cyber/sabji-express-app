@@ -11,7 +11,7 @@ function docRef(full){const p=full.split("/");const id=p.pop();const cp=p.join("
  update:async d=>{if(!(id in coll(cp)))throw {code:"not-found"};coll(cp)[id]=clone(applyInc(coll(cp)[id],d));notify()},
  delete:async()=>{delete coll(cp)[id];notify()},
  onSnapshot:(fn)=>{const s=()=>fn(snapDoc(cp,id));subs.push(s);setTimeout(s,5);return ()=>{}}}}
-const OPS={"==":(a,b)=>a===b,">=":(a,b)=>a>=b,"<=":(a,b)=>a<=b,">":(a,b)=>a>b,"<":(a,b)=>a<b};
+const OPS={"in":(a,b)=>(b||[]).includes(a),"==":(a,b)=>a===b,">=":(a,b)=>a>=b,"<=":(a,b)=>a<=b,">":(a,b)=>a>b,"<":(a,b)=>a<b};
 function q(path,filt){const ok=id=>!filt||OPS[filt[1]]((D[path][id]||{})[filt[0]],filt[2]);const o={where:(f,op,v)=>q(path,[f,op,v]),orderBy:()=>o,limit:()=>o,doc:id=>docRef(path+"/"+id),add:async d=>{const id="a"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);await docRef(path+"/"+id).set(d);return docRef(path+"/"+id)},
  get:async()=>({docs:Object.keys(D[path]||{}).filter(ok).map(id=>snapDoc(path,id))}),
  onSnapshot:(fn)=>{const s=()=>fn({docs:Object.keys(D[path]||{}).filter(ok).map(id=>snapDoc(path,id))});subs.push(s);setTimeout(s,5);return ()=>{}}};return o}

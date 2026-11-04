@@ -180,11 +180,18 @@ public class BtPrinterPlugin extends Plugin {
             boolean pdf = Boolean.TRUE.equals(call.getBoolean("pdf", true));
             String phone = call.getString("phone", "");
             String text = call.getString("text", "");
+            String mime = call.getString("mime", "");
+            String ext = call.getString("ext", "").replaceAll("[^A-Za-z0-9]", "");
             byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
             File dir = new File(getContext().getCacheDir(), "share");
             dir.mkdirs();
             File f;
-            if (pdf) {
+            if (mime != null && !mime.isEmpty() && ext != null && !ext.isEmpty()) {
+                f = new File(dir, name + "." + ext);
+                FileOutputStream os = new FileOutputStream(f);
+                os.write(bytes);
+                os.close();
+            } else if (pdf) {
                 Bitmap bm = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                 PdfDocument doc = new PdfDocument();
                 PdfDocument.PageInfo pi = new PdfDocument.PageInfo.Builder(bm.getWidth(), bm.getHeight(), 1).create();
@@ -205,7 +212,7 @@ public class BtPrinterPlugin extends Plugin {
             }
             Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
             Intent it = new Intent(Intent.ACTION_SEND);
-            it.setType(pdf ? "application/pdf" : "image/png");
+            it.setType(mime != null && !mime.isEmpty() ? mime : (pdf ? "application/pdf" : "image/png"));
             it.putExtra(Intent.EXTRA_STREAM, uri);
             if (text != null && !text.isEmpty()) it.putExtra(Intent.EXTRA_TEXT, text);
             it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);

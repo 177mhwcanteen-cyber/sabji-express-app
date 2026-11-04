@@ -1,0 +1,46 @@
+<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>सब्ज़ी एक्सप्रेस · घर बैठे ऑर्डर</title><meta name="theme-color" content="#0d1a33"><link rel="icon" href="icon.png"><link rel="stylesheet" href="fonts/fonts.css">
+<style>:root{--bg:#f2f2f7;--card:#fff;--ink:#1c1c1e;--mut:#6e6e73;--line:#e3e3e8;--acc:#e04a00;--accbg:#fff1e6}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--ink:#f5f5f7;--mut:#9a9aa1;--line:#38383a;--acc:#ff8a3d;--accbg:#3a2112}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 "Mukta","Noto Sans Devanagari",system-ui,sans-serif;padding-bottom:110px}
+header{background:linear-gradient(135deg,#0d1a33,#1b3566);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 16px;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:3}
+header img{width:44px;height:44px;border-radius:12px}h1{font:800 20px "Baloo 2",sans-serif;margin:0}header small{color:#cfe0ff}
+main{max-width:640px;margin:0 auto;padding:10px 12px}input.s,input.f,textarea{width:100%;border:1.5px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);padding:11px 12px;font:inherit;margin:0 0 10px}
+.g{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.t{background:var(--card);border-radius:18px;overflow:hidden;box-shadow:0 6px 18px rgba(16,24,40,.07);display:flex;flex-direction:column}
+.t .ph{aspect-ratio:5/4;background:#eee center/cover no-repeat;display:grid;place-items:center;font-size:42px}.t .b{padding:8px 10px 10px}.t b{display:block}.t .p{color:var(--acc);font-weight:800}
+.q{display:flex;align-items:center;justify-content:space-between;margin-top:6px}.q button{width:38px;height:38px;border-radius:12px;border:0;background:var(--accbg);color:var(--acc);font-size:22px;font-weight:800}.q span{font-weight:800}
+.t.on{outline:2.5px solid var(--acc)}.bar{position:fixed;left:0;right:0;bottom:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.go{width:100%;max-width:640px;margin:0 auto;display:block;border:0;border-radius:18px;padding:15px;font:800 18px inherit;color:#fff;background:linear-gradient(135deg,#ff9a4d,#f2640f 55%,#e04a00);box-shadow:0 10px 26px rgba(224,74,0,.4)}
+.go:disabled{opacity:.5}.c{background:var(--card);border-radius:20px;padding:14px;margin:10px 0;box-shadow:0 6px 18px rgba(16,24,40,.07)}.mut{color:var(--mut);font-size:13px}h3{margin:0 0 8px}</style></head><body>
+<header><img src="icon.png" alt=""><div><h1>सब्ज़ी एक्सप्रेस</h1><small>घर बैठे ऑर्डर — गाड़ी आपकी गली में 🚐</small></div></header>
+<main id="m"><div class="c">⏳ आज के भाव आ रहे हैं…</div></main>
+<div class="bar"><button class="go" id="go" disabled>सब्ज़ी चुनें</button></div>
+<script src="config.js"></script>
+<script>
+(async function(){const C=(window.SE_CONFIG||{}).firebase||{};const B="https://firestore.googleapis.com/v1/projects/"+C.projectId+"/databases/(default)/documents/";const m=document.getElementById("m"),go=document.getElementById("go");
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const V=v=>{if(!v)return null;if("stringValue"in v)return v.stringValue;if("integerValue"in v)return +v.integerValue;if("doubleValue"in v)return v.doubleValue;if("arrayValue"in v)return (v.arrayValue.values||[]).map(V);if("mapValue"in v){const o={};Object.entries(v.mapValue.fields||{}).forEach(([k,x])=>o[k]=V(x));return o}return null};
+const U={kg:"किलो",pc:"पीस",dz:"दर्जन",pkt:"पैकेट"};const st=u=>u==="kg"?0.25:1;const fq=(q,u)=>u==="kg"?(q<1?Math.round(q*1000)+" ग्राम":q+" किलो"):q+" "+(U[u]||u);
+let R,Q={},step="pick",qs="";try{const r=await fetch(B+"pub/rates?key="+C.apiKey);if(!r.ok)throw 0;R=V({mapValue:{fields:(await r.json()).fields||{}}})}catch(e){m.innerHTML='<div class="c">❌ अभी भाव नहीं मिले — थोड़ी देर बाद खोलें।</div>';return}
+const L=(R.items||[]).filter(i=>i&&i.s>0);const tot=()=>L.reduce((a,i)=>a+(Q[i.id]||0)*i.s,0);
+function draw(){if(step==="pick"){const f=L.filter(i=>!qs||(i.n+" "+(i.e||"")).toLowerCase().includes(qs));
+  m.innerHTML=`<input class="s" id="qs" type="search" placeholder="🔍 सब्ज़ी खोजें — जैसे टमाटर" value="${esc(qs)}"><div class="g">${f.map(i=>{const q=Q[i.id]||0;return `<div class="t ${q?"on":""}"><div class="ph" style="${i.p?`background-image:url('${esc(i.p)}')`:""}">${i.p?"":"🥬"}</div><div class="b"><b>${esc(i.n)}</b><span class="p">₹${i.s}</span><span class="mut">/${U[i.u]||i.u}</span>
+   <div class="q"><button data-m="${esc(i.id)}" aria-label="कम">−</button><span>${q?fq(q,i.u):"—"}</span><button data-p="${esc(i.id)}" aria-label="ज़्यादा">+</button></div></div></div>`}).join("")}</div>`;
+  const n=Object.values(Q).filter(x=>x>0).length;go.disabled=!n;go.textContent=n?`आगे बढ़ें · ${n} सब्ज़ी · लगभग ₹${Math.round(tot())}`:"सब्ज़ी चुनें";
+  const s=document.getElementById("qs");s.oninput=()=>{qs=s.value.trim().toLowerCase();const p=s.selectionStart;draw();const x=document.getElementById("qs");x.focus();x.setSelectionRange(p,p)}}
+ else if(step==="form"){const I=L.filter(i=>Q[i.id]>0);m.innerHTML=`<div class="c"><h3>🧺 आपका ऑर्डर</h3>${I.map(i=>`<div style="display:flex;justify-content:space-between"><span>${esc(i.n)} · ${fq(Q[i.id],i.u)}</span><b>₹${Math.round(Q[i.id]*i.s)}</b></div>`).join("")}<p class="mut">कुल लगभग ₹${Math.round(tot())} — असली रकम तौल के बाद बिल में</p><button class="lnk" id="bk" style="border:0;background:none;color:var(--acc);font:inherit;font-weight:700;padding:0">← सब्ज़ी बदलें</button></div>
+  <div class="c"><h3>📞 आपकी जानकारी</h3><input class="f" id="nm" placeholder="आपका नाम" maxlength="40" autocomplete="name"><input class="f" id="ph" placeholder="मोबाइल नंबर (10 अंक)" inputmode="tel" maxlength="14" autocomplete="tel"><input class="f" id="ad" placeholder="क्वार्टर / पता (जैसे 12/B, JCO लाइन)" maxlength="80"><textarea id="nt" rows="2" placeholder="कुछ खास? (ज़रूरी नहीं)" maxlength="200"></textarea></div>`;
+  go.disabled=false;go.textContent="✓ ऑर्डर भेजें";document.getElementById("bk").onclick=()=>{step="pick";draw()}}}
+m.addEventListener("click",e=>{const p=e.target.closest("[data-p]"),n=e.target.closest("[data-m]");if(!p&&!n)return;const id=(p||n).dataset[p?"p":"m"];const i=L.find(x=>x.id===id);const s=st(i.u);Q[id]=Math.max(0,Math.round(((Q[id]||0)+(p?s:-s))*100)/100);draw()});
+go.onclick=async()=>{if(step==="pick"){step="form";draw();window.scrollTo(0,0);return}
+ const nm=document.getElementById("nm").value.trim(),ph=document.getElementById("ph").value.replace(/\D/g,"").slice(-10),ad=document.getElementById("ad").value.trim(),nt=document.getElementById("nt").value.trim();
+ if(!nm){alert("अपना नाम लिखें");return}if(ph.length!==10){alert("10 अंक का मोबाइल नंबर लिखें");return}
+ const I=L.filter(i=>Q[i.id]>0).slice(0,40);go.disabled=true;go.textContent="⏳ भेजा जा रहा है…";
+ const S=v=>({stringValue:String(v)});const body={fields:{name:S(nm.slice(0,40)),phone:S(ph),addr:S(ad.slice(0,80)),note:S(nt.slice(0,200)),ts:{integerValue:String(Date.now())},status:S("new"),src:S("web"),
+  items:{arrayValue:{values:I.map(i=>({mapValue:{fields:{id:S(i.id),n:S(i.n),q:{doubleValue:Q[i.id]},u:S(i.u),s:{doubleValue:i.s}}}}))}}}};
+ try{const r=await fetch(B+"orders?key="+C.apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!r.ok)throw 0;
+  const wa=R.phone&&String(R.phone).length===10?"https://wa.me/91"+R.phone+"?text="+encodeURIComponent("🙏 मैंने सब्ज़ी एक्सप्रेस में ऑर्डर भेजा है — "+nm+" · "+ph):"";
+  m.innerHTML=`<div class="c" style="text-align:center"><div style="font-size:54px">✅</div><h3>ऑर्डर मिल गया, ${esc(nm)} जी!</h3><p>सब्ज़ी एक्सप्रेस की गाड़ी जल्द आपके पास आएगी 🚐<br>तौलकर बिल देंगे — UPI या नकद।</p>${wa?`<a href="${wa}" style="color:var(--acc);font-weight:800">WhatsApp पर बताएँ</a>`:""}</div>`;
+  document.querySelector(".bar").remove()}catch(e){go.disabled=false;go.textContent="✓ ऑर्डर भेजें";alert("ऑर्डर नहीं गया — इंटरनेट देखें और दोबारा भेजें")}};
+draw()})();
+</script></body></html>

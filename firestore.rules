@@ -66,7 +66,7 @@ service cloud.firestore {
     }
     match /parties/{id} {
       allow read, create: if active();
-      allow update: if isOwner() || (active() && onlyKeys(['lastCart', 'lastTs', 'phone', 'remindTs']));
+      allow update: if isOwner() || (active() && onlyKeys(['lastCart', 'lastTs', 'phone', 'remindTs', 'pubToken']));
       allow delete: if false;
     }
     match /customers/{id} { allow read, create, update: if active(); allow delete: if false; }
@@ -109,6 +109,21 @@ service cloud.firestore {
       allow write: if active() && request.auth.uid == uid;
     }
     match /places/{id} { allow read, write: if isOwner(); }  // जगहें सिर्फ़ मालिक की
+
+    // 🔗 ग्राहक के लिए खुले पन्ने (हिसाब-लिंक, आज के भाव) — गुप्त लिंक से कोई भी पढ़ सके, लिखे सिर्फ़ टीम
+    match /pub/{id} { allow read: if true; allow write: if active(); }
+    // 📥 घर बैठे ऑर्डर — ग्राहक बिना लॉगिन नया ऑर्डर भेज सके (तय खाने, छोटी सीमा); देखना/बदलना टीम, मिटाना मालिक
+    match /orders/{id} {
+      allow read, update: if active();
+      allow create: if request.resource.data.keys().hasOnly(['name', 'phone', 'addr', 'note', 'items', 'ts', 'status', 'src'])
+        && request.resource.data.status == 'new'
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.phone is string && request.resource.data.phone.matches('^[0-9]{10}$')
+        && request.resource.data.items is list && request.resource.data.items.size() > 0 && request.resource.data.items.size() <= 40
+        && (!('addr' in request.resource.data) || (request.resource.data.addr is string && request.resource.data.addr.size() <= 80))
+        && (!('note' in request.resource.data) || (request.resource.data.note is string && request.resource.data.note.size() <= 200));
+      allow delete: if isOwner();
+    }
 
     // 🔐 मालिक का UPI मिलान, असली दुकानदार, अपने खाते — कर्मचारी पढ़ भी नहीं सकते
     match /pay/{id}      { allow read, write: if isOwner(); }
