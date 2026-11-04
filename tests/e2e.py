@@ -115,7 +115,7 @@ async def main():
 
         # ---------- 1) मालिक ----------
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1}}}, users)
+        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1}}}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
@@ -765,7 +765,7 @@ async def main():
         assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
         print("opening edit ok")
         # 🪧 बोर्ड के भाव: एक बार अपने-आप
-        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
         bd = await pg.evaluate("[window.__MOCK__.items.tamatar.sale,window.__MOCK__.items.nimbu.sale,!!window.__MOCK__.items.parwal,window.__MOCK__.items.parwal&&window.__MOCK__.items.parwal.sale,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.note&&x.note.includes('बोर्ड')).length,window.__MOCK__.ownerCfg.flags.board1>0]")
         assert bd[0] == 20 and bd[1] == 200 and bd[2] and bd[3] == 90 and bd[4] >= 10 and bd[5], bd
         b2 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.board2>0,window.__MOCK__.items.harapyaj&&window.__MOCK__.items.harapyaj.sale,window.__MOCK__.items.kachchakela&&window.__MOCK__.items.kachchakela.sale,!window.__MOCK__.items.safalmatar,window.__MOCK__.items.methi.sale]")
@@ -779,6 +779,9 @@ async def main():
             assert await pg.evaluate("(S.prevStock||{}).seb&&S.prevStock.seb.close") == 5, "opening stock not loaded for today"
         c2 = await pg.evaluate("""(()=>{const M=window.__MOCK__,st=((M['days/2026-11-02/meta']||{}).stock)||{},cp=((M['days/2026-11-02/meta']||{}).copy)||{};const I=st.items||{};return [M.ownerCfg.flags.copy1>0,I.aloo&&I.aloo.close,I.tamatar&&I.tamatar.close,I.papita&&I.papita.waste,I.kiwi&&I.kiwi.close,!!(cp.day&&cp.day.sale),(st.wlog||[]).length]})()""")
         assert c2 == [True, 30, 0, 2.5, 10, True, 10], c2
+        c3 = await pg.evaluate("""(()=>{const M=window.__MOCK__,st=((M['days/2026-11-03/meta']||{}).stock)||{},cp=((M['days/2026-11-03/meta']||{}).copy)||{};const I=st.items||{},P=M.purchases||{};
+          const mm=Object.entries(M.items).find(([k,v])=>v.name==='मोटी मिर्च');return [M.ownerCfg.flags.copy2>0,I.seb&&I.seb.close,I.kiwi&&I.kiwi.close,I.kheera&&I.kheera.close,!!I.tamatar&&I.tamatar.close!==undefined,P.cp2_0311_seb&&P.cp2_0311_seb.total,P.cp2_0311_papita&&P.cp2_0311_papita.total,P.cp2_0311_papita&&P.cp2_0311_papita.pay,cp.day&&cp.day.sale.online,(cp.day&&cp.day.kharid.length),mm?(I[mm[0]]||{}).close:0.5]})()""")
+        assert c3 == [True, 8, 7, 0, False, 1500, 350, "galla", 7201, 28, 0.5], c3
         if await pg.evaluate("today()") == "2026-11-03":
             await pg.wait_for_timeout(400)
             assert await pg.evaluate("(S.prevStock||{}).aloo&&S.prevStock.aloo.close") == 30, "02-11 night must be today's opening"

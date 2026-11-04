@@ -13,7 +13,7 @@ async def m():
         b = await p.chromium.launch()
         mig = json.load(open(os.path.join(WWW, "migrate.json"), encoding="utf8"))
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        mock = {"items": mig["items"], "parties": mig["parties"], "settings": mig["settings"], "customers": mig["customers"], "purchases": {}, "ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1}}}
+        mock = {"items": mig["items"], "parties": mig["parties"], "settings": mig["settings"], "customers": mig["customers"], "purchases": {}, "ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1}}}
         import datetime, random
         random.seed(3)
         for i in range(1, 7):
