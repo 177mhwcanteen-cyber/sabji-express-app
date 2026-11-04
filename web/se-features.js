@@ -411,7 +411,7 @@ function dayMoney(rows){
   const sales=sum(sale,b=>b.total),profit=r2(sales-cogs);
   const expSale=r2(rows.reduce((a,r)=>{const used=r.avail-r.instQ-(r.close!=null?r.close:Math.max(0,r.expect))-r.waste;return a+Math.max(0,used)*(+r.it.sale||0)},0));
   const gap=r2(expSale-sales);
-  const html=`<div class="card2" style="border:1.5px solid var(--leaf)"><h3>📊 आज का पूरा हिसाब ${allClosed?"":'<span class="pill blue">रात का स्टॉक बाकी — अभी अंदाज़ा</span>'}</h3>
+  const html=`<div class="card2"><h3>📊 आज का पूरा हिसाब ${allClosed?"":'<span class="pill blue">रात का स्टॉक बाकी — अभी अंदाज़ा</span>'}</h3>
     <div class="stkmeta"><span>कल रात बचा माल (खरीद भाव)</span><b>${rs(openVal)}</b></div>
     <div class="stkmeta"><span>+ आज की खरीद (${livePurch().length} बिल)</span><b>${rs(buyAll)}</b></div>
     <div class="stkmeta"><span>− संस्थाओं को दिया</span><b>${rs(instVal)}</b></div>

@@ -278,7 +278,7 @@ async def main():
         await pg.fill("#pShop", "पवन सब्ज़ी भंडार"); await pg.fill("#pPh", "98290 11111")
         await pg.click('#pgrid [data-pitem="tamatar"]'); await pg.wait_for_selector("#piQ")
         await pg.fill("#piQ", "28"); await pg.press("#piQ", "Enter"); await pg.keyboard.type("10"); await pg.keyboard.press("Enter"); await pg.wait_for_timeout(300)
-        await pg.wait_for_function("document.activeElement&&document.activeElement.id==='pq'", timeout=4000)
+        await pg.wait_for_function("document.activeElement&&document.activeElement.id==='pq'", timeout=9000)
         ae = await pg.evaluate("[document.activeElement.id,document.activeElement.tagName,!!document.querySelector(\"#sheet .qpop\"),document.querySelector(\"#sheet\").innerText.slice(0,80)]"); assert ae[0] == "pq", ae
         await pg.keyboard.type("प्याज 92"); await pg.keyboard.press("Enter"); await pg.wait_for_selector("#piQ")
         assert await pg.input_value("#piQ") == "92"

@@ -433,6 +433,54 @@ s = s.replace(".ppc-sum small.roff{", ".bfbar{position:sticky;top:var(--hdrh,52p
 rep('  const rows=S.parties.map(p=>({...p,b:bal(p.id)})).sort((a,b)=>b.b-a.b);', '  let rows=S.parties.map(p=>({...p,b:bal(p.id)})).sort((a,b)=>b.b-a.b);')
 rep('  <div class="list">${rows.length?rows.map(r=>`<button class="li" data-party=', '  ${window.SF&&SF.udBarHTML?SF.udBarHTML():""}<div class="list">${(rows=window.SF&&SF.udFilter?SF.udFilter(rows):rows).length?rows.map(r=>`<button class="li" data-party=')
 s = s.replace(".ppc-sum small.roff{", ".shopsug{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0}.shopsug button{display:flex;flex-direction:column;align-items:flex-start;border:1.5px solid var(--leaf);background:var(--ok-bg);color:var(--ink);border-radius:12px;padding:6px 10px;font:inherit;text-align:left;max-width:100%}.shopsug b{font-size:14px}.shopsug span{font-size:11px;color:var(--muted)}.udbar{margin-top:-4px}.ppc-sum small.roff{",1)
+# v43: नया रंग-रूप (iPhone Pro जैसा) — गहरा नीला ऊपर, नारंगी मुख्य रंग, हरा सिर्फ़ "अच्छा/मुनाफ़ा" के लिए
+THEME2 = """
+:root{--bg:#f2f2f7;--surface:#ffffff;--surface2:#f2f2f5;--ink:#1c1c1e;--muted:#6e6e73;--line:#e3e3e8;
+ --accent:#ef5a0a;--accent-2:#ff8a3d;--accent-ink:#ffffff;--accent-bg:#fff1e6;--grad:linear-gradient(135deg,#ff9a4d 0%,#f2640f 55%,#e04a00 100%);
+ --hdr:linear-gradient(135deg,#0d1a33 0%,#1b3566 100%);--hdr-solid:#13264a;--hdr-ink:#ffffff;
+ --leaf:#1f8a3c;--leaf-ink:#ffffff;--ok-bg:#e8f7ec;--sky:#0a6cff;--sky-bg:#e8f1ff;
+ --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px rgba(16,24,40,.07);--r:20px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000000;--surface:#1c1c1e;--surface2:#2c2c2e;--ink:#f5f5f7;--muted:#9a9aa1;--line:#38383a;
+ --accent:#ff8a3d;--accent-2:#ffb067;--accent-ink:#ffffff;--accent-bg:#3a2112;--grad:linear-gradient(135deg,#ff9a52 0%,#f06418 55%,#d94c06 100%);
+ --hdr:linear-gradient(135deg,#070d1a 0%,#13264a 100%);--hdr-solid:#0b1630;--hdr-ink:#ffffff;
+ --leaf:#30d158;--leaf-ink:#00180a;--ok-bg:#0f2e1a;--sky:#64a8ff;--sky-bg:#10233d;--shadow:0 1px 1px rgba(0,0,0,.5),0 8px 24px rgba(0,0,0,.55)}}
+html body::before{background:var(--hdr-solid)}
+html header{background:var(--hdr);color:var(--hdr-ink);box-shadow:0 6px 20px rgba(8,16,40,.25);-webkit-backdrop-filter:none;backdrop-filter:none}
+html .tabs button{color:var(--hdr-ink);opacity:.72;border-bottom:0;border-radius:99px;margin:0 1px 6px;padding:6px 11px}
+html .tabs button[aria-selected="true"]{opacity:1;background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);color:#fff}
+html .tabs button[aria-selected="true"] .ti{filter:drop-shadow(0 0 6px rgba(255,154,77,.7))}
+html header{--leaf-ink:#ffffff}html #sbar .scanbtn{background:var(--grad);color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.25)}html .btab[aria-pressed="true"]{background:var(--grad);color:#fff;border-color:transparent}html .btab[aria-pressed="true"] *{color:#fff}
+html .who{color:var(--hdr-ink);border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)}
+html .lg{background:transparent;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+html .big{background:var(--grad);color:var(--accent-ink);box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent);text-shadow:0 1px 1px rgba(0,0,0,.15)}
+html .big.ghost{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);text-shadow:none;border:1px solid var(--line)}
+html .cartbtn{background:var(--grad);color:#fff;box-shadow:0 10px 28px color-mix(in srgb,var(--accent) 45%,transparent)}
+html .cartbtn *{color:#fff}
+html .scanbtn{background:var(--grad);color:#fff}
+html .chip[aria-pressed="true"],html .qchips button[aria-pressed="true"],html .who2 button[aria-pressed="true"],html .dseg button[aria-pressed=true]{background:var(--grad);color:#fff;border-color:transparent;box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 30%,transparent)}
+html .paym button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-bg);color:var(--ink)}
+html .kpi.hero{background:var(--grad);color:#fff;box-shadow:0 10px 26px color-mix(in srgb,var(--accent) 35%,transparent)}
+html .tick{background:var(--grad);color:#fff}html .sb-spin{border-color:var(--accent);border-top-color:transparent}
+html .bars div,html .hbar .t i{background:linear-gradient(180deg,var(--accent-2),var(--accent))}
+html .lgmsg,html .nsbox summary,html .sb-change b{color:var(--accent)}
+html .livestk,html .card.addnew{border-color:var(--accent)}
+html .obrief{border:0;background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--grad) border-box;border:2px solid transparent}
+html .ob-g>div{background:var(--surface2)}
+html .shopsug button{border-color:var(--accent);background:var(--accent-bg)}
+html .ratechip{color:var(--accent);border-color:var(--accent)!important}html .ratechip.on{background:var(--grad)!important;color:#fff!important}
+html .paper.pp-c .ppc-head{background:var(--hdr)}
+html .paper.pp-c .ppc-meta b{background:#fff1e6;color:#9a3d00}
+html .ppc-qr{border-color:#13264a}
+html .card2,html .kpi,html .list{border-radius:20px}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"]) .card2,html:not([data-theme="light"]) .kpi,html:not([data-theme="light"]) .list{box-shadow:none;border:1px solid #2a2a2d}}
+html h2.sec{letter-spacing:-.01em}
+html button,html .li,html .chip{transition:transform .12s ease,background-color .2s ease,box-shadow .2s ease}
+html button:active,html .li:active{transform:scale(.975)}
+html .cartbtn:active{transform:scale(.985)}
+@media (prefers-reduced-motion:reduce){html button,html .li,html .chip{transition:none}html button:active,html .li:active{transform:none}}
+"""
+_i = s.index(":root{--bg:#f2f2f7"); _j = s.index("</style>", _i); s = s[:_j] + THEME2 + s[_j:]
+s = s.replace('<meta name="theme-color" content="#0f5132">', '<meta name="theme-color" content="#0d1a33">')
 s = s.replace("आम ग्राहक", "VIP ग्राहक")
 # टीम के लिए "स्टाफ" शब्द नहीं
 s = s.replace("सब स्टाफ के फोन", "सब कर्मचारियों के फोन").replace("स्टाफ", "कर्मचारी")
