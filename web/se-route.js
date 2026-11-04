@@ -1276,6 +1276,24 @@ SR.autoInst2=async function(db){
     try{renderPane()}catch(x){}
   }catch(e){SR._inst2=0}
 };
+/* 🗺️ दिन का हिसाब → "सार" में आज की गाड़ी का छोटा नक्शा (सिर्फ़ मालिक) — टैप करें तो पूरा रूट */
+SR.mini={date:"",day:null,ts:0,map:null};
+SR.miniMapHTML=function(){if(!S.isOwner)return "";const d=SR.mini.date===S.billsDate?SR.mini.day:null;
+  const sum=d?`${d.stops.length} जगह रुकी · लगभग ${d.km} km · ${d.stops.filter(s=>s.sales>0).length} जगह बिक्री${d.gaps&&d.gaps.length?" · ⚠ "+d.gaps.length+" बार लोकेशन बंद":""}`:"⏳ नक्शा लोड हो रहा है…";
+  return `<div class="card2 mmap" data-gorute><h3 style="margin:0 0 6px">🗺️ ${S.billsDate===today()?"आज":fdate(S.billsDate)} की गाड़ी <small class="note">· टैप करें — पूरा रूट</small></h3><div id="dMini" class="dmini" role="img" aria-label="आज का रास्ता"></div><p class="note" id="dMiniT">${sum}</p></div>`};
+SR.miniInit=async function(){const el=document.getElementById("dMini");if(!el||!S.isOwner)return;const date=S.billsDate;
+  try{if(SR.mini.date!==date||Date.now()-SR.mini.ts>5*60000){const docs=S.demo||!S.db?[]:(await S.db.collection("trk").where("date","==",date).get()).docs.map(x=>x.data());
+      SR.mini={date,day:analyze(date,docs,(S.dayBills||[]).filter(b=>!b.cancelled)),ts:Date.now(),map:null}}
+    const d=SR.mini.day;const t=document.getElementById("dMiniT");
+    if(t)t.textContent=`${d.stops.length} जगह रुकी · लगभग ${d.km} km · ${d.stops.filter(s=>s.sales>0).length} जगह बिक्री${d.gaps&&d.gaps.length?" · ⚠ "+d.gaps.length+" बार लोकेशन बंद":""}`;
+    if(!window.L)await loadLeaflet();const el2=document.getElementById("dMini");if(!el2||el2._lm)return;
+    const m=L.map(el2,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false,tap:false});el2._lm=m;
+    L.tileLayer(SATU,{maxZoom:20,maxNativeZoom:18}).addTo(m);const B=[];
+    d.pts.forEach(u=>{const ll=u.P.map(p=>[p.lat,p.lng]);if(ll.length<2)return;L.polyline(ll,{color:"#fff",weight:6,opacity:.45}).addTo(m);L.polyline(ll,{color:colorOf(u.uid),weight:3.5}).addTo(m);ll.forEach(x=>B.push(x))});
+    d.stops.forEach((s,i)=>{L.circleMarker([s.lat,s.lng],{radius:s.sales>0?Math.min(14,6+Math.sqrt(s.sales)/6):5,color:"#fff",weight:2,fillColor:s.sales>0?"#22c55e":"#f59e0b",fillOpacity:.95}).addTo(m);B.push([s.lat,s.lng])});
+    if(B.length)m.fitBounds(B,{padding:[14,14],maxZoom:17});else m.setView([HOME.lat,HOME.lng],15);setTimeout(()=>{try{m.invalidateSize()}catch(e){}},150);
+  }catch(e){const t=document.getElementById("dMiniT");if(t)t.textContent="नक्शा नहीं बना: "+(e.code||e.message||"")}};
+document.addEventListener("click",e=>{if(!e.target.closest("[data-gorute]"))return;R.date=S.billsDate;R.raw=null;R.day=null;const t=document.querySelector('[data-tab="route"]');if(t)t.click()});
 /* SF के साथ जोड़ */
 if(window.SF){const _o=SF.onDb;SF.onDb=function(db){_o(db);try{SR.onDb(db)}catch(e){}}}
 })();

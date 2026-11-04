@@ -32,6 +32,66 @@ async def page(b, mock, users, cfg=True):
     await pg.goto(URL)
     return pg
 
+
+CONTRAST_JS = r"""(()=>{const P=s=>{const m=s.match(/rgba?\(([^)]+)\)/);if(!m)return null;const a=m[1].split(',').map(x=>parseFloat(x));return {r:a[0],g:a[1],b:a[2],a:a.length>3?a[3]:1}};
+const L=c=>{const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)};return .2126*f(c.r)+.7152*f(c.g)+.0722*f(c.b)};
+const mix=(top,bot)=>({r:top.r*top.a+bot.r*(1-top.a),g:top.g*top.a+bot.g*(1-top.a),b:top.b*top.a+bot.b*(1-top.a),a:1});
+const bgOf=el=>{const st=[];let e=el;while(e&&e.nodeType===1){if(getComputedStyle(e).backgroundImage!=='none'&&!st.length)return null;const c=P(getComputedStyle(e).backgroundColor);if(c&&c.a>0){st.push(c);if(c.a>=.99)break}e=e.parentElement}
+  let base=P(getComputedStyle(document.body).backgroundColor)||{r:255,g:255,b:255,a:1};if(base.a<1)base={r:255,g:255,b:255,a:1};for(let i=st.length-1;i>=0;i--)base=mix(st[i],base);return base};
+const out=[];const seen=new Set();
+document.querySelectorAll('body *').forEach(el=>{if(!el.offsetParent&&getComputedStyle(el).position!=='fixed')return;const own=[...el.childNodes].some(n=>n.nodeType===3&&n.textContent.trim().length>1);if(!own)return;
+  const cs=getComputedStyle(el);if(cs.visibility==='hidden'||+cs.opacity<.3)return;if(el.closest('svg,canvas,.leaflet-container,img,header'))return;
+  const r=el.getBoundingClientRect();if(r.width<2||r.height<2)return;
+  let fg=P(cs.color);if(!fg)return;const bg=bgOf(el);if(!bg)return;if(fg.a<1)fg=mix(fg,bg);
+  const l1=L(fg),l2=L(bg),cr=(Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05);
+  if(cr<3){const path=[];let e=el;for(let i=0;i<4&&e&&e!==document.body;i++){path.unshift(e.tagName.toLowerCase()+(e.id?'#'+e.id:'')+(e.className&&typeof e.className==='string'?'.'+e.className.trim().split(/\s+/).slice(0,2).join('.'):''));e=e.parentElement}
+    const k=path.join('>');if(seen.has(k))return;seen.add(k);out.push({cr:+cr.toFixed(2),path:k,text:el.textContent.trim().slice(0,40)})}});
+return out})()"""
+
+BRIGHT_JS = r"""(()=>{const P=s=>{const m=s.match(/rgba?\(([^)]+)\)/);if(!m)return null;const a=m[1].split(',').map(x=>parseFloat(x));return {r:a[0],g:a[1],b:a[2],a:a.length>3?a[3]:1}};
+const L=c=>{const f=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)};return .2126*f(c.r)+.7152*f(c.g)+.0722*f(c.b)};const out=[],seen=new Set();
+document.querySelectorAll('body *').forEach(el=>{if(!el.offsetParent)return;if(el.closest('header,.qr,.qrbox,canvas,svg,img,.leaflet-container,[class*=qr]'))return;const c=P(getComputedStyle(el).backgroundColor);if(!c||c.a<.9)return;if(L(c)<.55)return;
+ const r=el.getBoundingClientRect();if(r.width*r.height<1500)return;const k=el.tagName.toLowerCase()+'.'+(typeof el.className==='string'?el.className.trim().split(/\s+/).slice(0,2).join('.'):'');if(seen.has(k))return;seen.add(k);out.push(k+' '+getComputedStyle(el).backgroundColor)});return out})()"""
+
+LATIN_JS = r"""(()=>{const W=new Map();const tw=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while(n=tw.nextNode()){const el=n.parentElement;if(!el||!el.offsetParent||el.closest('script,style,svg'))continue;
+ (n.textContent.match(/[A-Za-z][A-Za-z.\-]{2,}/g)||[]).forEach(w=>W.set(w,(W.get(w)||0)+1))}return [...W.keys()]})()"""
+
+async def gallery(pg, who):
+    """GALLERY=1 हो तो हर टैब की फोटो — रोशनी और अँधेरे (dark) दोनों में"""
+    if not os.environ.get("GALLERY"): return
+    g = os.path.join(SHOTS, "gallery"); os.makedirs(g, exist_ok=True)
+    await pg.evaluate("closeSheet&&closeSheet()")
+    tabs = await pg.eval_on_selector_all("[data-tab]", "e=>e.map(x=>x.dataset.tab)")
+    for cs in ["light", "dark"]:
+        await pg.emulate_media(color_scheme=cs)
+        for t in tabs:
+            await pg.click(f'[data-tab="{t}"]'); await pg.wait_for_timeout(500)
+            if t == "day" and who == "owner":
+                for k in ["sar", "paisa", "maal", "ai"]:
+                    await pg.evaluate(f"SF.dseg='{k}';SF.dsegApply();window.scrollTo(0,0)"); await pg.wait_for_timeout(400)
+                    await pg.screenshot(path=f"{g}/{who}-{cs}-day-{k}.png", full_page=True)
+                    for x in await pg.evaluate(CONTRAST_JS): print("LOWCONTRAST", who, cs, "day-"+k, x["cr"], x["path"], "|", x["text"])
+                await pg.evaluate("SF.dseg='sar';SF.dsegApply()")
+            await pg.screenshot(path=f"{g}/{who}-{cs}-{t}.png", full_page=True)
+            bad = await pg.evaluate(CONTRAST_JS)
+            for x in bad: print("LOWCONTRAST", who, cs, t, x["cr"], x["path"], "|", x["text"])
+            if cs == "light": print("LATIN", who, t, " ".join(await pg.evaluate(LATIN_JS)))
+            if cs == "dark":
+                for x in await pg.evaluate(BRIGHT_JS): print("BRIGHT", who, t, x)
+        for t, sel in [("bills", "[data-bill]"), ("udhar", "[data-party]"), ("day", "[data-night]"), ("kharid", "[data-pview]"), ("bill", "#grid [data-item]")]:
+            if t not in tabs: continue
+            await pg.click(f'[data-tab="{t}"]'); await pg.wait_for_timeout(400)
+            el = await pg.query_selector(sel)
+            if not el: continue
+            try:
+                await el.click(); await pg.wait_for_timeout(700)
+                await pg.screenshot(path=f"{g}/{who}-{cs}-sheet-{t}.png", full_page=True)
+                bad = await pg.evaluate(CONTRAST_JS)
+                for x in bad: print("LOWCONTRAST", who, cs, "sheet-"+t, x["cr"], x["path"], "|", x["text"])
+            except Exception as ex: print("SHEETFAIL", who, t, str(ex)[:80])
+            await pg.evaluate("closeSheet&&closeSheet()"); await pg.wait_for_timeout(200)
+    await pg.emulate_media(color_scheme="light")
+
 async def main():
     async with async_playwright() as p:
         b = await p.chromium.launch()
@@ -412,6 +472,7 @@ async def main():
         assert len(cr) == 1 and cr[0]["status"] == "pending", cr
         print("cancel request", cr[0]["no"], cr[0]["reason"])
         mock = await pg.evaluate("window.__MOCK__")
+        await gallery(pg, "staff")
         await pg.context.close()
 
         # ---------- 3) मालिक रिपोर्ट + A4 ----------
@@ -432,7 +493,20 @@ async def main():
         assert ["मूंग दाल", 1, 65] in kc, (kcode, kc)
         print("kirana code", kcode, "cart", kc)
         await pg.evaluate("S.cart=[];refreshAfterCart()")
+        # 📑 खंड-पट्टी: एक बार में एक खंड
         await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(600)
+        assert await pg.is_visible('[data-dseg="sar"]') and await pg.is_visible("#p-day .obrief") and not await pg.is_visible("#p-day [data-saveclose]"), "sections"
+        await pg.click('[data-dseg="paisa"]'); await pg.wait_for_timeout(200)
+        assert await pg.is_visible("#p-day [data-saveclose]") and not await pg.is_visible("#p-day .obrief") and await pg.is_visible("#p-day .gpc")
+        await pg.click('[data-dseg="maal"]'); await pg.wait_for_timeout(200)
+        assert await pg.is_visible("#p-day [data-night]") and not await pg.is_visible("#p-day [data-saveclose]")
+        await pg.click('[data-dseg="ai"]'); await pg.wait_for_timeout(200)
+        assert await pg.is_visible("#p-day .cpy") and not await pg.is_visible("#p-day [data-night]")
+        await pg.click('[data-dseg="sar"]'); await pg.wait_for_timeout(300)
+        assert await pg.query_selector("#p-day #dMini"), "mini map"
+        await pg.screenshot(path=f"{SHOTS}/12a-owner-day-sar.png")
+        print("day sections ok")
+        await pg.evaluate("SF.dseg='all';SF.dsegApply()")
         await pg.screenshot(path=f"{SHOTS}/12-owner-day.png", full_page=True)
         assert await pg.query_selector("#p-day .obrief") and "खरीद दर्ज" in await pg.inner_text("#p-day .obrief"), "owner brief missing"
         txt = await pg.inner_text("#p-day")
@@ -544,6 +618,50 @@ async def main():
         pdt = await pg.inner_text("#p-udhar .pdel"); assert "नेपाली स्टाफ (कैंटीन)" in pdt and "मालिक ने हटाया" in pdt and "संस्था में भेजा" in pdt, pdt
         await pg.screenshot(path=f"{SHOTS}/38-udhar-deleted.png", full_page=True)
         print("party rename/delete ok")
+        # 🧾 बिल फिल्टर + से–तक
+        await pg.click('[data-tab="bills"]'); await pg.wait_for_timeout(400)
+        assert await pg.is_visible("#p-bills .bfbar"), "filter bar"
+        n_all = await pg.evaluate("document.querySelectorAll('#p-bills [data-bill]').length")
+        if await pg.query_selector('[data-bfm="upi"]'):
+            await pg.click('[data-bfm="upi"]'); await pg.wait_for_timeout(200)
+            ok = await pg.evaluate("[...document.querySelectorAll('#p-bills [data-bill]')].every(x=>{const b=S.dayBills.find(y=>y.no===x.dataset.bill);return b&&+b.pay.upi>0})")
+            assert ok, "upi filter"
+        await pg.click('[data-bfm="all"]'); await pg.wait_for_timeout(200)
+        first = await pg.evaluate("(document.querySelector('#p-bills [data-bill]')||{}).dataset.bill")
+        await pg.fill("#bfQ", first); await pg.wait_for_timeout(500)
+        nq = await pg.evaluate("[...document.querySelectorAll('#p-bills [data-bill]')].map(x=>x.dataset.bill)")
+        assert nq == [first], nq
+        await pg.fill("#bfQ", ""); await pg.wait_for_timeout(500)
+        await pg.fill("#bfFrom", "2026-10-28"); await pg.dispatch_event("#bfFrom", "change")
+        await pg.wait_for_function("[...document.querySelectorAll('#p-bills [data-bill]')].some(x=>x.dataset.bill==='SE-JB0001')", timeout=8000)
+        n_rng = await pg.evaluate("document.querySelectorAll('#p-bills [data-bill]').length")
+        assert n_rng > n_all, (n_rng, n_all)
+        await pg.screenshot(path=f"{SHOTS}/39-bills-filter.png")
+        await pg.click('[data-bfq="%s|%s"]' % (await pg.evaluate("today()"), await pg.evaluate("today()"))); await pg.wait_for_timeout(300)
+        # 📅 अवधि रिपोर्ट
+        await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(300)
+        await pg.click("[data-rropen]"); await pg.wait_for_function("document.querySelector('.rrc table.rrt')", timeout=8000)
+        rtx = await pg.inner_text(".rrc"); assert "कुल" in rtx and "फायदा" in rtx, rtx[:300]
+        await pg.locator(".rrc").screenshot(path=f"{SHOTS}/40-range-report.png")
+        print("bill filters + range ok", n_all, n_rng)
+        # 🏪 सप्लायर का नाम टाइप करते ही सुझाव
+        await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
+        await pg.fill("#pShop", ""); await pg.type("#pShop", "पव"); await pg.wait_for_timeout(200)
+        assert await pg.is_visible("#shopSug") and "पवन" in await pg.inner_text("#shopSug"), "supplier suggestions"
+        await pg.click("#shopSug [data-shopsug]"); await pg.wait_for_timeout(200)
+        sv = await pg.evaluate("[document.getElementById('pShop').value,document.getElementById('pPh').value]")
+        assert sv[0].startswith("पवन") and len(sv[1].replace(" ","")) >= 10, sv
+        await pg.fill("#pShop", ""); await pg.dispatch_event("#pShop", "input")
+        # 📒 उधार फिल्टर
+        await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(300)
+        await pg.click('[data-ufm="hide"]'); await pg.wait_for_timeout(200)
+        hid = await pg.evaluate("[...document.querySelectorAll('#p-udhar [data-party]')].map(x=>x.dataset.party)")
+        assert hid and all(h in ("adm-commander", "manoj-ghar") for h in hid), hid
+        await pg.click('[data-ufm="all"]'); await pg.fill("#ufQ", "JCO"); await pg.wait_for_timeout(500)
+        jq = await pg.evaluate("[...document.querySelectorAll('#p-udhar [data-party]')].map(x=>x.innerText.split('\\n')[0])")
+        assert jq and all("JCO" in x for x in jq), jq
+        await pg.fill("#ufQ", ""); await pg.wait_for_timeout(400)
+        print("supplier suggest + udhar filter ok", sv, hid)
         assert o3[0] == 36 and o3[1] == o3[2] == 21405 and o3[3:7] == ["177 MH वेट कैंटीन", "nopay", "home", 0] and o3[7] and o3[8], o3
         assert o2[0] + len(await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar2Skip||[]")) == 34 and o2[1] <= o2[2] == 13610 and o2[3] and o2[4] == 8, o2
         await pg.click('[data-tab="udhar"]'); await pg.wait_for_timeout(500)
@@ -723,6 +841,15 @@ async def main():
         html = await pg.evaluate("(()=>{const f=[...document.querySelectorAll('iframe')].pop();return f?f.contentDocument.documentElement.outerHTML:''})()")
         assert "सब्ज़ी-वार" in html and "टमाटर" in html and "मंडी खरीद" in html, html[:300]
         open(f"{SHOTS}/a4.html", "w", encoding="utf8").write(html)
+        # 🌙 डार्क मोड: कहीं भी लिखावट अदृश्य न हो (दिन का हिसाब, बिल, उधार, रिपोर्ट)
+        await pg.evaluate("closeSheet&&closeSheet()"); await pg.emulate_media(color_scheme="dark")
+        for t in ["day", "bills", "udhar", "report", "kharid"]:
+            await pg.click(f'[data-tab="{t}"]'); await pg.wait_for_timeout(400)
+            bad = await pg.evaluate(CONTRAST_JS)
+            assert not bad, (t, bad[:5])
+        await pg.emulate_media(color_scheme="light")
+        print("dark mode contrast ok")
+        await gallery(pg, "owner")
         await pg.context.close()
         await b.close()
     bad = [e for e in errs if "favicon" not in e]

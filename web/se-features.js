@@ -125,8 +125,9 @@ SF.renderKharid=function(force){
   ${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
   ${SF.morningHTML()}
   ${S.isOwner&&window.SP?SP.cardHTML():""}
-  <div class="shoprow"><label class="fld">🏪 दुकान का नाम<input class="inp" id="pShop" list="shopList" value="${esc(P.shop)}" placeholder="कुछ भी — जैसे पवन, 12 नं दुकान" autocomplete="off"></label>
+  <div class="shoprow"><label class="fld">🏪 दुकान का नाम<input class="inp" id="pShop" value="${esc(P.shop)}" placeholder="कुछ भी — जैसे पवन, 12 नं दुकान" autocomplete="off"></label>
     <label class="fld">📞 मोबाइल<input class="inp" id="pPh" inputmode="tel" value="${esc(P.phone)}" placeholder="ज़रूरी नहीं" autocomplete="off"></label></div>
+  <div class="shopsug" id="shopSug" hidden></div>
   <datalist id="shopList">${names.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
   <input class="inp" id="pq" type="search" placeholder="🔍 सब्ज़ी खोजें — जैसे टमाटर 25" value="${esc(P.q||"")}" autocomplete="off" aria-label="सब्ज़ी खोजें" style="margin:10px 0">
   <div class="grid" id="pgrid">${pGridHTML()}</div>
@@ -307,11 +308,22 @@ function supPaySheet(sid){
       if(S.demo)S.supPay.push({id:uid(),...d});else S.db.collection("supPay").doc("s"+uid()).set(d).catch(()=>toast("सेव नहीं हुआ"));
       S.supPay.push({id:"tmp",...d});closeSheet();toast(s.name+" को "+rs(amt)+" दर्ज");SF.renderKharid(1)}};
 }
+/* 🏪 दुकान का नाम टाइप करते ही पुराने सप्लायर (नाम/नंबर) — टैप करें तो नाम + नंबर भर जाए */
+const latinHi=s=>String(s||"").toLowerCase().replace(/\s+/g," ").trim();
+function shopSug(q){const box=$("#shopSug");if(!box)return;q=latinHi(q);const dq=q.replace(/\D/g,"");
+  const L=S.suppliers.filter(s=>s.name&&(!q||latinHi(s.name).includes(q)||(dq.length>=3&&String(s.phone||"").includes(dq)))).filter(s=>latinHi(s.name)!==q).slice(0,6);
+  if(!L.length){box.hidden=true;box.innerHTML="";return}
+  box.hidden=false;box.innerHTML=L.map(s=>{const ago=s.lastTs?Math.floor((Date.now()-s.lastTs)/864e5):null;return `<button type="button" data-shopsug="${esc(s.id)}"><b>${esc(s.name)}</b><span>${s.phone?esc(s.phone)+" · ":""}${ago==null?"":ago<1?"आज":ago===1?"कल":ago+" दिन पहले"}</span></button>`}).join("")}
+SF.shopSug=shopSug;
 SF.bindKharid=function(){
   const el=$("#p-kharid");
+  el.addEventListener("focusin",e=>{if(e.target.id==="pShop")shopSug(e.target.value)});
+  el.addEventListener("focusout",e=>{if(e.target.id==="pShop")setTimeout(()=>{const b=$("#shopSug");if(b&&!b.contains(document.activeElement))b.hidden=true},250)});
+  el.addEventListener("pointerdown",e=>{const b=e.target.closest("[data-shopsug]");if(!b)return;e.preventDefault();const s=S.suppliers.find(x=>x.id===b.dataset.shopsug);if(!s)return;
+    P.shop=s.name;P.phone=s.phone||"";saveDraft();const a=$("#pShop"),p=$("#pPh");if(a)a.value=P.shop;if(p)p.value=P.phone;const box=$("#shopSug");if(box)box.hidden=true;const q=$("#pq");if(q)q.focus()});
   el.addEventListener("input",e=>{const t=e.target;
     if(t.id==="pq"){P.q=t.value;const g=$("#pgrid");if(g)g.innerHTML=pGridHTML();return}
-    if(t.id==="pShop"){P.shop=t.value;saveDraft();return}
+    if(t.id==="pShop"){P.shop=t.value;saveDraft();shopSug(t.value);return}
     if(t.id==="pPh"){P.phone=t.value;saveDraft();return}
   });
   el.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pq"){e.preventDefault();const L=pPick();const m=String(P.q||"").match(/(\d+(?:[.,]\d+)?)\s*(kg|किलो)?\s*$/i);if(L.length)pItemSheet(L[0].id,null,m?num(m[1]):"")}});
@@ -368,8 +380,10 @@ SF.dayStockHTML=function(){
     <button class="big" data-night>🌙 रात का स्टॉक डालें</button>${S.stock&&S.stock.nightTs?`<p class="note" style="margin:6px 0 0">✓ ${esc(S.stock.nightBy||"")} ने ${ftime(S.stock.nightTs)} पर भरा — बदलना हो तो फिर से दबाएँ</p>`:""}</div>
   <div class="card2"><h3>🛒 मंडी की खरीद</h3><p class="note" style="margin:0">सुबह न जुड़ पाई तो दोपहर, शाम या रात को "खरीद" में डाल दें। आधी रात के बाद हो तो वहाँ "कल" चुनें।</p>
     <button class="big ghost" data-gokharid>🛒 खरीद डालें</button></div>`;
-  return `${SF.liveStockHTML()+SF.nightReviewHTML()+SF.copyCardHTML()+SF.gpayCardHTML()+SF.auditCardHTML()+SF.xyzWarnHTML()+P2.html}
-  ${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}
+  return `<div data-ds="sar">${P2.html}${SF.xyzWarnHTML()}${window.SR&&SR.miniMapHTML?SR.miniMapHTML():""}</div>
+  <div data-ds="paisa">${SF.gpayCardHTML()}</div>
+  <div data-ds="ai">${SF.copyCardHTML()+SF.auditCardHTML()}</div>
+  <div data-ds="maal">${SF.liveStockHTML()+SF.nightReviewHTML()}
   ${SF.missingBuyHTML()}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>
     <p class="note" style="margin:0">दुकान बंद करते समय बचा माल तौलकर डालें। "होना चाहिए" = कल रात का + आज की खरीद − बिका − संस्था।</p>
@@ -383,7 +397,7 @@ SF.dayStockHTML=function(){
     <label class="fld">रात बचा (होना चाहिए ${fq(Math.max(0,r.expect),it.unit)})<input class="inp ${r.flag?"bad":""}" id="sc-${id}" data-sk="close" inputmode="decimal" value="${r.close??""}"></label></div>
     ${(()=>{const o=(S.stock.items||{})[it.id]||{};return S.isOwner&&o.recount&&o.close1!=null?`<div class="note" style="margin-top:4px">⚖️ पहली गिनती ${fq(num(o.close1),it.unit)} → दोबारा ${fq(num(o.close),it.unit)}${o.closeBy?" · "+esc(o.closeBy):""}</div>`:""})()}
     ${r.short!=null?`<div class="stkmeta" style="margin-top:4px">${r.flag?`<span class="pill red">कमी ${fq(r.short,it.unit)} · ${rs(r2(r.short*(+it.sale||0)))}</span>`:r.extra?`<span class="pill blue">${fq(-r.short,it.unit)} ज़्यादा बचा</span>`:'<span class="pill green">✓ हिसाब मिला</span>'}</div>`:""}
-  </div></div>`}).join("")||'<div class="empty">आज अभी कोई माल नहीं — "खरीद" में मंडी की खरीद डालें</div>'}</div>`;
+  </div></div>`}).join("")||'<div class="empty">आज अभी कोई माल नहीं — "खरीद" में मंडी की खरीद डालें</div>'}</div></div>`;
 };
 function dayMoney(rows){
   const bills=liveBills(),sale=bills.filter(b=>b.mode!=="inst"),inst=bills.filter(b=>b.mode==="inst");
@@ -1371,5 +1385,98 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-nag]");if(
   if(k==="go"){const t=document.querySelector('[data-tab="kharid"]');if(t)t.click()}
   if(k==="none"){const d={by:S.uid||"",byName:biller(),ts:Date.now()};SF.nobuy=d;if(!S.demo&&S.db)S.db.doc("days/"+today()+"/meta/nobuy").set(d).catch(()=>{});toast("ठीक है — आज खरीद की याद नहीं आएगी")}});
 setTimeout(()=>{try{SF.buyNag()}catch(e){}},15*60000);setInterval(()=>{try{SF.buyNag()}catch(e){}},5*60000);
+
+/* 📑 दिन का हिसाब (मालिक) — खंड-पट्टी */
+const DSEG=[["sar","📊 सार"],["paisa","💵 पैसा"],["maal","📦 माल"],["ai","🤖 कॉपी·AI"]];
+SF.dseg=(()=>{try{return localStorage.getItem("se_dseg")||"sar"}catch(e){return "sar"}})();
+SF.dsegHTML=function(){let fl=0,mb=0;try{fl=dayRows().filter(r=>r.active&&r.flag).length}catch(e){}try{mb=SF.missingBuy().length}catch(e){}
+  const c=cashCalc(S.billsDate),gb=c.diff!=null&&c.diff<-5?1:0;const bad={maal:fl+mb,paisa:gb};
+  return `<nav class="dseg" role="tablist" aria-label="दिन का हिसाब — खंड">${DSEG.map(([k,t])=>`<button role="tab" data-dseg="${k}" aria-pressed="${SF.dseg===k}">${t}${bad[k]?`<i>${bad[k]}</i>`:""}</button>`).join("")}</nav>${window.SR&&SR.quickStripHTML?SR.quickStripHTML():""}`};
+SF.dsegApply=function(){const el=$("#p-day");if(!el)return;if(S.isOwner)el.dataset.dsec=SF.dseg;else delete el.dataset.dsec;
+  const h=document.querySelector("header");if(h)document.documentElement.style.setProperty("--hdrh",h.offsetHeight+"px")};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-dseg]");if(!b)return;SF.dseg=b.dataset.dseg;try{localStorage.setItem("se_dseg",SF.dseg)}catch(x){}
+  document.querySelectorAll("[data-dseg]").forEach(x=>x.setAttribute("aria-pressed",x===b));SF.dsegApply();if(SF.dseg==="sar"&&window.SR&&SR.miniInit)SR.miniInit();
+  const n=document.querySelector(".dseg");if(n&&n.getBoundingClientRect().top<0)n.scrollIntoView({block:"start"})});
+/* =============== 🧾 आज के बिल (मालिक) — ऊपर टिके फिल्टर + तारीख "से–तक" =============== */
+SF.bf={mode:"all",who:"",q:"",from:"",to:""};
+SF.rng={key:"",bills:[],loading:false};
+const dayList=(a,b)=>{const L=[];let d=a;for(let i=0;i<93&&d<=b;i++){L.push(d);d=dayAdd(d,1)}return L};
+SF.fetchRange=async function(from,to){const key=from+"|"+to;if(SF.rng.key===key&&!SF.rng.loading&&Date.now()-(SF.rng.ts||0)<120000)return SF.rng.bills;
+  SF.rng={key,bills:SF.rng.key===key?SF.rng.bills:[],loading:true,ts:0};let out=[];
+  try{for(const d of dayList(from,to)){if(d===S.billsDate){out=out.concat(S.dayBills.map(b=>({...b,date:b.date||d})));continue}
+      if(S.demo||!S.db)continue;const q=await S.db.collection("days/"+d+"/bills").get();out=out.concat(q.docs.map(x=>({...x.data(),date:x.data().date||d})))}}catch(e){}
+  SF.rng={key,bills:out,loading:false,ts:Date.now()};return out};
+const BF=[["all","सब"],["cash","💵 नकद"],["upi","📱 UPI"],["udhar","📒 उधार"],["inst","🏢 संस्था"],["pend","⏳ बाकी"],["cancel","🚫 रद्द"],["phone","☎️ नंबर वाले"],["edit","✏️ बदले गए"]];
+const bfOk={all:b=>true,cash:b=>!b.cancelled&&num(b.pay&&b.pay.cash)>0,upi:b=>!b.cancelled&&num(b.pay&&b.pay.upi)>0,udhar:b=>!b.cancelled&&num(b.pay&&b.pay.udhar)>0,inst:b=>!b.cancelled&&b.mode==="inst",
+  pend:b=>!b.cancelled&&b.settled===false,cancel:b=>!!b.cancelled,phone:b=>String(b.custPhone||"").length===10,edit:b=>num(b.editCount)>0};
+SF.bfRange=function(){const f=SF.bf,from=f.from||S.billsDate,to=f.to||S.billsDate;if(from===to)return [S.billsDate,S.billsDate];return from<=to?[from,to]:[to,from]};
+SF.renderBills=function(){
+  const el=$("#p-bills");if(!el)return;const f=SF.bf,[from,to]=SF.bfRange(),multi=from!==to;
+  let all=multi?(SF.rng.key===from+"|"+to?SF.rng.bills:null):S.dayBills;
+  if(multi&&(!all||Date.now()-(SF.rng.ts||0)>120000)&&!SF.rng.loading){SF.fetchRange(from,to).then(()=>{if(S.tab==="bills")SF.renderBills()})}
+  all=(all||[]).slice().sort((a,b)=>b.ts-a.ts);
+  const q=f.q.trim().toLowerCase();
+  const base=all.filter(b=>(!f.who||b.byName===f.who)&&(!q||[b.no,b.partyName,b.custName,b.custPhone,(b.upiPayer||{}).name,(b.lines||[]).map(l=>l.name).join(" ")].join(" ").toLowerCase().includes(q)));
+  const list=base.filter(bfOk[f.mode]||bfOk.all),live=list.filter(b=>!b.cancelled);
+  const sum=k=>r2(live.reduce((a,b)=>a+num(b.pay&&b.pay[k]),0)),saleT=r2(live.filter(b=>b.mode!=="inst").reduce((a,b)=>a+num(b.total),0)),instT=r2(live.filter(b=>b.mode==="inst").reduce((a,b)=>a+num(b.total),0));
+  const who=[...new Set(all.map(b=>b.byName).filter(Boolean))];
+  const y=dayAdd(today(),-1),mStart=today().slice(0,8)+"01";
+  const qk=[[today(),today(),"आज"],[y,y,"कल"],[dayAdd(today(),-6),today(),"7 दिन"],[mStart,today(),"इस महीने"]];
+  el.innerHTML=liveHTML()+`<div class="bfbar">
+    <div class="bf-r">${qk.map(([a,b,t])=>`<button class="chip" data-bfq="${a}|${b}" aria-pressed="${from===a&&to===b}">${t}</button>`).join("")}
+      <label class="bf-d">से<input type="date" id="bfFrom" value="${from}"></label><label class="bf-d">तक<input type="date" id="bfTo" value="${to}"></label></div>
+    <div class="bf-r">${BF.map(([k,t])=>{const n=base.filter(bfOk[k]).length;return k!=="all"&&!n?"":`<button class="chip" data-bfm="${k}" aria-pressed="${f.mode===k}">${t} <small>${n}</small></button>`}).join("")}</div>
+    <div class="bf-r"><input class="inp bf-q" id="bfQ" type="search" value="${esc(f.q)}" placeholder="🔍 बिल नं / ग्राहक / नंबर / सब्ज़ी" autocomplete="off">${who.length>1?`<select class="inp bf-w" id="bfW" aria-label="कर्मचारी"><option value="">👥 सब</option>${who.map(w=>`<option ${w===f.who?"selected":""}>${esc(w)}</option>`).join("")}</select>`:""}</div>
+  </div>
+  ${multi&&SF.rng.loading?'<p class="note">⏳ '+fdate(from)+' से '+fdate(to)+' तक के बिल आ रहे हैं…</p>':""}
+  <div class="kpis k4"><div class="kpi"><span>बिल</span><b>${live.length}</b></div><div class="kpi"><span>बिक्री</span><b>${rs(saleT)}</b></div><div class="kpi"><span>नकद</span><b>${rs(sum("cash"))}</b></div><div class="kpi blue"><span>UPI</span><b>${rs(sum("upi"))}</b></div><div class="kpi red"><span>उधार</span><b>${rs(sum("udhar"))}</b></div><div class="kpi"><span>संस्था</span><b>${rs(instT)}</b></div></div>
+  ${SF.profitKpiHTML?SF.profitKpiHTML(live):""}
+  <div class="list">${list.length?list.map(b=>`<button class="li${b.cancelled?" bcx":""}" data-bill="${esc(b.no)}" data-bdate="${esc(b.date||"")}"><div class="mid"><b>${b.pending?"📴 ":""}${esc(b.partyName)} ${b.rateChanged||b.disc?'<span class="pill red">ध्यान दें</span>':""}${b.cancelled?' <span class="pill red">रद्द</span>':""}</b><span>${multi?fdate(b.date).slice(0,5)+" ":""}${ftime(b.ts)} · ${esc(b.no)} · ${esc(b.byName)} · ${(b.lines||[]).length} चीज़ें${b.custPhone?" · ☎️ "+esc(b.custPhone):""}</span></div><div class="rt">${rs(b.total)}<small>${b.mode==="inst"?"संस्था":b.payMode==="upi"?"UPI":b.payMode==="cash"?"नकद":b.payMode==="split"?"नकद+उधार":b.settled===false?"⏳ बाकी":"उधार"}</small>${!b.cancelled&&SF.billProfitTag?SF.billProfitTag(b):""}${SF.gpTag&&!multi?SF.gpTag(b):""}</div></button>`).join(""):`<div class="empty"><b>इस फिल्टर में कोई बिल नहीं</b>ऊपर फिल्टर बदलें।</div>`}</div>`;
+  const h=document.querySelector("header");if(h)document.documentElement.style.setProperty("--hdrh",h.offsetHeight+"px");
+};
+document.addEventListener("click",e=>{
+  const qb=e.target.closest("[data-bfq]");if(qb){const [a,b]=qb.dataset.bfq.split("|");SF.bf.from=a;SF.bf.to=b;if(a===b&&a!==S.billsDate&&SF.setDayDate){SF.setDayDate(a);return}SF.renderBills();return}
+  const mb=e.target.closest("[data-bfm]");if(mb){SF.bf.mode=mb.dataset.bfm;SF.renderBills();return}
+  const bb=e.target.closest("#p-bills [data-bill]");if(bb&&S.isOwner&&!S.dayBills.find(y=>y.no===bb.dataset.bill)){const x=(SF.rng.bills||[]).find(y=>y.no===bb.dataset.bill);if(x&&typeof showReceipt==="function")showReceipt(x,false)}
+});
+document.addEventListener("change",e=>{const t=e.target;
+  if(t.id==="bfFrom"||t.id==="bfTo"){SF.bf[t.id==="bfFrom"?"from":"to"]=t.value||today();const [a,b]=SF.bfRange();if(a===b&&a!==S.billsDate&&SF.setDayDate){SF.setDayDate(a);return}SF.renderBills();return}
+  if(t.id==="bfW"){SF.bf.who=t.value;SF.renderBills()}});
+document.addEventListener("input",e=>{if(e.target.id!=="bfQ")return;SF.bf.q=e.target.value;clearTimeout(SF._bfT);SF._bfT=setTimeout(()=>{const pos=e.target.selectionStart;SF.renderBills();const x=$("#bfQ");if(x){x.focus();try{x.setSelectionRange(pos,pos)}catch(y){}}},250)});
+
+/* =============== 📅 अवधि रिपोर्ट (मालिक) — से–तक, दिन-वार =============== */
+SF.rr={from:"",to:"",open:false};
+SF.rangeHTML=function(){if(!S.isOwner)return "";const r=SF.rr;const to=r.to||today(),from=r.from||dayAdd(to,-6);const key=from+"|"+to;const B=SF.rng.key===key?SF.rng.bills:null;
+  if(r.open&&!B&&!SF.rng.loading)SF.fetchRange(from,to).then(()=>{if(S.tab==="report")renderReport()});
+  let body="";
+  if(r.open&&B){const days={};B.forEach(b=>{const d=b.date;const o=days[d]||(days[d]={n:0,sale:0,cash:0,upi:0,ud:0,inst:0,pf:0,cx:0});if(b.cancelled){o.cx++;return}o.n++;
+      if(b.mode==="inst")o.inst+=num(b.total);else{o.sale+=num(b.total);o.cash+=num(b.pay&&b.pay.cash);o.upi+=num(b.pay&&b.pay.upi);o.ud+=num(b.pay&&b.pay.udhar);try{o.pf+=num(SF.billProfit(b).p)}catch(x){}}});
+    const D=Object.keys(days).sort();const T={n:0,sale:0,cash:0,upi:0,ud:0,inst:0,pf:0,cx:0};D.forEach(d=>Object.keys(T).forEach(k=>T[k]+=days[d][k]));
+    const per={};B.filter(b=>!b.cancelled&&b.mode!=="inst").forEach(b=>{const o=per[b.byName||"—"]||(per[b.byName||"—"]={n:0,sale:0});o.n++;o.sale+=num(b.total)});
+    const td=v=>`<td class="r">${rs(r2(v))}</td>`;
+    body=D.length?`<div class="tblwrap"><table class="rrt"><thead><tr><th>दिन</th><th class="r">बिल</th><th class="r">बिक्री</th><th class="r">नकद</th><th class="r">UPI</th><th class="r">उधार</th><th class="r">संस्था</th><th class="r">फायदा</th></tr></thead><tbody>
+      ${D.map(d=>{const o=days[d];return `<tr><td>${fdate(d).slice(0,5)}</td><td class="r">${o.n}${o.cx?` <small>(${o.cx} रद्द)</small>`:""}</td>${td(o.sale)}${td(o.cash)}${td(o.upi)}${td(o.ud)}${td(o.inst)}${td(o.pf)}</tr>`}).join("")}
+      <tr class="tot"><td>कुल</td><td class="r">${T.n}</td>${td(T.sale)}${td(T.cash)}${td(T.upi)}${td(T.ud)}${td(T.inst)}${td(T.pf)}</tr></tbody></table></div>
+      <p class="note" style="margin:6px 0 0">रोज़ औसत बिक्री ${rs(r2(T.sale/Math.max(1,D.length)))} · औसत फायदा ${rs(r2(T.pf/Math.max(1,D.length)))} · ${Object.entries(per).map(([k,o])=>esc(k)+": "+o.n+" बिल "+rs(r2(o.sale))).join(" · ")}</p>`:'<p class="note">इन तारीखों में कोई बिल नहीं</p>';}
+  else if(r.open)body='<p class="note">⏳ बिल आ रहे हैं…</p>';
+  return `<div class="card2 rrc"><div class="rr-h"><h3 style="margin:0">📅 अवधि रिपोर्ट</h3><button class="lnk" data-rropen>${r.open?"बंद करें":"खोलें ›"}</button></div>
+    ${r.open?`<div class="bf-r" style="margin:6px 0">${[[dayAdd(today(),-6),today(),"7 दिन"],[today().slice(0,8)+"01",today(),"इस महीने"],[dayAdd(today(),-29),today(),"30 दिन"]].map(([a,b,t])=>`<button class="chip" data-rrq="${a}|${b}" aria-pressed="${from===a&&to===b}">${t}</button>`).join("")}<label class="bf-d">से<input type="date" id="rrFrom" value="${from}"></label><label class="bf-d">तक<input type="date" id="rrTo" value="${to}"></label></div>${body}`:'<p class="note" style="margin:4px 0 0">किसी भी तारीख से किसी तारीख तक — दिन-वार बिक्री, नकद, UPI, उधार, संस्था, फायदा</p>'}</div>`};
+document.addEventListener("click",e=>{if(e.target.closest("[data-rropen]")){SF.rr.open=!SF.rr.open;renderReport();return}
+  const q=e.target.closest("[data-rrq]");if(q){const [a,b]=q.dataset.rrq.split("|");SF.rr.from=a;SF.rr.to=b;renderReport()}});
+document.addEventListener("change",e=>{if(e.target.id==="rrFrom"||e.target.id==="rrTo"){SF.rr[e.target.id==="rrFrom"?"from":"to"]=e.target.value;if(SF.rr.from&&SF.rr.to&&SF.rr.from>SF.rr.to){const t=SF.rr.from;SF.rr.from=SF.rr.to;SF.rr.to=t}renderReport()}});
+
+/* 📒 उधार खाता — खोज + फिल्टर + क्रम (मालिक को रकम वाले फिल्टर; कर्मचारी को सिर्फ़ खोज) */
+SF.uf={q:"",mode:"all",sort:"bal"};
+SF.udBarHTML=function(){const f=SF.uf;const M=[["all","सब"],["due","बाकी वाले"],["old","15+ दिन पुराने"],["clear","साफ़"],["hide","🔒 छिपे"]];
+  return `<div class="bfbar udbar"><div class="bf-r"><input class="inp bf-q" id="ufQ" type="search" value="${esc(f.q)}" placeholder="🔍 नाम / नंबर / क्वार्टर" autocomplete="off">${S.isOwner?`<select class="inp bf-w" id="ufS" aria-label="क्रम"><option value="bal" ${f.sort==="bal"?"selected":""}>ज़्यादा बाकी ऊपर</option><option value="age" ${f.sort==="age"?"selected":""}>सबसे पुराना ऊपर</option><option value="name" ${f.sort==="name"?"selected":""}>नाम से</option></select>`:""}</div>
+  ${S.isOwner?`<div class="bf-r">${M.map(([k,t])=>`<button class="chip" data-ufm="${k}" aria-pressed="${f.mode===k}">${t}</button>`).join("")}</div>`:""}</div>`};
+SF.udFilter=function(rows){const f=SF.uf,q=f.q.trim().toLowerCase();let L=rows.filter(r=>!q||[r.name,r.phone,r.qtr].join(" ").toLowerCase().includes(q));
+  if(S.isOwner){const age=r=>{try{return udharAge(r.id)||0}catch(e){return 0}};
+    L=L.filter(r=>f.mode==="all"?true:f.mode==="due"?r.b>0:f.mode==="old"?r.b>0&&age(r)>15:f.mode==="clear"?!r.hide&&r.b<=0:f.mode==="hide"?!!r.hide:true);
+    if(f.sort==="name")L.sort((a,b)=>String(a.name).localeCompare(String(b.name),"hi"));else if(f.sort==="age")L.sort((a,b)=>age(b)-age(a))}
+  return L};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-ufm]");if(!b)return;SF.uf.mode=b.dataset.ufm;renderUdhar()});
+document.addEventListener("change",e=>{if(e.target.id==="ufS"){SF.uf.sort=e.target.value;renderUdhar()}});
+document.addEventListener("input",e=>{if(e.target.id!=="ufQ")return;SF.uf.q=e.target.value;clearTimeout(SF._ufT);SF._ufT=setTimeout(()=>{const pos=e.target.selectionStart;renderUdhar();const x=$("#ufQ");if(x){x.focus();try{x.setSelectionRange(pos,pos)}catch(y){}}},250)});
 SF.bindKharid();SF.bindLabel();SF.bindDay();SF.bindLabelSettings();
 })();

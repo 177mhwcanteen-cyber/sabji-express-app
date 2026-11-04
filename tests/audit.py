@@ -73,6 +73,7 @@ async def m():
         await pg.screenshot(path=f"{SHOTS}/a-bills.png")
         ok("आज के बिल + कौन बिल बना रहा है (लाइव)", await pg.evaluate("document.querySelector('#p-bills').innerText.length>40"))
         await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(400)
+        await pg.evaluate("window.SF&&(SF.dseg='all',SF.dsegApply())")
         t = await pg.inner_text("#p-day")
         ok("गल्ला मिलान + खर्चा + रात का स्टॉक + पूरा हिसाब", all(k in t for k in ["गल्ला मिलान", "खर्चा", "रात का स्टॉक", "आज का पूरा हिसाब"]))
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(600)
