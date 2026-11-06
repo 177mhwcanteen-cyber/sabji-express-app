@@ -561,6 +561,20 @@ html button,html .li,html .chip{transition:transform .12s ease,background-color 
 html button:active,html .li:active{transform:scale(.975)}
 html .cartbtn:active{transform:scale(.985)}
 @media (prefers-reduced-motion:reduce){html button,html .li,html .chip{transition:none}html button:active,html .li:active{transform:none}}
+/* 📊 रिपोर्ट-क्षेत्र */
+.rp-fav{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 10px}.rp-fav button{display:grid;justify-items:start;gap:1px;padding:9px;border:1px solid var(--line);border-radius:14px;background:var(--surface);text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.rp-fav i{font-style:normal;font-size:20px}.rp-fav span{font-size:12.5px;font-weight:700;line-height:1.15}.rp-fav b{font-size:13px;color:var(--leaf)}
+.rp-g{padding:6px 4px 4px}.rp-g h3{margin:4px 10px 4px;font-size:15px}
+.rp-r{display:flex;align-items:center;border-top:1px solid var(--line)}.rp-r:first-of-type{border-top:0}
+.rp-go{flex:1;display:flex;align-items:center;gap:9px;min-height:42px;padding:3px 8px;border:0;background:none;text-align:left;color:var(--ink);min-width:0}
+.rp-go i{font-style:normal;font-size:18px;width:26px;text-align:center;flex:none}.rp-go b{font-weight:600;font-size:14.5px;flex:1;min-width:0}.rp-go small{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}.rp-go em{font-style:normal;color:var(--muted);font-size:18px}
+.rp-r.warn .rp-go small{color:var(--chili)}.rp-r.warn .rp-go b::after{content:" •";color:var(--chili)}
+.rp-st{border:0;background:none;font-size:20px;color:#c3c7cf;width:38px;height:40px;flex:none}.rp-st.on{color:#f5b301}
+.rp-top{display:flex;align-items:center;gap:10px;margin:0 0 10px}.rp-top b{font-size:16px}.rp-back{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 12px;font-weight:700;color:var(--ink)}
+/* 🧭 सेटिंग की "सीधे जाएँ" पट्टी */
+.snav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.snav button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:5px 10px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.toast{pointer-events:none}
 </style>
 
 <header class="px">
@@ -1435,10 +1449,11 @@ function renderReport(){
   const topC=[...S.customers].sort((a,b)=>(b.spent||0)-(a.spent||0)).slice(0,5);
   const waText=`*सब्ज़ी एक्सप्रेस · ${fdate(date)}*\nबिक्री: ${rs(salesTot)} (${sale.length} बिल)\nनकद ${rs(cash)} · UPI ${rs(upi)} · उधार ${rs(ud)}\nवसूली: ${rs(jc+ju)}\nखर्चा: ${rs(cc.khAll)}\nमुनाफ़ा (खर्चे के बाद): ${rs(net)}\nगल्ला: ${cc.diff==null?"गिना नहीं":Math.abs(cc.diff)<=5?"पूरा मिला":rs(cc.diff)}\nमाल में कमी: ${rs(shortTot)}\nरेट बदले/छूट: ${flags.length} बिल`;
   const rows=Object.values(items).sort((a,b)=>b.amt-a.amt);
-  $("#p-report").innerHTML=(window.SX&&SX.toolsHTML?SX.toolsHTML():"")+(window.SF&&SF.rangeHTML?SF.rangeHTML():"")+(window.SF?SF.cancelReqsHTML():"")+(window.SF&&SF.ownerBriefHTML?SF.ownerBriefHTML():"")+(window.SB?SB.editsHTML()+(SB.udharHTML?SB.udharHTML():""):"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">मालिक की रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>
-  <button class="big ghost" data-a4 style="margin-bottom:10px">🖨️ A4 रिपोर्ट प्रिंट / PDF</button>
-  ${window.SF?SF.chartsHTML():""}
-  <div class="kpis">
+  /* 📊 रिपोर्ट-क्षेत्र (06-11-2026, Vyapar जैसा): ऊपर ज़रूरी चेतावनी + आज की झलक, नीचे समूह-वार सूची, ⭐ पसंदीदा सबसे ऊपर।
+     रिपोर्ट टैप करने पर ही उसका HTML बनता है (कम भार, ऐप अटके नहीं)। */
+  const R=(id,g,ic,t,hint,html,warn)=>({id,g,ic,t,hint,html,warn});
+  const REP=[
+    R("full","day","🧾","आज का पूरा हिसाब",rs(salesTot),()=>`<button class="big ghost" data-a4 style="margin-bottom:10px">🖨️ A4 रिपोर्ट प्रिंट / PDF</button><div class="kpis">
     <div class="kpi hero"><span>कुल बिक्री · ${fdate(date)} · ${sale.length} बिल</span><b>${rs(salesTot)}</b></div>
     <div class="kpi"><span>नकद बिक्री</span><b>${rs(cash)}</b></div><div class="kpi blue"><span>UPI बिक्री</span><b>${rs(upi)}</b></div>
     <div class="kpi red"><span>आज की नई उधारी</span><b>${rs(ud)}</b></div><div class="kpi"><span>उधारी वसूली (नकद+UPI)</span><b>${rs(jc+ju)}</b></div>
@@ -1448,24 +1463,52 @@ function renderReport(){
     <div class="kpi ${freeCost>0?"red":""}"><span>मुफ्त दिया (${freeQty} बार, खरीद कीमत)</span><b>${rs(freeCost)}</b></div><div class="kpi ${shortTot>0?"red":""}"><span>माल में कमी</span><b>${rs(shortTot)}</b></div>
     <div class="kpi hero" style="background:var(--surface);color:var(--ink)"><span style="color:var(--muted)">गल्ला मिलान · होना चाहिए ${rs(cc.expected)}${cc.counted!=null?" · गिना "+rs(cc.counted):""}</span><b style="font-size:20px;padding-top:4px">${diffPill(cc.diff)}</b></div>
   </div>
-  <a class="big ghost" style="margin-bottom:14px" target="_blank" rel="noopener" href="${waLink(waText,"")}">आज की रिपोर्ट WhatsApp पर भेजें</a>
-  ${srows.length?`<h3 style="margin:0 0 6px;color:var(--chili)">⚠ माल में कमी (रात के स्टॉक से)</h3><div class="list">${srows.map(r=>`<div class="li"><div class="mid"><b>${esc(r.it.name)}</b><span>आया ${fq(r.open,r.it.unit)} · बिका ${fq(r.sold,r.it.unit)} · खराब ${fq(r.waste,r.it.unit)} · बचा ${fq(r.close,r.it.unit)}</span></div><div class="rt" style="color:var(--chili)">${fq(r.short,r.it.unit)}<small>${rs(r.shortVal)}</small></div></div>`).join("")}</div>`:""}
-  ${noCost>0?`<p class="note" style="margin:-6px 0 12px">${rs(noCost)} की बिक्री ऐसी सब्ज़ियों की है जिनका खरीद रेट नहीं डाला — उनका मुनाफ़ा नहीं जुड़ा।</p>`:""}
-  ${flags.length?`<h3 style="margin:0 0 6px;color:var(--chili)">⚠ ध्यान दें: ${flags.length} बिल में रेट बदला या छूट दी</h3><div class="list">${flags.map(b=>`<button class="li" data-bill="${esc(b.no)}"><div class="mid"><b>${esc(b.partyName)} · ${esc(b.byName)}</b><span>${ftime(b.ts)} · ${b.lines.filter(l=>l.changed).map(l=>esc(l.name)+" "+rs(l.rate)+" (फिक्स "+rs(l.board)+")").join(", ")}${b.disc?" · छूट "+rs(b.disc):""}</span></div><div class="rt">${rs(b.total)}</div></button>`).join("")}</div>`:`<p class="note" style="margin:0 0 12px">✓ आज सभी बिल फिक्स रेट पर बने, कोई छूट नहीं।</p>`}
-  <h3 style="margin:0 0 6px">सब्ज़ी-वार बिक्री</h3>
-  <div class="tblwrap"><table class="t"><thead><tr><th>सब्ज़ी</th><th class="n">कितना बिका</th><th class="n">किस रेट पर</th><th class="n">फिक्स रेट</th><th class="n">रकम</th><th class="n">मुनाफ़ा</th></tr></thead><tbody>
-  ${rows.length?rows.map(o=>{const rates=[...o.rates];const p=o.cost>0?r2(o.amt-o.cost*o.qty):null;return `<tr class="${o.chg?"flag":""}"><td>${esc(o.name)}</td><td class="n">${fq(o.qty,o.unit)}</td><td class="n">${rates.map(r=>rs(r)).join(", ")}</td><td class="n">${rs(o.board)}</td><td class="n">${rs(o.amt)}</td><td class="n">${p==null?"—":rs(p)}</td></tr>`}).join(""):`<tr><td colspan="6" class="note">इस दिन कोई बिक्री नहीं</td></tr>`}
-  </tbody></table></div>
-  <h3 style="margin:0 0 6px">कर्मचारी-वार हिसाब</h3>
+<a class="big ghost" style="margin-bottom:14px" target="_blank" rel="noopener" href="${waLink(waText,"")}">आज की रिपोर्ट WhatsApp पर भेजें</a>${window.SK?SK.reportBtnHTML():""}`),
+    R("brief","day","📋","आज का सार (खरीद, स्टॉक)","",()=>window.SF&&SF.ownerBriefHTML?SF.ownerBriefHTML():""),
+    R("chart","day","📈","हफ़्ते का चार्ट","",()=>window.SF?SF.chartsHTML():""),
+    R("galla","day","💰","गल्ला मिलान",cc.diff==null?"गिना नहीं":Math.abs(cc.diff)<=5?"✓ मिला":rs(cc.diff),()=>`<div class="kpis"><div class="kpi hero" style="background:var(--surface);color:var(--ink)"><span style="color:var(--muted)">होना चाहिए ${rs(cc.expected)}${cc.counted!=null?" · गिना "+rs(cc.counted):""}</span><b>${cc.diff==null?"अभी गिना नहीं":Math.abs(cc.diff)<=5?"✓ पूरा मिला":rs(cc.diff)}</b></div><div class="kpi"><span>कर्मचारी के पास नकद होना चाहिए</span><b>${rs(cash+jc)}</b></div><div class="kpi red"><span>खर्चा</span><b>${rs(cc.khAll)}</b></div></div>`,cc.diff!=null&&Math.abs(cc.diff)>5),
+    R("flags","day","⚠️","रेट बदले / छूट वाले बिल",flags.length?flags.length+" बिल":"कोई नहीं",()=>`${flags.length?`<h3 style="margin:0 0 6px;color:var(--chili)">⚠ ध्यान दें: ${flags.length} बिल में रेट बदला या छूट दी</h3><div class="list">${flags.map(b=>`<button class="li" data-bill="${esc(b.no)}"><div class="mid"><b>${esc(b.partyName)} · ${esc(b.byName)}</b><span>${ftime(b.ts)} · ${b.lines.filter(l=>l.changed).map(l=>esc(l.name)+" "+rs(l.rate)+" (फिक्स "+rs(l.board)+")").join(", ")}${b.disc?" · छूट "+rs(b.disc):""}</span></div><div class="rt">${rs(b.total)}</div></button>`).join("")}</div>`:`<p class="note" style="margin:0 0 12px">✓ आज सभी बिल फिक्स रेट पर बने, कोई छूट नहीं।</p>`}${flags.length?"":`<div class="empty">आज किसी बिल में रेट नहीं बदला 👍</div>`}`,flags.length>0),
+    R("daybook","day","📒","आज के सारे बिल (Day Book)",sale.length+inst.length+" बिल",null),
+    R("kharch","day","💸","खर्चा · गल्ला · रात का स्टॉक",rs(cc.khAll),null),
+    R("hour","day","⏰","घंटे-वार बिक्री (कब भीड़)","",()=>{const H=Array(24).fill(0),N=Array(24).fill(0);sale.forEach(b=>{const h=new Date(b.ts||0).getHours();H[h]+=(+b.total||0);N[h]++});
+      const a=H.findIndex(v=>v>0),z=23-[...H].reverse().findIndex(v=>v>0),mx=Math.max(1,...H);if(a<0)return `<div class="empty">आज अभी कोई बिक्री नहीं</div>`;const pk=H.indexOf(Math.max(...H));
+      return `<p class="note" style="margin:0 0 8px">सबसे ज़्यादा भीड़: <b>${pk}:00–${pk+1}:00</b> · ${rs(H[pk])} (${N[pk]} बिल) — इस समय ज़्यादा साथी और तैयार माल रखें</p><div class="list">${H.slice(a,z+1).map((v,k)=>`<div class="li" style="gap:8px"><b style="width:52px;flex:none">${a+k}:00</b><i style="flex:0 0 ${Math.round(v/mx*45)}%;height:12px;border-radius:6px;background:${a+k===pk?"var(--chili)":"var(--leaf)"}"></i><span style="flex:1"></span><span class="rt">${rs(v)} <small class="note">${N[a+k]}</small></span></div>`).join("")}</div>`}),
+    R("staff","day","🧑‍💼","साथी-वार हिसाब",Object.keys(staff).length+" साथी",()=>`<h3 style="margin:0 0 6px">कर्मचारी-वार हिसाब</h3>
   <div class="tblwrap"><table class="t"><thead><tr><th>बिलर</th><th class="n">बिल</th><th class="n">नकद</th><th class="n">UPI</th><th class="n">उधार</th><th class="n">संस्था</th></tr></thead><tbody>
   ${Object.entries(staff).map(([n,s])=>`<tr><td>${esc(n||"—")}</td><td class="n">${s.n}</td><td class="n">${rs(s.cash)}</td><td class="n">${rs(s.upi)}</td><td class="n">${rs(s.ud)}</td><td class="n">${rs(s.inst)}</td></tr>`).join("")||`<tr><td colspan="6" class="note">—</td></tr>`}
-  </tbody></table></div>
-  <h3 style="margin:0 0 6px">संस्थाओं को गया माल</h3>
-  <div class="list">${Object.keys(instMap).length?Object.entries(instMap).map(([n,v])=>`<div class="li"><div class="mid"><b>${esc(n)}</b><span>खरीद रेट पर</span></div><div class="rt">${rs(v)}</div></div>`).join(""):`<div class="empty">इस दिन संस्थाओं को कुछ नहीं गया</div>`}</div>
-  ${topC.length?`<h3 style="margin:0 0 6px">सबसे ज़्यादा खरीदने वाले ग्राहक</h3><div class="list">${topC.map(c=>`<div class="li"><div class="mid"><b>${esc(c.name||c.phone)}</b><span>${esc(c.phone)} · ${c.visits||0} बार · आखिरी बार ${daysAgo(c.lastTs||Date.now())} दिन पहले</span></div><div class="rt">${rs(c.spent||0)}</div></div>`).join("")}</div>`:""}
-  <h3 style="margin:0 0 6px">लंबे समय की बिक्री</h3>
-  <div class="seg"><button class="chip" data-range="7" aria-pressed="${S.range?.n===7}">पिछले 7 दिन</button><button class="chip" data-range="30" aria-pressed="${S.range?.n===30}">पिछले 30 दिन</button></div>
-  <div id="rangeBox">${rangeHTML()}</div>`;
+  </tbody></table></div>`),
+    R("items","item","🥬","सब्ज़ी-वार बिक्री",rows.length+" सामान",()=>`<h3 style="margin:0 0 6px">सब्ज़ी-वार बिक्री</h3>
+  <div class="tblwrap"><table class="t"><thead><tr><th>सब्ज़ी</th><th class="n">कितना बिका</th><th class="n">किस रेट पर</th><th class="n">फिक्स रेट</th><th class="n">रकम</th><th class="n">मुनाफ़ा</th></tr></thead><tbody>
+  ${rows.length?rows.map(o=>{const rates=[...o.rates];const p=o.cost>0?r2(o.amt-o.cost*o.qty):null;return `<tr class="${o.chg?"flag":""}"><td>${esc(o.name)}</td><td class="n">${fq(o.qty,o.unit)}</td><td class="n">${rates.map(r=>rs(r)).join(", ")}</td><td class="n">${rs(o.board)}</td><td class="n">${rs(o.amt)}</td><td class="n">${p==null?"—":rs(p)}</td></tr>`}).join(""):`<tr><td colspan="6" class="note">इस दिन कोई बिक्री नहीं</td></tr>`}
+  </tbody></table></div>${noCost>0?`<p class="note" style="margin:-6px 0 12px">${rs(noCost)} की बिक्री ऐसी सब्ज़ियों की है जिनका खरीद रेट नहीं डाला — उनका मुनाफ़ा नहीं जुड़ा।</p>`:""}`),
+    R("short","item","📉","माल में कमी",shortTot>0?rs(shortTot):"कोई नहीं",()=>`${srows.length?`<h3 style="margin:0 0 6px;color:var(--chili)">⚠ माल में कमी (रात के स्टॉक से)</h3><div class="list">${srows.map(r=>`<div class="li"><div class="mid"><b>${esc(SE.capNm(r.it.name))}</b><span>आया ${fq(r.open,r.it.unit)} · बिका ${fq(r.sold,r.it.unit)} · खराब ${fq(r.waste,r.it.unit)} · बचा ${fq(r.close,r.it.unit)}</span></div><div class="rt" style="color:var(--chili)">${fq(r.short,r.it.unit)}<small>${rs(r.shortVal)}</small></div></div>`).join("")}</div>`:""}${srows.length?"":`<div class="empty">रात के स्टॉक से कोई कमी नहीं 👍</div>`}`,shortTot>0),
+    R("stock","item","🌙","रात का बचा माल · कल की मंडी सूची","",null),
+    ...(window.SX&&SX.wasteHTML?[R("waste","item","🥀","खराबी रिपोर्ट (30 दिन)","",()=>SX.wasteHTML())]:[]),
+    R("profit","item","💹","सब्ज़ी-वार मुनाफ़ा (दिन चुनें)","",()=>window.SQ?SQ.html():""),
+    R("udhar","party","📒","आज का उधार",ud?rs(ud):"कोई नहीं",()=>(window.SB&&SB.udharHTML?SB.udharHTML():"")||`<div class="empty">आज कोई नया उधार नहीं</div>`),
+    R("ledger","party","🧾","पार्टी / उधार खाता (स्टेटमेंट)","",null),
+    R("topc","party","⭐","सबसे अच्छे ग्राहक",topC.length+"",()=>`${topC.length?`<h3 style="margin:0 0 6px">सबसे ज़्यादा खरीदने वाले ग्राहक</h3><div class="list">${topC.map(c=>`<div class="li"><div class="mid"><b>${esc(c.name||c.phone)}</b><span>${esc(c.phone)} · ${c.visits||0} बार · आखिरी बार ${daysAgo(c.lastTs||Date.now())} दिन पहले</span></div><div class="rt">${rs(c.spent||0)}</div></div>`).join("")}</div>`:""}${topC.length?"":`<div class="empty">अभी कोई ग्राहक नहीं</div>`}`),
+    R("sleep","party","😴","सोए ग्राहक (30 दिन से नहीं आए)",S.customers.filter(c=>c.lastTs&&Date.now()-c.lastTs>30*864e5&&(c.visits||0)>=2).length+"",()=>{const L=S.customers.filter(c=>c.lastTs&&Date.now()-c.lastTs>30*864e5&&(c.visits||0)>=2).sort((a,b)=>(b.spent||0)-(a.spent||0)).slice(0,40);
+      return L.length?`<p class="note" style="margin:0 0 8px">पहले आते थे (2+ बार), अब 30 दिन से नहीं — एक WhatsApp से वापस बुलाएँ। सबसे ज़्यादा खरीदने वाले पहले।</p><div class="list">${L.map(c=>`<div class="li"><div class="mid"><b>${esc(c.name||c.id)}</b><span>${esc(c.id)} · ${Math.floor((Date.now()-c.lastTs)/864e5)} दिन से नहीं · कुल ${rs(c.spent||0)}</span></div><a class="lnk" href="tel:+91${esc(c.id)}" aria-label="कॉल">📞</a> <a class="lnk" target="_blank" rel="noopener" aria-label="WhatsApp" href="${waLink("🙏 नमस्ते "+(c.name||"")+" जी, 177 MH कैंटीन में आपकी याद आई! ताज़ी मिठाई-नाश्ता तैयार है — घर बैठे भी मँगा सकते हैं।",c.id)}">💬</a></div>`).join("")}</div>`:`<div class="empty">कोई सोया ग्राहक नहीं 👍</div>`}),
+    R("route","long","🚐","रूट: जगह-समय की कमाई","",null),
+    R("area","party","📍","इलाका-वार बिक्री (बिल की जगह से)","",()=>{const M={};let no=0;sale.forEach(b=>{if(!b.loc){no++;return}const pl=window.SR&&SR.placeAt?SR.placeAt(b.loc):null;const k=pl?pl.name||"जगह":"नाम नहीं रखा (नई जगह)";const o=M[k]||(M[k]={n:0,v:0});o.n++;o.v+=(+b.total||0)});
+      const L=Object.entries(M).sort((a,b)=>b[1].v-a[1].v);return `${L.length?`<div class="list">${L.map(([k,o])=>`<div class="li"><div class="mid"><b>📍 ${esc(k)}</b><span>${o.n} बिल</span></div><div class="rt">${rs(o.v)}</div></div>`).join("")}</div>`:`<div class="empty">आज के बिलों में जगह दर्ज नहीं</div>`}${no?`<p class="note">${no} बिल में जगह नहीं (फोन की लोकेशन बंद थी)</p>`:""}<p class="note">जगहों के नाम 📍 लोकेशन टैब में रखें — हर बिल अपने-आप उस इलाके में गिना जाएगा।</p>`}),
+    R("inst","party","🏢","संस्थाओं को गया माल",rs(sum(inst,b=>b.total)),()=>`<h3 style="margin:0 0 6px">संस्थाओं को गया माल</h3>`),
+    R("range","long","🗓️","7 / 30 दिन की बिक्री","",()=>`<div class="seg"><button class="chip" data-range="7" aria-pressed="${S.range?.n===7}">पिछले 7 दिन</button><button class="chip" data-range="30" aria-pressed="${S.range?.n===30}">पिछले 30 दिन</button></div>
+  <div id="rangeBox">${rangeHTML()}</div>`),
+    R("rr","long","📆","तारीख से तारीख तक","",()=>window.SF&&SF.rangeHTML?SF.rangeHTML():""),
+    R("tools","long","🧰","महीने का A4 · बैकअप · Excel","",()=>window.SX&&SX.toolsHTML?SX.toolsHTML():""),
+    ...(window.SFM&&SFM.html?[R("firms","long","🏢","सभी फर्म · 177 MH का महीना","",()=>SFM.html())]:[])];
+  const G={day:"📅 आज का हिसाब",item:"🥬 सब्ज़ी और माल",party:"👥 ग्राहक और पार्टी",long:"🗓️ लंबा समय और औज़ार"};
+  let fav=[];try{fav=JSON.parse(lsGet("rep_fav")||(window.SFM?'["full","items","firms"]':'["full","items","galla"]'))}catch(e){}
+  const alerts=(window.SF?SF.cancelReqsHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML();
+  const GO={daybook:"bills",kharch:"day",stock:"day",ledger:"udhar",route:"route"};REP.forEach(r=>{if(GO[r.id])r.tab=GO[r.id]});
+  const sel=REP.find(r=>r.id===S.repSel&&!r.tab);
+  const row=r=>`<div class="rp-r${r.warn?" warn":""}"><button type="button" class="rp-go" ${r.tab?`data-rtab="${r.tab}"`:`data-rsel="${r.id}"`}><i>${r.ic}</i><b>${r.t}</b>${r.hint?`<small>${esc(r.hint)}</small>`:""}<em>${r.tab?"↗":"›"}</em></button><button type="button" class="rp-st${fav.includes(r.id)?" on":""}" data-rfav="${r.id}" aria-label="पसंदीदा">${fav.includes(r.id)?"★":"☆"}</button></div>`;
+  const head=`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">📊 रिपोर्ट</h2><input class="inp" type="date" id="repDate" value="${date}" aria-label="तारीख"></div>`;
+  $("#p-report").innerHTML=alerts+(sel?`${head}<div class="rp-top"><button type="button" class="rp-back" data-rsel="">‹ सब रिपोर्ट</button><b>${sel.ic} ${sel.t}</b></div><div class="rp-body">${sel.html()}</div>`
+    :`${head}${window.SA?"":`<div class="kpis" style="margin-bottom:10px"><div class="kpi hero"><span>बिक्री · ${sale.length} बिल</span><b>${rs(salesTot)}</b></div><div class="kpi"><span>मुनाफ़ा (खर्चे के बाद)</span><b style="color:${net>=0?"var(--leaf)":"var(--chili)"}">${rs(net)}</b></div><div class="kpi blue"><span>नकद · UPI</span><b>${rs(cash)} · ${rs(upi)}</b></div><div class="kpi red"><span>नया उधार</span><b>${rs(ud)}</b></div></div>`}<div class="rp-fav">${fav.map(id=>REP.find(r=>r.id===id)).filter(Boolean).map(r=>`<button type="button" ${r.tab?`data-rtab="${r.tab}"`:`data-rsel="${r.id}"`}><i>${r.ic}</i><span>${r.t}</span>${r.hint?`<b>${esc(r.hint)}</b>`:""}</button>`).join("")||`<p class="note" style="margin:0">☆ दबाकर ज़रूरी रिपोर्ट यहाँ ऊपर रखें</p>`}</div>
+    ${Object.entries(G).map(([g,t])=>`<div class="card2 rp-g"><h3>${t}</h3>${REP.filter(r=>r.g===g).map(row).join("")}</div>`).join("")}`);
 }
 function rangeHTML(){
   const R=S.range;if(!R)return '<p class="note">दिन चुनें — हर दिन की बिक्री का चार्ट और सबसे ज़्यादा बिकी सब्ज़ियाँ दिखेंगी।</p>';
@@ -1490,7 +1533,8 @@ async function loadRange(n){
   }catch(e){S.range=null;toast("पुरानी बिक्री लोड नहीं हुई")}
   if(S.tab==="report")$("#rangeBox").innerHTML=rangeHTML();
 }
-$("#p-report").addEventListener("click",e=>{const crk=e.target.closest("[data-crok],[data-crno]");if(crk&&window.SF){const ok=!!crk.dataset.crok;if(ok&&crk.dataset.sure!=="1"){crk.dataset.sure="1";crk.textContent="पक्का? दोबारा दबाएँ";return}SF.decideCancel(crk.dataset.crok||crk.dataset.crno,ok);return}if(e.target.closest("[data-a4]")){SE.printA4("दिन की रिपोर्ट · "+fdate(S.repDate),reportA4(S.repDate)).catch(err=>toast("प्रिंट नहीं हुआ: "+(err.message||"")));return}if(e.target.closest("[data-gseen]")){G.alarms.forEach(a=>a.seen=true);gset("g_alarms",{list:G.alarms});renderTabs();renderReport();return}const rb=e.target.closest("[data-range]");if(rb){loadRange(+rb.dataset.range);$("#p-report").querySelectorAll("[data-range]").forEach(x=>x.setAttribute("aria-pressed",x===rb));return}
+$("#p-report").addEventListener("click",e=>{const rt=e.target.closest("[data-rtab]");if(rt){if(document.querySelector('[data-tab="'+rt.dataset.rtab+'"]')||S.isOwner){S.tab=rt.dataset.rtab;showTab()}return}const rs_=e.target.closest("[data-rsel]");if(rs_){S.repSel=rs_.dataset.rsel;renderReport();window.scrollTo(0,0);return}
+  const rf=e.target.closest("[data-rfav]");if(rf){let f=[];try{f=JSON.parse(lsGet("rep_fav")||'["full","items","galla"]')}catch(x){}const id=rf.dataset.rfav;f=f.includes(id)?f.filter(x=>x!==id):[...f,id].slice(-6);lsSet("rep_fav",JSON.stringify(f));renderReport();return}const crk=e.target.closest("[data-crok],[data-crno]");if(crk&&window.SF){const ok=!!crk.dataset.crok;if(ok&&crk.dataset.sure!=="1"){crk.dataset.sure="1";crk.textContent="पक्का? दोबारा दबाएँ";return}SF.decideCancel(crk.dataset.crok||crk.dataset.crno,ok);return}if(e.target.closest("[data-a4]")){SE.printA4("दिन की रिपोर्ट · "+fdate(S.repDate),reportA4(S.repDate)).catch(err=>toast("प्रिंट नहीं हुआ: "+(err.message||"")));return}if(e.target.closest("[data-gseen]")){G.alarms.forEach(a=>a.seen=true);gset("g_alarms",{list:G.alarms});renderTabs();renderReport();return}const rb=e.target.closest("[data-range]");if(rb){loadRange(+rb.dataset.range);$("#p-report").querySelectorAll("[data-range]").forEach(x=>x.setAttribute("aria-pressed",x===rb));return}
   const b=e.target.closest("[data-bill]");if(b){const x=S.dayBills.find(y=>y.no===b.dataset.bill);if(x)showReceipt(x,false)}});
 
 /* ---------- settings (owner) ---------- */
@@ -1539,7 +1583,15 @@ function renderSettings(){
   <input type="file" id="photoIn" accept="image/*" hidden>
   <h3 style="margin:0 0 6px">रेट बदलने का रिकॉर्ड</h3><p class="note" style="margin:0 0 8px">किसने, कब, कौन सा रेट बदला — पिछले 30 बदलाव।</p>
   <div class="list">${S.priceLog.length?S.priceLog.map(l=>`<div class="li"><div class="mid"><b>${esc(l.name)} · ${l.field==="sale"?"बिक्री":"खरीद"} रेट</b><span>${fdate(today(new Date(l.ts)))} ${ftime(l.ts)} · ${esc(l.byName||"")}</span></div><div class="rt">${rs(l.old)} → ${rs(l.new)}</div></div>`).join(""):'<div class="empty">अभी कोई बदलाव दर्ज नहीं</div>'}</div>`;
-}
+;setTimeout(setNav,0)}
+/* 🧭 सेटिंग लंबी है — ऊपर "सीधे जाएँ" पट्टी: हर हिस्से का चिह्न + 1-2 शब्द, टैप = वहीं पहुँचें (कुछ छिपता नहीं) */
+function setNav(){const P=$("#p-set");if(!P)return;const old=P.querySelector(".snav");if(old)old.remove();
+  const H=[...P.querySelectorAll(":scope > .card2 > h3, :scope > h3, :scope > details > summary")].filter(h=>h.textContent.trim());
+  const seen={};const L=H.map((h,i)=>{const box=h.closest(".card2,details")||h;box.id=box.id||"sset"+i;box.style.scrollMarginTop="150px";
+    let t=h.textContent.replace(/\s+/g," ").trim().split(/[(—·:]/)[0].trim();const m=t.match(/^(\p{Extended_Pictographic}\uFE0F?)\s*/u),ic=m?m[1]:"•";const W=t.slice(m?m[0].length:0).split(" ").filter(w=>!/^(का|की|के|और|व|में|से|को|पर|हाल)$/.test(w));t=W.slice(0,2).join(" ");if(seen[t])t=W.slice(0,3).join(" ");seen[t]=1;
+    return `<button type="button" data-snav="${box.id}">${ic} ${esc(t.slice(0,16))}</button>`});
+  if(L.length<3)return;P.insertAdjacentHTML("afterbegin",`<nav class="snav" aria-label="सेटिंग के हिस्से">${L.join("")}</nav>`)}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-snav]");if(!b)return;const t=document.getElementById(b.dataset.snav);if(t)t.scrollIntoView({behavior:"smooth",block:"start"})});
 $("#p-set").addEventListener("change",async e=>{
   const t=e.target;
   if(t.dataset.sf){let v=t.value.trim();if(t.dataset.sf==="insts")v=v.split("\n").map(x=>x.trim()).filter(Boolean);await saveSetting({[t.dataset.sf]:v});return}
@@ -1681,5 +1733,6 @@ boot();
 <script src="se-pay.js"></script>
 <script src="se-bill.js"></script>
 <script src="se-plus.js"></script>
+<script src="se-watch.js"></script>
 
 </body></html>

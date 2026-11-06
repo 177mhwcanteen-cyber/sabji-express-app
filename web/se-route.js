@@ -1316,13 +1316,14 @@ SR.miniInit=async function(){const el=document.getElementById("dMini");if(!el||!
       SR.mini={date,day:analyze(date,docs,(S.dayBills||[]).filter(b=>!b.cancelled)),ts:Date.now(),map:null}}
     const d=SR.mini.day;const t=document.getElementById("dMiniT");
     if(t)t.textContent=`${d.stops.length} जगह रुकी · लगभग ${d.km} km · ${d.stops.filter(s=>s.sales>0).length} जगह बिक्री${d.gaps&&d.gaps.length?" · ⚠ "+d.gaps.length+" बार लोकेशन बंद":""}`;
-    if(!window.L)await loadLeaflet();const el2=document.getElementById("dMini");if(!el2||el2._lm)return;
+    if(!window.L)await loadLeaflet().catch(()=>{});const el2=document.getElementById("dMini");if(!el2||el2._lm)return;
+    if(!window.L||!L.map){el2.style.display="none";return}
     const m=L.map(el2,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,touchZoom:false,tap:false});el2._lm=m;
     L.tileLayer(SATU,{maxZoom:20,maxNativeZoom:18}).addTo(m);const B=[];
     d.pts.forEach(u=>{const ll=u.P.map(p=>[p.lat,p.lng]);if(ll.length<2)return;L.polyline(ll,{color:"#fff",weight:6,opacity:.45}).addTo(m);L.polyline(ll,{color:colorOf(u.uid),weight:3.5}).addTo(m);ll.forEach(x=>B.push(x))});
     d.stops.forEach((s,i)=>{L.circleMarker([s.lat,s.lng],{radius:s.sales>0?Math.min(14,6+Math.sqrt(s.sales)/6):5,color:"#fff",weight:2,fillColor:s.sales>0?"#22c55e":"#f59e0b",fillOpacity:.95}).addTo(m);B.push([s.lat,s.lng])});
     if(B.length)m.fitBounds(B,{padding:[14,14],maxZoom:17});else m.setView([HOME.lat,HOME.lng],15);setTimeout(()=>{try{m.invalidateSize()}catch(e){}},150);
-  }catch(e){const t=document.getElementById("dMiniT");if(t)t.textContent="नक्शा नहीं बना: "+(e.code||e.message||"")}};
+  }catch(e){const t=document.getElementById("dMiniT"),el3=document.getElementById("dMini");if(el3)el3.style.display="none";if(t&&!/जगह रुकी/.test(t.textContent))t.textContent="🗺️ नक्शा इंटरनेट आने पर दिखेगा — टैप करके पूरा रास्ता देखें"}};
 document.addEventListener("click",e=>{if(!e.target.closest("[data-gorute]"))return;R.date=S.billsDate;R.raw=null;R.day=null;const t=document.querySelector('[data-tab="route"]');if(t)t.click()});
 /* SF के साथ जोड़ */
 if(window.SF){const _o=SF.onDb;SF.onDb=function(db){_o(db);try{SR.onDb(db)}catch(e){}}}

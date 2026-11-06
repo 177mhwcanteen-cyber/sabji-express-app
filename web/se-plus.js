@@ -129,7 +129,7 @@ SX.ordersSheet=function(){const L=SX.orders;$("#sheet").innerHTML=`<div class="s
     ${o.addr?`<p class="note" style="margin:2px 0">📍 ${esc(o.addr)}</p>`:""}<p style="margin:4px 0">${(o.items||[]).map(x=>esc(x.n)+" "+fq(num(x.q),x.u||"kg")).join(", ")}</p>${o.note?`<p class="note" style="margin:0">📝 ${esc(o.note)}</p>`:""}
     <div class="row2" style="margin-top:6px"><button class="big" data-sxobill="${esc(o.id)}">🧾 बिल बनाएँ</button><a class="big ghost" target="_blank" rel="noopener" href="${waLink(`🙏 नमस्ते ${o.name||""} जी, आपका ऑर्डर मिल गया — सब्ज़ी एक्सप्रेस की गाड़ी जल्द आपके पास पहुँचेगी 🚐🥬`,o.phone||"")}">✓ WhatsApp पुष्टि</a></div>
     <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxodone="${esc(o.id)}">✓ पूरा हो गया</button><button class="big ghost" data-sxono="${esc(o.id)}" style="color:var(--chili)">✕ रद्द</button></div></div>`).join(""):'<div class="empty">अभी कोई ऑर्डर नहीं</div>'}
-  <button class="big ghost" data-sxolink style="margin-top:6px">🔗 ऑर्डर-लिंक ग्राहकों को भेजें</button></div></div>`};
+  <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxolink>🔗 ऑर्डर-लिंक भेजें</button><button class="big ghost" data-sxqr>📲 घर-घर का QR</button></div></div></div>`};
 SX.orderBill=async function(id){const o=SX.orders.find(x=>x.id===id);if(!o)return;closeSheet();S.tab="bill";showTab();
   if(String(o.phone||"").length===10){S.mode="walk";S.cust={phone:o.phone,name:o.name||""}}
   (o.items||[]).forEach(x=>{const it=item(x.id);if(it&&num(x.q)>0)try{quickAdd(it,num(x.q))}catch(e){}});
@@ -234,12 +234,30 @@ SX.toolsHTML=function(){if(!S.isOwner)return "";const d=today(),pm=dayAdd(d.slic
   return `${+d.slice(8)<=3?`<div class="card2 sxc" style="border:2px solid var(--accent)"><b>📄 पिछले महीने (${pm}) का हिसाब तैयार है</b><button class="big" data-sxmonth="${pm}" style="margin-top:6px">🖨️ खोलें / PDF</button></div>`:""}
   <div class="card2 sxc"><h3 style="margin:0 0 8px">🧰 मालिक के औज़ार</h3><div class="sx-tools">
     <button data-sxmonth="${cm}">📄<span>इस महीने का A4</span></button><button data-sxmonth="${pm}">📄<span>पिछला महीना A4</span></button>
-    <button data-sxposter>🖼️<span>भाव-पोस्टर</span></button><button data-sxbk>📦<span>बैकअप फ़ाइल</span></button></div>
+    <button data-sxposter>🖼️<span>भाव-पोस्टर</span></button><button data-sxqr>📲<span>घर-घर का QR</span></button><button data-sxbk>📦<span>बैकअप फ़ाइल</span></button></div>
     <p class="note" style="margin:6px 0 0">${ago==null?"⚠ बैकअप फ़ाइल अभी तक नहीं बनी — एक बार बनाकर Google Drive में रखें":ago>7?`⚠ आख़िरी बैकअप फ़ाइल ${ago} दिन पहले — नई बनाएँ`:`✓ आख़िरी बैकअप फ़ाइल ${ago?ago+" दिन पहले":"आज"}`} · रोज़ का बैकअप अपने-आप सर्वर पर</p>
     <h4 style="margin:10px 0 4px">📊 Vyapar / Excel फ़ाइल</h4><div class="bf-r"><label class="bf-d">से<input type="date" id="sxvF" value="${SX.vy.from}"></label><label class="bf-d">तक<input type="date" id="sxvT" value="${SX.vy.to}"></label></div>
     <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxvy="sale">🧾 बिक्री फ़ाइल</button><button class="big ghost" data-sxvy="buy">🛒 खरीद फ़ाइल</button></div></div>
   ${SX.wasteHTML()}`};
 
+/* 📲 घर-घर / गाड़ी का पक्का QR कार्ड (भाव नहीं — हमेशा चले): स्कैन → o.html ऑर्डर पेज (06-11-2026, 177 MH जैसा) */
+SX.qrCard=async function(){toast("📲 QR कार्ड बन रहा है…");const link=pubBase()+"o.html",W=1240,H=1748,c=document.createElement("canvas");c.width=W;c.height=H;const x=c.getContext("2d");
+  try{await document.fonts.load('800 60px "Baloo 2"')}catch(e){}
+  const ctr=(t,y,f,col)=>{x.font=f;x.fillStyle=col||"#14181c";x.textAlign="center";x.fillText(t,W/2,y)};
+  const rr=(X,Y,w,h,r)=>{x.beginPath();x.moveTo(X+r,Y);x.arcTo(X+w,Y,X+w,Y+h,r);x.arcTo(X+w,Y+h,X,Y+h,r);x.arcTo(X,Y+h,X,Y,r);x.arcTo(X,Y,X+w,Y,r);x.closePath()};
+  const F=(w,px)=>`${w} ${px}px "Baloo 2","Mukta",sans-serif`;const icon=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src="icon.png"});
+  x.fillStyle="#fffdf5";x.fillRect(0,0,W,H);x.fillStyle="#0c831f";x.fillRect(0,0,W,400);x.fillStyle="#f8cb46";x.fillRect(0,400,W,16);
+  if(icon){x.save();rr(W/2-70,40,140,140,30);x.clip();x.drawImage(icon,W/2-70,40,140,140);x.restore()}
+  ctr("सब्ज़ी एक्सप्रेस",265,F(800,96),"#fff");ctr("ताज़ी सब्ज़ी-फल · घर के दरवाज़े तक",335,F(700,42),"#e9f6ec");
+  ctr("घर बैठे ऑर्डर करें",520,F(800,96),"#0a6b19");ctr("स्कैन करें → सब्ज़ी चुनें → गाड़ी आपके दरवाज़े पर 🚐",590,F(700,42));
+  x.fillStyle="#fff";x.strokeStyle="#0c831f";x.lineWidth=10;rr(W/2-410,640,820,820,48);x.fill();x.stroke();
+  let m=null;try{const q=new QRCode(document.createElement("div"),{text:link,width:64,height:64,correctLevel:QRCode.CorrectLevel?QRCode.CorrectLevel.H:2});m=q&&q._oQRCode}catch(e){}
+  if(!m){toast("QR नहीं बना");return}const n=m.getModuleCount(),cs=Math.floor(720/n),o0=Math.round(W/2-cs*n/2),o1=Math.round(1050-cs*n/2);x.fillStyle="#0b3d14";
+  for(let r=0;r<n;r++)for(let k=0;k<n;k++)if(m.isDark(r,k))x.fillRect(o0+k*cs,o1+r*cs,cs,cs);
+  x.fillStyle="#fff";rr(W/2-76,974,152,152,28);x.fill();if(icon)x.drawImage(icon,W/2-58,992,116,116);
+  ctr("📷 कैमरा खोलें → QR पर रखें → ऑर्डर करें",1530,F(700,44));ctr("🥬 सब्ज़ी · 🍎 फल · 🌿 पत्तेदार · 🛒 पैक्ड सामान",1600,F(700,42),"#3b3b2f");
+  const ph=String((S.settings&&S.settings.ownerPh)||"").replace(/\D/g,"").slice(-10);x.fillStyle="#0c831f";x.fillRect(0,H-100,W,100);ctr(ph?"📞 "+ph:"सब्ज़ी एक्सप्रेस",H-36,F(700,40),"#fff");
+  SX._qr=c;const blob=await new Promise(r=>c.toBlob(r,"image/png"));await SX.shareBlob(blob,"SabjiExpress_Order_QR","png","image/png","🥬 सब्ज़ी एक्सप्रेस — घर बैठे ऑर्डर करें: "+link)};
 /* ======================= बटन ======================= */
 const rerender=k=>{if(k==="slot"){if(S.tab==="route"&&SR.renderRoute)SR.renderRoute()}else if(k==="waste"||k==="tools"){try{renderReport()}catch(e){}}else{try{renderDay()}catch(e){}}};
 document.addEventListener("click",async e=>{const t=e.target;
@@ -254,6 +272,7 @@ document.addEventListener("click",async e=>{const t=e.target;
   const ob=t.closest("[data-sxobill]");if(ob){SX.orderBill(ob.dataset.sxobill);return}
   const od=t.closest("[data-sxodone]");if(od){SX.orderSet(od.dataset.sxodone,"done");closeSheet();return}
   const on=t.closest("[data-sxono]");if(on){if(!on.dataset.sure){on.dataset.sure="1";on.textContent="पक्का रद्द?";return}SX.orderSet(on.dataset.sxono,"cancel");closeSheet();return}
+  if(t.closest("[data-sxqr]")){SX.qrCard();return}
   if(t.closest("[data-sxolink]")){window.open(waLink("🥬 सब्ज़ी एक्सप्रेस — अब घर बैठे ऑर्डर करें! सब्ज़ी चुनें, भेजें, गाड़ी आपकी गली में 🚐\n"+pubBase()+"o.html",""),"_blank");return}
   if(t.closest("[data-sxposter]")){SX.poster();return}
   if(t.closest("[data-sxbk]")){SX.backupFile();return}

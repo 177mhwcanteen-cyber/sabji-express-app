@@ -651,6 +651,7 @@ async def main():
         await pg.click('[data-bfq="%s|%s"]' % (await pg.evaluate("today()"), await pg.evaluate("today()"))); await pg.wait_for_timeout(300)
         # 📅 अवधि रिपोर्ट
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(300)
+        await pg.evaluate("S.repSel='rr';renderReport()"); await pg.wait_for_timeout(200)  # 📊 नया रिपोर्ट-क्षेत्र: पहले रिपोर्ट चुनो
         await pg.click("[data-rropen]"); await pg.wait_for_function("document.querySelector('.rrc table.rrt')", timeout=8000)
         rtx = await pg.inner_text(".rrc"); assert "कुल" in rtx and "फायदा" in rtx, rtx[:300]
         await pg.locator(".rrc").screenshot(path=f"{SHOTS}/40-range-report.png")
@@ -692,6 +693,7 @@ async def main():
         assert sl == [True, True, True], sl
         # 4) खराबी रिपोर्ट + 14/15/16 औज़ार
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(300)
+        await pg.evaluate("S.repSel='tools';renderReport()"); await pg.wait_for_timeout(200)
         await pg.click('[data-sxo="waste"]'); await pg.wait_for_function("(document.querySelector('[data-sxo=waste]')||{}).closest&&!document.body.innerText.includes('30 दिन की खराबी देखी जा रही')", timeout=15000)
         await pg.click('[data-sxmonth]'); await pg.wait_for_function("window.__a4", timeout=15000)
         a4 = await pg.evaluate("window.__a4"); assert "असली मुनाफ़ा" in a4["h"] and "दिन-वार" in a4["h"], a4["t"]
@@ -904,8 +906,9 @@ async def main():
         print("tracker ok")
         await pg.screenshot(path=f"{SHOTS}/16-route.png", full_page=True)
         print("route stops", len(stops), "|", stops[0].replace("\n", " ")[:80])
-        await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(500)
-        await pg.screenshot(path=f"{SHOTS}/7-owner-report.png")
+        await pg.click('[data-tab="report"]'); await pg.evaluate("S.repSel='';renderReport()"); await pg.wait_for_timeout(500)
+        await pg.screenshot(path=f"{SHOTS}/7-owner-report.png", full_page=True)
+        assert await pg.locator("#p-report .rp-g").count() == 4, "रिपोर्ट के 4 समूह"
         assert await pg.is_visible("[data-npok]"), "pending new item card missing"
         await pg.click("[data-npok]"); await pg.wait_for_timeout(500)
         assert not [v for v in (await pg.evaluate("Object.values(window.__MOCK__.items)")) if v.get("pending")], "approve failed"
@@ -925,6 +928,17 @@ async def main():
         assert cancelled == 1, cancelled
         assert sorted(x["status"] for x in await pg.evaluate("Object.values(window.__MOCK__.cancelReq)")) == ["approved", "rejected"]
         print("owner approved cancel")
+        await pg.evaluate("S.repSel='tools';renderReport()"); await pg.wait_for_timeout(200)
+        await pg.evaluate("window.__qq=null;window.__oSh2=SX.shareBlob;SX.shareBlob=async(b,n,e)=>{if(n==='SabjiExpress_Order_QR')window.__qq={e,size:b?b.size:-1,url:SX._qr.toDataURL('image/png')}}")
+        await pg.click("[data-sxqr]"); await pg.wait_for_function("window.__qq", timeout=15000)
+        q = await pg.evaluate("window.__qq"); assert q["e"] == "png" and q["size"] > 20000, q.get("size")
+        await pg.evaluate("void(SX.shareBlob=window.__oSh2)")
+        import base64, numpy as np, cv2
+        img = cv2.imdecode(np.frombuffer(base64.b64decode(q["url"].split(",")[1]), np.uint8), cv2.IMREAD_COLOR); cv2.imwrite(f"{SHOTS}/44-qr-card.png", img)
+        val, _, _ = cv2.QRCodeDetector().detectAndDecode(img); assert val.endswith("o.html"), val
+        await pg.evaluate("S.repSel='';renderReport()")
+        print("qr card ok")
+        await pg.evaluate("S.repSel='full';renderReport()"); await pg.wait_for_timeout(200)
         await pg.click("[data-a4]"); await pg.wait_for_timeout(800)
         html = await pg.evaluate("(()=>{const f=[...document.querySelectorAll('iframe')].pop();return f?f.contentDocument.documentElement.outerHTML:''})()")
         assert "सब्ज़ी-वार" in html and "टमाटर" in html and "मंडी खरीद" in html, html[:300]
