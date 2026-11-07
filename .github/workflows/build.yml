@@ -6,6 +6,8 @@ name: build
 on:
   push:
     branches: [main]
+    # 📏 GitHub की सीमा बचाओ: सिर्फ़ लिखा-पढ़ी (docs, टेस्ट, md) बदले तो कुछ नहीं बनता
+    paths-ignore: ["docs/**", "**/*.md", "tests/**", "checks/**", "apps-script/**"]
   workflow_dispatch:
 
 permissions:
@@ -22,8 +24,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      native: ${{ steps.nat.outputs.native }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 50
+      # 📱 नई APK सिर्फ़ तब, जब Android वाला हिस्सा बदले (वरना "ऐप अपडेट करें" ही काफ़ी)
+      - id: nat
+        run: |
+          B="${{ github.event.before }}"; N=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$B" ] || ! git cat-file -e "$B" 2>/dev/null; then N=true
+          elif git diff --name-only "$B" "${{ github.sha }}" | grep -Eq '^(android/|capacitor\.config\.json|package(-lock)?\.json|web/src/)'; then N=true
+          elif git diff "$B" "${{ github.sha }}" -- scripts/build.mjs | grep -Eq '^[-+].*NATIVE_MIN *='; then N=true; fi
+          echo "native=$N" >> "$GITHUB_OUTPUT"; echo "नई APK: $N"
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -41,6 +54,7 @@ jobs:
         with:
           name: www
           path: www
+          retention-days: 3
 
   pages:
     needs: web
@@ -54,6 +68,7 @@ jobs:
 
   apk:
     needs: web
+    if: needs.web.outputs.native == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -88,6 +103,7 @@ jobs:
         with:
           name: sabji-express-apk
           path: sabji-express.apk
+          retention-days: 7
       - name: Release में डालें (हमेशा एक ही लिंक से डाउनलोड)
         uses: softprops/action-gh-release@v2
         with:
@@ -98,3 +114,10 @@ jobs:
             पुराना ऐप हटाने की ज़रूरत नहीं — ऊपर से इंस्टॉल करें, डेटा नहीं मिटेगा।
           files: sabji-express.apk
           make_latest: true
+      # 🧹 पुरानी APK रिलीज़ हटाओ — आख़िरी 5 रहें (डाउनलोड का लिंक "latest" वही रहता है)
+      - name: पुरानी रिलीज़ साफ़
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list -R "${{ github.repository }}" --limit 200 --json tagName,createdAt -q 'sort_by(.createdAt)|reverse|.[5:]|.[].tagName' | while read t; do
+            [ -n "$t" ] && gh release delete "$t" -R "${{ github.repository }}" --yes --cleanup-tag || true; done
