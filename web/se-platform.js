@@ -377,6 +377,13 @@ SE.printA4=async function(title,bodyHTML){
   printHTMLWeb(html);
 };
 
+/* 🔐 ज़िप का SHA-256 (Capgo 8.5x इसके बिना डाउनलोड नहीं करता)। version.json में हो तो वही, नहीं तो खुद फ़ाइल लाकर गिनो।
+   साथ में जाँच: फ़ाइल मिली? (HTTP, आकार, सच में ज़िप "PK") — ताकि ग़लती का असली कारण दिखे। */
+SE._zipCk=async function(v,url,D){if(v&&v.checksum&&!D)return v.checksum;
+  try{const r=await fetch(url+(url.includes("?")?"&":"?")+"ck="+Date.now(),{cache:"no-store"});const b=new Uint8Array(await r.arrayBuffer());
+    const h=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",b))).map(x=>x.toString(16).padStart(2,"0")).join("");
+    if(D)D.probe="HTTP "+r.status+" · "+Math.round(b.length/1024)+" KB · "+(b[0]===80&&b[1]===75?"ज़िप ✓":"ज़िप नहीं ✗")+(v&&v.checksum?" · checksum "+(v.checksum===h?"✓":"✗ अलग"):"");
+    return r.ok?((v&&v.checksum)||h):(v&&v.checksum)||""}catch(e){if(D)D.probe="फ़ाइल नहीं आई: "+String(e.message||e).slice(0,80);return (v&&v.checksum)||""}};
 /* ---------- अपने-आप अपडेट (APK दोबारा नहीं भेजनी पड़ेगी) ----------
    🩹 07-11-2026 सुधार: पहले "मैं ठीक चल रहा हूँ" (notifyAppReady) सिर्फ़ लॉगिन के 4 सेकंड बाद बोला जाता था।
    Capgo 15 सेकंड में यह न सुने तो नया संस्करण "खराब" मानकर पुराना वापस लगा देता है (rollback) — इसी से
@@ -409,7 +416,7 @@ SE.checkUpdate=async function(toast){
     if(pend===v.version){try{const l=await U.list();b=(l.bundles||[]).find(x=>x.version===v.version&&x.status!=="error")}catch(e){}}
     // पिछली बार डाउनलोड हो चुका — ऐप खुलते ही (कोई बिल चालू न हो तो) तुरंत लगा दो
     if(b&&!SE._busy()){toast&&toast("✨ नया अपडेट "+v.version+" लग रहा है…");try{_markTry(v.version);await U.set({id:b.id});return}catch(e){}}
-    if(!b){b=await U.download({url:new URL(v.url,CFG.updateUrl.replace(/\/?$/,"/")).href,version:v.version});ls.set("se_upd_ready",v.version)}
+    if(!b){const zu=new URL(v.url,CFG.updateUrl.replace(/\/?$/,"/")).href;b=await U.download({url:zu,version:v.version,checksum:await SE._zipCk(v,zu)});ls.set("se_upd_ready",v.version)}
     SE._pendingBundle=b;
     toast&&toast("✨ नया अपडेट "+v.version+" आ गया — ऐप बंद करके खोलते ही लग जाएगा");
     if(!SE._asl){SE._asl=1;N.App.addListener("appStateChange",async s=>{if(!s.isActive&&SE._pendingBundle&&!SE._busy()){try{_markTry(SE._pendingBundle.version||"");await U.set({id:SE._pendingBundle.id})}catch(e){}}})}

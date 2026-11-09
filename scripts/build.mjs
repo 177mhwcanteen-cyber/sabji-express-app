@@ -62,6 +62,8 @@ fs.mkdirSync(path.join(DIST, "update"), { recursive: true });
 const zipName = `bundle-${VERSION}.zip`;
 execSync(`cd "${OUT}" && zip -qr "${path.join(DIST, "update", zipName)}" . -x sw.js`);
 fs.writeFileSync(path.join(DIST, "update/version.json"),
-  JSON.stringify({ version: VERSION, url: "update/" + zipName, minNative: NATIVE_MIN, built: now.toISOString() }, null, 1));
+  JSON.stringify({ version: VERSION, url: "update/" + zipName, minNative: NATIVE_MIN, built: now.toISOString(),
+    /* 🔐 Capgo 8.5x ज़िप का SHA-256 माँगता है — बिना इसके "Failed to download from" (विक्रम जी का फोन, 09-11-2026) */
+    checksum: (await import("node:crypto")).createHash("sha256").update(fs.readFileSync(path.join(DIST, "update", zipName))).digest("hex") }, null, 1));
 fs.writeFileSync(path.join(DIST, ".nojekyll"), "");
 console.log("बना:", VERSION, "·", files.length, "फ़ाइलें");
