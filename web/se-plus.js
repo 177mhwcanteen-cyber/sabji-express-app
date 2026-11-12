@@ -138,7 +138,7 @@ SX.orderBill=async function(id){const o=SX.orders.find(x=>x.id===id);if(!o)retur
 SX.orderSet=async function(id,status,extra){try{if(!S.demo)await S.db.collection("orders").doc(id).update({status,dts:Date.now(),byName:biller()||"",...(extra||{})})}catch(e){toast("नहीं हुआ: "+(e.code||""))}};
 /* बिल सेव हुआ तो उसी ग्राहक का ऑर्डर अपने-आप पूरा */
 SX.checkOrderDone=function(){const o=S.sxOrder;if(!o)return;const b=(S.dayBills||[]).find(x=>!x.cancelled&&x.ts>o.ts&&(!o.phone||x.custPhone===o.phone));if(b){S.sxOrder=null;SX.orderSet(o.id,"done",{billNo:b.no});toast("✓ ऑर्डर पूरा — बिल "+b.no)}};
-SX.pubRates=async function(force){if(S.demo||!S.db||!S.isOwner)return;const k="sx_pubr";const last=LS.get(k)||0;
+SX.pubRates=async function(force){if(S.demo||!S.db||!(S.isOwner||S.uid))return;/* साथी के फोन से भी भाव जाएँ — तीन-दुकान ऑर्डर-पेज इन्हीं से चलता है */const k="sx_pubr";const last=LS.get(k)||0;
   const L=S.items.filter(i=>i.active!==false&&!i.virtual&&!i.pending&&num(i.sale)>0&&i.id!=="xyz"&&!i.track).map(i=>{const ps=SE.photoSrc(i);return {id:i.id,n:i.name,e:window.SN&&SN.en?SN.en(i):"",u:i.unit,s:num(i.sale),c:i.cat||"",p:ps&&!/^data:/.test(ps)?ps:"",h:num(i.hue)}});
   const h=JSON.stringify(L.map(i=>[i.id,i.s,i.p]));if(!force&&Date.now()-last<6*3600e3&&LS.get("sx_pubh")===h)return;
   try{await S.db.collection("pub").doc("rates").set({type:"rates",items:L,ts:Date.now(),phone:String(S.settings.ownerPh||"").replace(/\D/g,"").slice(-10)});LS.set(k,Date.now());LS.set("sx_pubh",h)}catch(e){}};
@@ -281,6 +281,6 @@ document.addEventListener("click",async e=>{const t=e.target;
 });
 document.addEventListener("change",e=>{if(e.target.id==="sxvF")SX.vy.from=e.target.value||SX.vy.from;if(e.target.id==="sxvT")SX.vy.to=e.target.value||SX.vy.to});
 /* शुरुआत: मालिक — रोज़ का बैकअप + भाव सूची (हल्के, देर से); सब — ऑर्डर सुनें */
-SX.start=function(){if(SX._st)return;SX._st=1;setTimeout(()=>{SX.watchOrders();if(S.isOwner){SX.pubRates();setTimeout(SX.autoBackup,20000)}},8000);setInterval(()=>{try{SX.checkOrderDone()}catch(e){}},15000);if(S.isOwner)setInterval(()=>{try{SX.pubRates()}catch(e){}},10*60000)};
+SX.start=function(){if(SX._st)return;SX._st=1;setTimeout(()=>{SX.watchOrders();SX.pubRates();if(S.isOwner){setTimeout(SX.autoBackup,20000)}},8000);setInterval(()=>{try{SX.checkOrderDone()}catch(e){}},15000);if(S.isOwner)setInterval(()=>{try{SX.pubRates()}catch(e){}},10*60000)};
 const wait=setInterval(()=>{if(window.S&&S.db&&S.items&&S.items.length&&(S.isOwner||S.uid)){clearInterval(wait);SX.start()}},2000);
 })();
