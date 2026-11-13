@@ -425,6 +425,12 @@ SE.checkUpdate=async function(toast){
 /* लॉगिन का इंतज़ार किए बिना भी जाँचो (लॉगिन पन्ने पर अटका पुराना ऐप भी नया हो जाए) */
 if(_U())setTimeout(()=>SE.checkUpdate(),6000);
 SE._busy=()=>false;
+/* 🔄 अपने-आप अपडेट (177 MH से, 13-11-2026): ऐप खुला रहे तब भी हर 30 मिनट और फोन पर वापस आते ही जाँच;
+   अपडेट उतर चुका हो और कोई बिल चालू न हो तो खुद लग जाता है — बटन दबाने की ज़रूरत नहीं */
+SE.autoUpdateLoop=function(toast){if(SE._loop)return;SE._loop=1;
+  const go=async()=>{if(!_U())return;if(SE._pendingBundle&&!SE._busy()){try{toast&&toast("✨ नया अपडेट लग रहा है — ऐप 2 सेकंड में दोबारा खुलेगा");await new Promise(r=>setTimeout(r,1800));if(SE._busy())return;_markTry(SE._pendingBundle.version||"");await N.CapacitorUpdater.set({id:SE._pendingBundle.id})}catch(e){}return}SE.checkUpdate(toast)};
+  setInterval(()=>{if(document.visibilityState==="visible")go()},30*60000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&Date.now()-(SE._lastChk||0)>10*60000){SE._lastChk=Date.now();go()}})};
 SE.applyUpdateNow=async()=>{if(SE._pendingBundle)try{_markTry(SE._pendingBundle.version||"");await N.CapacitorUpdater.set({id:SE._pendingBundle.id})}catch(e){}};
 
 /* वेब (Chrome) के लिए ऑफ़लाइन कैश */
