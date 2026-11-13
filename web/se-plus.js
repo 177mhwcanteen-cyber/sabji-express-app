@@ -259,11 +259,26 @@ SX.qrCard=async function(){toast("📲 QR कार्ड बन रहा ह�
   const ph=String((S.settings&&S.settings.ownerPh)||"").replace(/\D/g,"").slice(-10);x.fillStyle="#0c831f";x.fillRect(0,H-100,W,100);ctr(ph?"📞 "+ph:"सब्ज़ी एक्सप्रेस",H-36,F(700,40),"#fff");
   SX._qr=c;const blob=await new Promise(r=>c.toBlob(r,"image/png"));await SX.shareBlob(blob,"SabjiExpress_Order_QR","png","image/png","🥬 सब्ज़ी एक्सप्रेस — घर बैठे ऑर्डर करें: "+link)};
 /* ======================= बटन ======================= */
+/* 🌱 मौसम का माल (13-11): items.season वाले सामान — मालिक चुनकर कमल भाई को "ये खरीदो" भेजे, माल आए तो ▶ चालू करे */
+SX.seasonSel=SX.seasonSel||{};
+SX.seasonHTML=function(){if(!S.isOwner)return "";const L=S.items.filter(i=>i.season);if(!L.length)return "";
+  const off=L.filter(i=>i.active===false),on=L.filter(i=>i.active!==false);const n=Object.values(SX.seasonSel).filter(Boolean).length;
+  const body=!open.season?"":`<p class="note" style="margin:0 0 6px">❄️ सर्दी में आने वाली सब्ज़ी/फल — अभी <b>बंद</b> हैं (बिलिंग में नहीं दिखते)। जो मँगवानी हो उस पर ✓ लगाएँ और WhatsApp भेजें। माल आए तो ▶ चालू करें, फिर भाव डालें।</p>
+    ${off.map(i=>`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line,rgba(128,128,128,.2))"><label style="flex:1;line-height:1.35"><input type="checkbox" data-sxsn="${esc(i.id)}" ${SX.seasonSel[i.id]?"checked":""}> <b>${i.emoji||""} ${esc(i.name)}</b> <small>${esc(i.seasonMon||"")}</small><br><small>${esc(i.seasonTip||"")}</small></label><button class="lnk" data-sxsnon="${esc(i.id)}">▶ चालू</button></div>`).join("")||'<p class="note">सब चालू हो चुके ✓</p>'}
+    ${on.length?`<p class="note" style="margin:6px 0 0">✅ चालू: ${on.map(i=>esc(i.name)+(num(i.sale)?" ₹"+num(i.sale):" (भाव बाकी)")).join(" · ")}</p>`:""}
+    <button class="big" data-sxsnwa style="margin-top:8px" ${n?"":"disabled"}>📤 ${n?n+" चीज़ें":"चुनी हुई चीज़ें"} खरीदने को कहें (WhatsApp)</button>`;
+  return `<div class="card2 sxc"><div class="rr-h"><h3 style="margin:0">🌱 मौसम का नया माल <small class="note">${off.length} बाकी</small></h3><button class="lnk" data-sxo="season">${open.season?"बंद करें":"खोलें ›"}</button></div>${body}</div>`};
+SX.seasonText=function(){const L=S.items.filter(i=>i.season&&SX.seasonSel[i.id]);if(!L.length)return "";
+  return "🌱 *सब्ज़ी एक्सप्रेस — मौसम का नया माल*\nकल मंडी में ये चीज़ें देखें। भाव ठीक लगे तो थोड़ी-थोड़ी लाएँ और खरीद ऐप में चढ़ाएँ:\n\n"+L.map((i,k)=>(k+1)+". "+i.name+(i.seasonTip?" — "+i.seasonTip:"")).join("\n")+"\n\nमंडी का भाव और माल कैसा है — बता दीजिए। 🙏"};
+SX.seasonOn=async function(id){const it=item(id);if(!it||!S.isOwner)return;try{if(S.demo)it.active=true;else await S.db.collection("items").doc(id).update({active:true,onTs:Date.now(),onBy:"विक्रम जी"});it.active=true;delete SX.seasonSel[id];toast("▶ "+it.name+" चालू — अब ⚙️ सेटिंग → सामान में भाव डालें");rerender("season")}catch(e){toast("चालू नहीं हुआ: "+(e.code||e.message||""))}};
 const rerender=k=>{if(k==="slot"){if(S.tab==="route"&&SR.renderRoute)SR.renderRoute()}else if(k==="waste"||k==="tools"){try{renderReport()}catch(e){}}else{try{renderDay()}catch(e){}}};
 document.addEventListener("click",async e=>{const t=e.target;
   const o=t.closest("[data-sxo]");if(o){const k=o.dataset.sxo;open[k]=!open[k];rerender(k);
     if(open[k]){if(k==="mandi"&&!(SX.mandi&&SX.mandi.date===S.billsDate))SX.calcMandi().then(()=>rerender(k));if(k==="slot"&&!SX.slot.res)SX.calcSlots(SX.slot.days).then(()=>rerender(k));if(k==="waste"&&!SX.waste)SX.calcWaste().then(()=>rerender(k))}return}
   if(t.closest("[data-sxmandire]")){SX.mandi=null;rerender("mandi");SX.calcMandi().then(()=>rerender("mandi"));return}
+  const sn=t.closest("[data-sxsn]");if(sn){SX.seasonSel[sn.dataset.sxsn]=sn.checked;rerender("season");return}
+  const so=t.closest("[data-sxsnon]");if(so){if(!so.dataset.sure){so.dataset.sure="1";so.textContent="पक्का चालू?";return}SX.seasonOn(so.dataset.sxsnon);return}
+  if(t.closest("[data-sxsnwa]")){const x=SX.seasonText();if(x)window.open(waLink(x,""),"_blank");return}
   if(t.closest("[data-sxmandiwa]")){window.open(waLink(SX.mandiText(),""),"_blank");return}
   const rt=t.closest("[data-sxrate]");if(rt){const [id,v]=rt.dataset.sxrate.split("|");if(!rt.dataset.sure){rt.dataset.sure="1";rt.textContent="पक्का ₹"+v+"?";return}SX.setRate(id,num(v));return}
   const sl=t.closest("[data-sxslot]");if(sl){SX.slot.days=+sl.dataset.sxslot;SX.slot.res=null;rerender("slot");SX.calcSlots(SX.slot.days).then(()=>rerender("slot"));return}

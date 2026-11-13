@@ -384,7 +384,7 @@ SF.dayStockHTML=function(){
   return `<div data-ds="sar">${P2.html}${SF.xyzWarnHTML()}${window.SR&&SR.miniMapHTML?SR.miniMapHTML():""}</div>
   <div data-ds="paisa">${SF.gpayCardHTML()}</div>
   <div data-ds="ai">${SF.copyCardHTML()+SF.auditCardHTML()}</div>
-  <div data-ds="maal">${window.SX?SX.mandiHTML()+SX.priceHTML():""}${SF.liveStockHTML()+SF.nightReviewHTML()}
+  <div data-ds="maal">${window.SX?SX.mandiHTML()+(SX.seasonHTML?SX.seasonHTML():'')+SX.priceHTML():""}${SF.liveStockHTML()+SF.nightReviewHTML()}
   ${SF.missingBuyHTML()}
   <div class="card2"><h3>🌙 रात का स्टॉक</h3>
     <p class="note" style="margin:0">दुकान बंद करते समय बचा माल तौलकर डालें। "होना चाहिए" = कल रात का + आज की खरीद − बिका − संस्था।</p>

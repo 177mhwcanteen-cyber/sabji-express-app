@@ -1134,7 +1134,31 @@ const COPY2={date:"2026-11-03",flag:"copy2",src:"कमल भाई की क�
    night:{type:"sabji-night",date:"2026-11-03",night:[],kharab:[],unclear:["टमाटर, धनिया, केला, गाजर, मूली, मक्का, माल्टा रात की सूची में नहीं — ऐप के हिसाब से बचने चाहिए थे"]}}};
 {const U={kiwi:"pc",nariyal:"pc"},H={seb:"सेब",amrood:"अमरूद",papita:"पपीता",tarbooj:"तरबूज",anar:"अनार",kiwi:"कीवी",aloo:"आलू",phoolgobhi:"फूलगोभी",pattagobhi:"पत्तागोभी",lauki:"लौकी",harimirch:"हरी मिर्च",kaddu:"कद्दू",nariyal:"नारियल",shakarkand:"शकरकंद",beans:"बीन्स",shimla:"शिमला मिर्च",amla:"आंवला",adrak:"अदरक",chukandar:"चुकंदर",lahsun:"लहसुन",pyaj:"प्याज",chandaliya:"चंदलिया",palak:"पालक",methi:"मेथी"};
   COPY2.copy.night.night=Object.entries(COPY2.night.items).map(([id,q])=>({name:H[id]||id,qty:q,unit:U[id]||"kg"})).concat([{name:"बड़ी मिर्च",qty:0.5,unit:"kg"}]);}
-const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2];
+/* 13-11: ❄️ सर्दी का नया माल — जो सब्ज़ी/फल नवंबर–फ़रवरी में आते हैं पर ऐप में नहीं थे. बंद (active:false) जुड़ते हैं, भाव खाली —
+   मालिक "🌱 मौसम का माल" कार्ड (दिन → 📦 माल) से कमल भाई को खरीदने को कहें, माल आए तो ▶ चालू करें + भाव डालें. पुराना कुछ नहीं बदलता */
+const WN=(id,name,cat,emoji,hue,mon,tip,unit)=>({id,name,unit:unit||"kg",cat,emoji,hue,sale:0,active:false,season:"winter",seasonMon:mon,seasonTip:tip});
+const WINTER1={date:"2026-11-13",flag:"winter1",src:"सर्दी का नया माल (13-11-2026)",
+  add:[WN("bathua","बथुआ","patta","🌿",120,"नवं–फ़र","रायता/पराठे का साग — पालक के साथ रखें"),
+    WN("soya","सुवा (सोया) भाजी","patta","🌿",130,"नवं–फ़र","मेथी-पालक के साथ बिकती है"),
+    WN("haralahsun","हरा लहसुन","patta","🧄",100,"दिसं–फ़र","गड्डी में — सर्दी की ख़ास माँग"),
+    WN("harachana","हरा चना (छोलिया)","sabzi","🫛",105,"दिसं–फ़र","छिला/बिना छिला — जल्दी बिकता है"),
+    WN("mogri","मोगरी (मूली की फली)","sabzi","🫛",115,"नवं–जन","राजस्थान की सर्दी की सब्ज़ी"),
+    WN("shalgam","शलगम","sabzi","🟣",300,"नवं–फ़र","फौजी परिवारों (पंजाब/उत्तर) में माँग"),
+    WN("ganthgobhi","गांठ गोभी","sabzi","🥬",95,"नवं–फ़र","कश्मीरी/उत्तर के ग्राहक लेते हैं"),
+    WN("broccoli","ब्रोकली","sabzi","🥦",125,"नवं–फ़र","अफसर मेस / JCO लाइन — कम मात्रा से शुरू"),
+    WN("lalpattagobhi","लाल पत्तागोभी","sabzi","🥬",320,"नवं–फ़र","सलाद के लिए — 2-3 नग से शुरू"),
+    WN("suran","जिमीकंद (सूरन)","sabzi","🟤",30,"अक्टू–जन","टिकाऊ — खराब कम होता है"),
+    WN("ratalu","रतालू","sabzi","🟣",285,"नवं–फ़र","टिकाऊ — गुजराती/राजस्थानी सब्ज़ी"),
+    WN("kamalkakdi","कमल ककड़ी","sabzi","⚪",40,"अक्टू–फ़र","कभी-कभी — माँग पूछकर लाएँ"),
+    WN("ber","बेर","fal","🟢",85,"दिसं–फ़र","सस्ता फल — बच्चों/जवानों में ख़ूब बिकता है"),
+    WN("santra","संतरा","fal","🍊",30,"नवं–फ़र","नागपुरी — कीनू से पहले/साथ"),
+    WN("angoor","अंगूर","fal","🍇",280,"दिसं–मार्च","हरा/काला — नाज़ुक, कम लाएँ"),
+    WN("strawberry","स्ट्रॉबेरी (डिब्बा)","fal","🍓",350,"दिसं–फ़र","डिब्बे में — अफसर मेस / परिवार","pc"),
+    WN("cheeku","चीकू","fal","🟤",25,"नवं–मार्च","पका ही लाएँ"),
+    WN("nashpati","नाशपाती","fal","🍐",75,"नवं–दिसं","सेब के साथ"),
+    WN("khajoor","खजूर (पिंड)","fal","🟤",20,"नवं–फ़र","सर्दी में माँग — खराब नहीं होता"),
+    WN("ganna","गन्ना (टुकड़े)","fal","🎋",110,"दिसं–फ़र","मकर संक्रांति के आसपास")]};
+const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1];
 SR.BOARD=BOARD;SR.PACKS=PACKS;
 SR.applyBoard=async function(db){
   if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
@@ -1174,7 +1198,7 @@ SR.applyBoard=async function(db){
           await put(ref,{items:items2,nightBy:"विक्रम जी",nightTs:now,openNote:P.stock.note,ts:now,by:S.uid||"",byName:"विक्रम जी"},{merge:true})}}
       let ord=Math.max(0,...items.map(i=>+i.order||0));
       for(const a of (P.add||[])){if(items.some(x=>x.id===a.id||String(x.name||"").replace(/\s*\(.*\)/,"").trim()===a.name.replace(/\s*\(.*\)/,"").trim()))continue;
-        const d={active:true,name:a.name,unit:a.unit,cat:a.cat,emoji:a.emoji,hue:a.hue,sale:a.sale,cost:a.cost||0,order:++ord,photo:"",buyHist:a.cost?[{date:P.date,rate:a.cost,src:"कमल भाई की कॉपी (अक्टूबर)"}]:[],saleSet:{date:P.date,src:a.sale?src:"भाव बाकी — विक्रम जी बताएँगे"}};
+        const d={active:a.active!==false,...(a.season?{season:a.season,seasonMon:a.seasonMon||"",seasonTip:a.seasonTip||"",offNote:"मौसम का माल — खरीदें तब चालू करें"}:{}),name:a.name,unit:a.unit,cat:a.cat,emoji:a.emoji,hue:a.hue,sale:a.sale,cost:a.cost||0,order:++ord,photo:"",buyHist:a.cost?[{date:P.date,rate:a.cost,src:"कमल भाई की कॉपी (अक्टूबर)"}]:[],saleSet:{date:P.date,src:a.sale?src:"भाव बाकी — विक्रम जी बताएँगे"}};
         await put(db.collection("items").doc(a.id),d);add++}
       await put(fr,{[P.flag]:now,[P.flag+"Changed"]:ch,[P.flag+"Added"]:add},{merge:true});
       if(W)await W.commit();
