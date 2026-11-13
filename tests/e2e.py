@@ -789,6 +789,13 @@ async def main():
           await SX.seasonOn('ber');r.push(M.items.ber.active);SX.seasonSel={};return r})()""")
         assert w1 == [True, False, "winter", "pc", 20, True, True, True, True], w1
         print("winter pack ok")
+        gl = await pg.evaluate("""(async()=>{const d=S.billsDate,c0=cashCalc(d).expected;SF.glF={kind:'out',why:''};const bad=await SF.glSave();
+          await SF.glWrite([{id:'g1',ts:1,kind:'out',why:'विक्रम जी को दिए',amt:500,by:'u_x',byName:'कमल भाई'},{id:'g2',ts:2,kind:'in',why:'MH कैंटीन से लिए',amt:200,by:'u_x',byName:'कमल भाई'}]);
+          const c1=cashCalc(d),h=SF.glCardHTML(),tile=SF.gallaTileHTML(),m=((window.__MOCK__['days/'+d+'/meta']||{}).galla||{}).log||[];
+          const pc=S.prevClose;S.prevClose={d:dayPlus(d,-1),counted:777};const fl=S.close&&S.close.float!=null&&S.close.float!==''?null:cashCalc(d).float;S.prevClose=pc;
+          const r=[bad,r2(c0-c1.expected),c1.gIn,c1.gOut,h.includes('data-glok'),tile.includes('2 एंट्री'),m.length,fl===null||fl===777];await SF.glWrite([]);r.push(cashCalc(d).expected===c0);return r})()""")
+        assert gl == [False, 300, 200, 500, True, True, 2, True, True], gl
+        print("galla in-out ok")
         if await pg.evaluate("today()") == "2026-11-03":
             await pg.wait_for_timeout(400)
             assert await pg.evaluate("(S.prevStock||{}).aloo&&S.prevStock.aloo.close") == 30, "02-11 night must be today's opening"

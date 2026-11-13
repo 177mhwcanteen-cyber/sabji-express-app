@@ -640,6 +640,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const r2=n=>Math.round((+n||0)*100)/100;
 const rs=n=>"₹"+r2(n).toLocaleString("en-IN",{maximumFractionDigits:2});
+function dayPlus(d,n){const x=new Date(d+"T12:00:00");x.setDate(x.getDate()+n);return today(x)}
 function today(d=new Date()){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function fq(q,u){q=+q||0;if(u==="kg")return (+q.toFixed(3))+" कि.ग्रा";return (+q.toFixed(2))+" "+(UNITS[u]||u)}
 function ftime(ts){const d=new Date(ts);return d.toLocaleTimeString("hi-IN",{hour:"2-digit",minute:"2-digit"})}
@@ -1361,10 +1362,12 @@ function cashCalc(d){
   const jamaCash=r2(S.ledger.filter(l=>l.date===d&&l.type==="jama"&&l.mode!=="upi").reduce((a,l)=>a+l.amt,0));
   const khCash=r2(S.kharch.filter(k=>k.mode!=="upi").reduce((a,k)=>a+(+k.amt||0),0)+(window.SF?SF.gallaPaid():0));
   const khAll=r2(S.kharch.reduce((a,k)=>a+(+k.amt||0),0));
-  const cl=S.close||{};const float=cl.float!=null&&cl.float!==""?+cl.float:(+S.settings.float||0);
-  const expected=r2(float+cashSale+jamaCash-khCash);
+  const cl=S.close||{};const pc=S.prevClose&&S.prevClose.d===dayPlus(d,-1)&&S.prevClose.counted!=null&&S.prevClose.counted!==""?+S.prevClose.counted:null;
+  const float=cl.float!=null&&cl.float!==""?+cl.float:(pc!=null?pc:(+S.settings.float||0));
+  const g=window.SF&&SF.glSum?SF.glSum():{in:0,out:0};
+  const expected=r2(float+cashSale+jamaCash+g.in-khCash-g.out);
   const counted=cl.counted!=null&&cl.counted!==""?+cl.counted:null;
-  return {cashSale,jamaCash,khCash,khAll,float,expected,counted,diff:counted==null?null:r2(counted-expected)};
+  return {cashSale,jamaCash,khCash,khAll,float,gIn:g.in,gOut:g.out,prev:pc,expected,counted,diff:counted==null?null:r2(counted-expected)};
 }
 function diffPill(diff){if(diff==null)return '<span class="pill blue">अभी गिना नहीं</span>';if(Math.abs(diff)<=5)return '<span class="pill green">✓ पूरा मिला</span>';return diff<0?`<span class="pill red">${rs(-diff)} कम है</span>`:`<span class="pill blue">${rs(diff)} ज़्यादा है</span>`}
 function renderDay(){
@@ -1381,12 +1384,15 @@ function renderDay(){
     <div class="stkmeta"><span>+ नकद बिक्री</span><b>${rs(c.cashSale)}</b></div>
     <div class="stkmeta"><span>+ उधारी वसूली (नकद)</span><b>${rs(c.jamaCash)}</b></div>
     <div class="stkmeta"><span>− नकद खर्चा + गल्ले से खरीद</span><b>${rs(c.khCash)}</b></div>
+    ${c.gIn?`<div class="stkmeta"><span>+ बाहर से गल्ले में आया</span><b>${rs(c.gIn)}</b></div>`:""}${c.gOut?`<div class="stkmeta"><span>− गल्ले से निकाला</span><b>${rs(c.gOut)}</b></div>`:""}
+    ${c.prev!=null&&Math.abs(c.prev-c.float)>5?`<p class="ud-w" style="margin:4px 0">⚠ कल रात ${rs(c.prev)} गिना था, आज सुबह ${rs(c.float)} खुला लिखा — ${rs(Math.abs(r2(c.prev-c.float)))} का फर्क</p>`:""}
     <div class="amtline" style="margin:0"><span>गल्ले में होना चाहिए</span><b>${rs(c.expected)}</b></div>`:'<p class="note" style="margin:0 0 6px">सुबह खुला पैसा और रात को गल्ला गिनकर लिखें — बस इतना।</p>'}
     <div class="row2" style="margin:0"><label class="fld">सुबह खुला पैसा ₹<input class="inp" id="dFloat" inputmode="decimal" value="${c.float||""}"></label><label class="fld">अभी गिनकर कितना है? ₹<input class="inp" id="dCount" inputmode="decimal" value="${c.counted??""}"></label></div>
     <button class="big" data-saveclose>गल्ला मिलान सेव करें</button>
     ${!S.isOwner&&c.counted!=null?'<p class="note" style="margin:0">✓ गिनती सेव हुई — धन्यवाद 🙏</p>':c.diff!=null?`<p style="margin:0;font-size:17px">नतीजा: ${diffPill(c.diff)}${S.close?.byName?` <span class="note">· ${esc(S.close.byName)} ने ${ftime(S.close.ts)} पर गिना</span>`:""}</p>`:""}
   </div>
 
+  ${window.SF&&SF.glCardHTML?SF.glCardHTML():""}
   <div class="card2" data-ds="paisa"><h3>खर्चा</h3>
     <div class="seg">${quick.map(q=>`<button class="chip" data-kq="${esc(q)}">${esc(q)}</button>`).join("")}</div>
     <div class="row2" style="margin:0"><input class="inp" id="kName" placeholder="किस चीज़ का खर्चा" aria-label="खर्चा किस चीज़ का"><input class="inp" id="kAmt" inputmode="decimal" placeholder="₹ रकम" aria-label="रकम"></div>
@@ -1424,7 +1430,7 @@ $("#p-day").addEventListener("click",async e=>{
   if(e.target.closest("[data-saveclose]")){
     const c=cashCalc(S.billsDate);const fl=$("#dFloat").value.trim(),ct=$("#dCount").value.trim();
     const float=fl===""?c.float:parseFloat(fl)||0,counted=ct===""?null:parseFloat(ct)||0;
-    const expected=r2(float+c.cashSale+c.jamaCash-c.khCash);
+    const expected=r2(float+c.cashSale+c.jamaCash+c.gIn-c.khCash-c.gOut);
     const doc={float,counted,expected,diff:counted==null?null:r2(counted-expected),ts:Date.now(),by:S.uid||"",byName:biller()};
     try{if(S.demo)S.close=doc;else await S.db.doc("days/"+S.billsDate+"/meta/close").set(doc);S.close=doc;renderDay();toast("गल्ला मिलान सेव हुआ")}catch(err){toast("सेव नहीं हुआ")}return}
   const ac=e.target.closest("[data-applycost]");if(ac){const r=stockRows().find(x=>x.it.id===ac.dataset.applycost);if(!r)return;const old=+r.it.cost||0;await saveItem(r.it.id,{cost:r.buyRate});logPrice(r.it.id,"cost",old,r.buyRate);renderDay();return}
@@ -1686,10 +1692,11 @@ function subBills(){
   if(S.unsubBills)S.unsubBills();
   S.dayBills=[];
   S.unsubBills=S.db.collection("days/"+S.billsDate+"/bills").onSnapshot(s=>{const got=s.docs.map(d=>d.data()),nos=new Set(got.map(x=>x.no)),gd=S.billsDate;if(S.isOwner)guardQ(()=>guardBills(gd,got));S.dayBills=got.concat(outbox().map(x=>x.bill).filter(x=>x.date===S.billsDate&&!nos.has(x.no)));renderPane();if(S.tab==="bill")renderBill()},err=>toast("बिल लोड नहीं हुए"));
-  S.unsubDay.forEach(f=>{try{f()}catch(e){}});S.stock={};S.kharch=[];S.close=null;const d="days/"+S.billsDate;
+  S.unsubDay.forEach(f=>{try{f()}catch(e){}});S.stock={};S.kharch=[];S.close=null;S.gl=null;{const pd=dayPlus(S.billsDate,-1);S.db.doc("days/"+pd+"/meta/close").get().then(x=>{S.prevClose={d:pd,...(x.exists?x.data():{})};if(S.tab==="day")renderPane()}).catch(()=>{})}const d="days/"+S.billsDate;
   S.unsubDay=[S.db.doc(d+"/meta/stock").onSnapshot(s=>{S.stock=s.exists?s.data():{};if(S.tab!=="day")renderPane()},()=>{}),
     S.db.collection(d+"/kharch").onSnapshot(s=>{S.kharch=s.docs.map(x=>({id:x.id,...x.data()}));renderPane(S.tab!=="day")},()=>{}),
-    S.db.doc(d+"/meta/close").onSnapshot(s=>{S.close=s.exists?s.data():null;if(S.tab!=="day")renderPane()},()=>{})];
+    S.db.doc(d+"/meta/close").onSnapshot(s=>{S.close=s.exists?s.data():null;if(S.tab!=="day")renderPane()},()=>{}),
+    S.db.doc(d+"/meta/galla").onSnapshot(s=>{S.gl=s.exists?s.data():null;renderPane(S.tab!=="day")},()=>{})];
 }
 function loadDemo(){
   S.demo=true;S.isOwner=true;

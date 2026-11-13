@@ -503,6 +503,7 @@ function nightSheet(){
       Object.entries(N).forEach(([id,v])=>{if(id.startsWith("__rm_")||v===""||v==null)return;const o=items[id]||(items[id]={});o.close=num(v);o.closeBy=by;o.closeTs=now;n++});
       S.stock.nightBy=by;S.stock.nightTs=now;S.stock.nightVal=nightVal(Object.fromEntries(Object.entries(N).filter(([k])=>!k.startsWith("__rm_"))));S.stock.nightN=n;
       await saveStock();renderDay();SF.nightDoneSheet();
+      if(!S.isOwner&&!(S.close&&S.close.counted!=null&&S.close.counted!==""))setTimeout(()=>toast("💵 अब गल्ला गिनकर लिखें — नीचे 'गल्ला मिलान' में"),1500);
     }
   };
 }
@@ -636,10 +637,10 @@ F. **कौन सा आँकड़ा अधूरा है** — जो ऐ
 - + नकद बिक्री: ₹${C.cashSale}
 - + उधारी की नकद वसूली: ₹${C.jamaCash}
 - − नकद खर्च + गल्ले से खरीद: ₹${C.khCash}
-- = गल्ले में होना चाहिए: ₹${C.expected}
+${C.gIn?"- + बाहर से गल्ले में आया: ₹"+C.gIn+"\n":""}${C.gOut?"- − गल्ले से निकाला: ₹"+C.gOut+"\n":""}${C.prev!=null&&Math.abs(C.prev-C.float)>5?"- ⚠ कल रात ₹"+C.prev+" गिना था, सुबह ₹"+C.float+" खुला लिखा\n":""}- = गल्ले में होना चाहिए: ₹${C.expected}
 - गिना हुआ: ${C.counted==null?"⚠ गिना ही नहीं गया":"₹"+C.counted+(S.close&&S.close.byName?" ("+S.close.byName+" ने "+ftime(S.close.ts)+" पर गिना)":"")}
 - फर्क: ${C.diff==null?"—":"₹"+C.diff}
-- कुल खर्च (नकद+UPI): ₹${C.khAll}
+- कुल खर्च (नकद+UPI): ₹${C.khAll}${SF.glLog().length?"\n\n### गल्ले का आना-जाना (कर्मचारी की लिखी एंट्री)\n"+SF.glLog().map(g=>"- "+ftime(g.ts)+" · "+(g.kind==="in"?"📥 आया":"📤 निकाला")+" ₹"+g.amt+" · "+g.why+(g.note?" ("+g.note+")":"")+" · "+(g.byName||"")+(g.ok?" · मालिक ने देखा":" · ⚠ मालिक ने नहीं देखा")).join("\n"):""}
 `;
   t+=`
 ## 3. माल का मिलान (हर सब्ज़ी)
@@ -1366,7 +1367,36 @@ SF.watchClose=function(d){if(SF._unC)try{SF._unC()}catch(e){}SF._ct=undefined;if
       toast((bad?"🚨 ":"💵 ")+(v.byName||"कर्मचारी")+" ने ₹"+c.counted+" गिना · होना चाहिए ₹"+c.expected+" → "+(c.diff===0?"ठीक":(c.diff>0?"+₹"+c.diff+" ज़्यादा":"₹"+Math.abs(c.diff)+" कम")));if(bad)try{beep(false)}catch(e){}},900);
     SF._ct=k},()=>{})};
 SF.gallaTileHTML=function(){if(!S.isOwner)return "";const c=cashCalc(S.billsDate);
-  return `<div><span>💵 गल्ला गिनती</span><b>${c.counted==null?"— अभी नहीं":rs(c.counted)}</b><small>होना चाहिए ${rs(c.expected)}${c.diff!=null?" · "+(c.diff===0?"✅ ठीक":c.diff>0?"+"+rs(c.diff):"🚨 "+rs(Math.abs(c.diff))+" कम"):""}${S.close&&S.close.byName&&c.counted!=null?" · "+esc(S.close.byName):""}</small></div>`};
+  return `<div><span>💵 गल्ला गिनती</span><b>${c.counted==null?"— अभी नहीं":rs(c.counted)}</b><small>होना चाहिए ${rs(c.expected)}${c.diff!=null?" · "+(c.diff===0?"✅ ठीक":c.diff>0?"+"+rs(c.diff):"🚨 "+rs(Math.abs(c.diff))+" कम"):""}${S.close&&S.close.byName&&c.counted!=null?" · "+esc(S.close.byName):""}${(()=>{const n=SF.glLog().filter(g=>!g.ok).length;return n?" · 🔔 "+n+" एंट्री देखनी है":""})()}</small></div>`};
+/* 💵 गल्ले का आना-जाना (13-11, नक्शा चरण 2 — docs/GALLA-PROMPT-2026-11-13.md): days/<d>/meta/galla {log:[…]} — एंट्री मिटती नहीं;
+   कर्मचारी को सिर्फ़ अपनी एंट्री, "होना चाहिए"/फर्क कभी नहीं */
+SF.GL={out:["विक्रम जी को दिए","अपने/घर के लिए लिया","MH कैंटीन को दिए","दूसरा काम"],in:["विक्रम जी ने दिए","MH कैंटीन से लिए","किसी से उधार लिए","दूसरा"]};
+SF.glF={kind:"out",why:""};
+SF.glLog=()=>((S.gl&&S.gl.log)||[]).filter(g=>g&&!g.void).slice().sort((a,b)=>a.ts-b.ts);
+SF.glSum=()=>{let i=0,o=0;SF.glLog().forEach(g=>{if(g.kind==="in")i+=num(g.amt);else o+=num(g.amt)});return {in:r2(i),out:r2(o)}};
+SF.glNeedNote=w=>/दूसरा|उधार/.test(w||"");
+SF.glCardHTML=function(){const F=SF.glF,own=S.isOwner,L=SF.glLog().filter(g=>own||g.by===(S.uid||"")),sm=SF.glSum();
+  return `<div class="card2" data-ds="paisa"><h3>💵 गल्ले से पैसा निकला / बाहर से आया</h3>
+  <p class="note" style="margin:0 0 6px">मंडी खरीद और खर्चा यहाँ नहीं — वे अपनी जगह चढ़ाएँ। यहाँ सिर्फ़: गल्ले से किसी को पैसा दिया, या बाहर से गल्ले में पैसा आया।</p>
+  <div class="seg"><button class="chip" data-glk="out" aria-pressed="${F.kind==="out"}">📤 गल्ले से निकाला</button><button class="chip" data-glk="in" aria-pressed="${F.kind==="in"}">📥 बाहर से आया</button></div>
+  <div class="seg">${SF.GL[F.kind].map(w=>`<button class="chip" data-glw="${esc(w)}" aria-pressed="${F.why===w}">${esc(w)}</button>`).join("")}</div>
+  <div class="row2" style="margin:0"><input class="inp" id="glAmt" inputmode="decimal" placeholder="₹ रकम" aria-label="रकम"><input class="inp" id="glNote" placeholder="${SF.glNeedNote(F.why)?"किससे / किस लिए (ज़रूरी)":"किस लिए (चाहें तो)"}" aria-label="किस लिए"></div>
+  <button class="big" data-glsave>✓ एंट्री सेव करें</button>
+  ${own&&(sm.in||sm.out)?`<p class="note" style="margin:6px 0 0">आज: 📥 आया <b>${rs(sm.in)}</b> · 📤 निकाला <b>${rs(sm.out)}</b></p>`:""}
+  ${L.length?`<div style="margin-top:6px">${L.slice().reverse().map(g=>`<div class="stkmeta"><span>${g.kind==="in"?"📥":"📤"} ${esc(g.why)}${g.note?" · "+esc(g.note):""}<br><small class="note">${ftime(g.ts)} · ${esc(g.byName||"")}${g.ok?" · ✓ देख लिया":""}</small></span><b>${rs(g.amt)}${own&&!g.ok?` <button class="lnk" data-glok="${esc(g.id)}">✓ देख लिया</button>`:""}</b></div>`).join("")}</div>`:""}
+  </div>`};
+SF.glWrite=async function(log){const d=S.billsDate;if(S.demo){S.gl={log};return}await S.db.doc("days/"+d+"/meta/galla").set({log,ts:Date.now()},{merge:true});S.gl={...(S.gl||{}),log}};
+SF.glSave=async function(){const F=SF.glF,amt=r2(num(($("#glAmt")||{}).value)),note=String(($("#glNote")||{}).value||"").trim();
+  if(!F.why){toast("पहले चुनें — पैसा किसको दिया / कहाँ से आया");return false}
+  if(!(amt>0)){toast("रकम लिखें");return false}
+  if(SF.glNeedNote(F.why)&&note.length<2){toast("लिखें — किससे / किस लिए");return false}
+  const ts=Date.now(),g={id:"g"+ts.toString(36),ts,kind:F.kind,why:F.why,amt,note,by:S.uid||"",byName:biller(),...(S.isOwner?{ok:{ts}}:{})};
+  try{await SF.glWrite(((S.gl&&S.gl.log)||[]).concat([g]));SF.glF={kind:F.kind,why:""};toast((g.kind==="in"?"📥 ":"📤 ")+rs(amt)+" की एंट्री सेव हुई");renderDay();return true}catch(e){toast("एंट्री सेव नहीं हुई: "+(e.code||""));return false}};
+document.addEventListener("click",e=>{const t=e.target;if(!t.closest)return;
+  const k=t.closest("[data-glk]");if(k){SF.glF={kind:k.dataset.glk,why:""};renderDay();return}
+  const w=t.closest("[data-glw]");if(w){const a=($("#glAmt")||{}).value,n=($("#glNote")||{}).value;SF.glF.why=w.dataset.glw;renderDay();if($("#glAmt")){$("#glAmt").value=a||"";$("#glNote").value=n||""}return}
+  if(t.closest("[data-glsave]")){SF.glSave();return}
+  const o=t.closest("[data-glok]");if(o&&S.isOwner){const log=((S.gl&&S.gl.log)||[]).map(g=>g.id===o.dataset.glok?{...g,ok:{ts:Date.now()}}:g);SF.glWrite(log).then(()=>renderDay()).catch(()=>toast("सेव नहीं हुआ"));return}});
 /* 🛒 कर्मचारी को छोटी याद: आज की मंडी खरीद ऐप में नहीं डली (पहली 15 मिनट बाद, फिर हर 45 मिनट; 9 से 10 बजे रात तक) */
 SF.nobuy=null;
 SF.loadNobuy=function(d){SF.nobuy=null;if(S.demo||!S.db)return;S.db.doc("days/"+d+"/meta/nobuy").get().then(x=>{SF.nobuy=x.exists?x.data():null}).catch(()=>{})};
