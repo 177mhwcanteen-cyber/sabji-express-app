@@ -1158,7 +1158,11 @@ const WINTER1={date:"2026-11-13",flag:"winter1",src:"सर्दी का न�
     WN("nashpati","नाशपाती","fal","🍐",75,"नवं–दिसं","सेब के साथ"),
     WN("khajoor","खजूर (पिंड)","fal","🟤",20,"नवं–फ़र","सर्दी में माँग — खराब नहीं होता"),
     WN("ganna","गन्ना (टुकड़े)","fal","🎋",110,"दिसं–फ़र","मकर संक्रांति के आसपास")]};
-const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1];
+/* 14-11: गाड़ी के बोर्ड की नई फोटो (विक्रम जी: "जो भाव बोर्ड पर लिखे हैं वह कर दो") — सिर्फ़ ये 18 बिक्री भाव बदलते हैं.
+   बोर्ड की "SAFAL MATAR" लाइन = रेगुलर मटर (स्थाई नियम); मटर/अनानास/नींबू का अंक फोटो में साफ़ नहीं — वे नहीं छुए. खाली लाइनों के पुराने भाव वही */
+const BOARD3={date:"2026-11-14",flag:"board3",src:"गाड़ी का बोर्ड 14-11-2026 (विक्रम जी की भेजी फोटो)",
+  sale:{harimirch:180,toroi:40,adrak:160,dhaniya:200,kiwi:120,chandaliya:100,palak:60,tamatar:30,gajar:80,lauki:40,seb:150,bhindi:70,pattagobhi:40,kundru:30,papita:70,amrood:100,nariyal:60,mushroom:70}};
+const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1,BOARD3];
 SR.BOARD=BOARD;SR.PACKS=PACKS;
 SR.applyBoard=async function(db){
   if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
