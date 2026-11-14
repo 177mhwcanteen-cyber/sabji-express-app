@@ -15,6 +15,21 @@ CFG = """window.SE_CONFIG={firebase:{apiKey:"TEST",projectId:"t"},ownerHash:"465
 errs = []
 UPLOADS = []
 
+async def wf(pg, expression, timeout=30000, polling=100):
+    """wait_for_function जैसा, पर evaluate से (पीछे के टैब में raf/CSP से अटकता नहीं)"""
+    import time
+    end = time.time() + timeout / 1000
+    while True:
+        try:
+            if await pg.evaluate(expression):
+                return True
+        except Exception:
+            pass
+        if time.time() > end:
+            raise TimeoutError("wf timeout: " + expression[:80])
+        await pg.wait_for_timeout(polling)
+
+
 async def page(b, mock, users, cfg=True):
     ctx = await b.new_context(viewport={"width": 400, "height": 860}, service_workers="block", geolocation={"latitude": 25.7712, "longitude": 71.3521, "accuracy": 12}, permissions=["geolocation", "clipboard-read", "clipboard-write"])
     pg = await ctx.new_page()
@@ -115,7 +130,7 @@ async def main():
 
         # ---------- 1) मालिक ----------
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1, "winter1": 1, "board3": 1}}}, users)
+        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1, "winter1": 1, "board3": 1, "supply1": 1}}}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
@@ -289,7 +304,7 @@ async def main():
         await pg.fill("#pShop", "पवन सब्ज़ी भंडार"); await pg.fill("#pPh", "98290 11111")
         await pg.click('#pgrid [data-pitem="tamatar"]'); await pg.wait_for_selector("#piQ")
         await pg.fill("#piQ", "28"); await pg.press("#piQ", "Enter"); await pg.keyboard.type("10"); await pg.keyboard.press("Enter"); await pg.wait_for_timeout(300)
-        await pg.wait_for_function("document.activeElement&&document.activeElement.id==='pq'", timeout=9000)
+        await wf(pg, "document.activeElement&&document.activeElement.id==='pq'", timeout=9000)
         ae = await pg.evaluate("[document.activeElement.id,document.activeElement.tagName,!!document.querySelector(\"#sheet .qpop\"),document.querySelector(\"#sheet\").innerText.slice(0,80)]"); assert ae[0] == "pq", ae
         await pg.keyboard.type("प्याज 92"); await pg.keyboard.press("Enter"); await pg.wait_for_selector("#piQ")
         assert await pg.input_value("#piQ") == "92"
@@ -430,7 +445,7 @@ async def main():
         assert "होना चाहिए" not in ntx and "बिका" not in ntx, "staff must not see expected stock"
         assert "बचा माल (4)" in ntx and "खत्म (0)" in ntx and "₹" in await pg.inner_text("#sheet .ns-sum"), ntx[:500]
         await pg.screenshot(path=f"{SHOTS}/34-night-entry.png")
-        await pg.click("[data-nsave]"); await pg.wait_for_selector("#nsadv"); await pg.wait_for_function("!document.querySelector('#nsadv').innerText.includes('बन रही')", timeout=8000)
+        await pg.click("[data-nsave]"); await pg.wait_for_selector("#nsadv"); await wf(pg, "!document.querySelector('#nsadv').innerText.includes('बन रही')", timeout=8000)
         adv = await pg.inner_text("#sheet"); assert "रात का स्टॉक सेव हुआ" in adv and "बचा माल" in adv and "रोज़ ~" not in adv, adv[:500]
         await pg.screenshot(path=f"{SHOTS}/35-night-done.png")
         await pg.evaluate("closeSheet()")
@@ -523,7 +538,7 @@ async def main():
         txt = await pg.inner_text("#p-day")
         assert "असली मुनाफ़ा" in txt, txt[:300]
         assert "रात का मिलान" in txt and "प्याज" in txt, txt[:600]
-        await pg.wait_for_function("document.querySelector('#p-day').innerText.includes('कल की खरीद की सलाह')", timeout=8000)
+        await wf(pg, "document.querySelector('#p-day').innerText.includes('कल की खरीद की सलाह')", timeout=8000)
         txt = await pg.inner_text("#p-day"); assert "भरने वाले" in txt and "रोज़ ~" in txt, txt[:800]
         assert "अभी गाड़ी में (लाइव)" in txt, "live stock card"
         await pg.click("[data-nrevok]"); await pg.wait_for_timeout(500)
@@ -566,7 +581,7 @@ async def main():
         import json as _j
         dj["date"] = await pg.evaluate("S.billsDate")
         await pg.fill("#cpyIn", "यह रहा:\n```json\n" + _j.dumps(dj, ensure_ascii=False) + "\n```"); await pg.click("[data-cpsave]"); await pg.wait_for_timeout(800)
-        await pg.wait_for_function("(document.querySelector('#p-day .cpy')||{}).innerText?.includes('खरीद — कॉपी बनाम ऐप')", timeout=6000)
+        await wf(pg, "(document.querySelector('#p-day .cpy')||{}).innerText?.includes('खरीद — कॉपी बनाम ऐप')", timeout=6000)
         ctx2 = await pg.inner_text("#p-day .cpy"); assert "बिक्री — कॉपी बनाम ऐप" in ctx2 and "खरीद — कॉपी बनाम ऐप" in ctx2 and "संस्था — कॉपी" in ctx2 and "पढ़ी नहीं" in ctx2, ctx2[:600]
         nj = {"type":"sabji-night","date":dj["date"],"night":[{"name":"सेब","qty":2,"unit":"kg"},{"name":"तरबुज","qty":4,"unit":"kg"},{"name":"G4","qty":1,"unit":"kg"},{"name":"प्याज","qty":12,"unit":"kg"}],"kharab":[{"name":"पपीता","qty":2.5,"unit":"kg"}],"unclear":[]}
         await pg.fill("#cpyIn", _j.dumps(nj, ensure_ascii=False)); await pg.click("[data-cpsave]"); await pg.wait_for_selector("[data-cpnight]")
@@ -592,16 +607,16 @@ async def main():
         print("old udhar", sums)
         assert all(x[1] == x[2] for x in sums), sums
         # नया वर्ज़न: मालिक के फोन पर अपने-आप जुड़ी
-        await pg.wait_for_function("Object.keys(window.__MOCK__.ledger||{}).filter(k=>k.startsWith('op_')).length>=97", timeout=15000)
+        await wf(pg, "Object.keys(window.__MOCK__.ledger||{}).filter(k=>k.startsWith('op_')).length>=97", timeout=15000)
         led = await pg.evaluate("Object.keys(window.__MOCK__.ledger||{}).filter(k=>k.startsWith('op_')).length")
         tot = await pg.evaluate("Object.entries(window.__MOCK__.ledger||{}).filter(([k])=>k.startsWith('op_')).reduce((a,[k,v])=>a+v.amt,0)")
         print("auto imported", led, tot)
         assert led == 97 and tot == 33305, (led, tot)
         assert (await pg.evaluate("window.__MOCK__.ownerCfg.flags.oldUdhar1")) > 0
-        await pg.wait_for_function("(window.__MOCK__.ownerCfg.flags||{}).oldUdhar2>0", timeout=15000)
+        await wf(pg, "(window.__MOCK__.ownerCfg.flags||{}).oldUdhar2>0", timeout=15000)
         o2 = await pg.evaluate("(()=>{const E=Object.entries(window.__MOCK__.ledger||{}).filter(([k])=>k.startsWith('o2_'));return [E.length,E.reduce((a,[k,v])=>a+v.amt,0),SR.OLD_UDHAR2.reduce((a,g)=>a+g.total,0),!!window.__MOCK__.parties['adm-commander'],E.filter(([k,v])=>v.partyId==='mh-canteen').length]})()")
         print("old udhar 2", o2)
-        await pg.wait_for_function("(window.__MOCK__.ownerCfg.flags||{}).oldUdhar3>0", timeout=15000)
+        await wf(pg, "(window.__MOCK__.ownerCfg.flags||{}).oldUdhar3>0", timeout=15000)
         o3 = await pg.evaluate("""(()=>{const M=window.__MOCK__,E=Object.entries(M.ledger||{}).filter(([k])=>k.startsWith('o3_'));return [E.length,E.reduce((a,[k,v])=>a+v.amt,0),SR.OLD_UDHAR3.reduce((a,g)=>a+g.total,0),M.parties['mh-canteen'].name,M.parties['adm-commander'].hide,M.parties['manoj-ghar'].hide,bal('adm-commander'),balRaw('adm-commander')>0,Object.values(M.ledger).filter(v=>v.partyId==='mh-canteen').every(v=>v.partyName==='177 MH वेट कैंटीन')]})()""")
         print("old udhar 3", o3)
         # 🏢 कर्मचारी के बनाए "अपनी संस्था" उधार खाते → संस्था चालान + खाता हटाया (नीचे दिखे)
@@ -644,7 +659,7 @@ async def main():
         assert nq == [first], nq
         await pg.fill("#bfQ", ""); await pg.wait_for_timeout(500)
         await pg.fill("#bfFrom", "2026-10-28"); await pg.dispatch_event("#bfFrom", "change")
-        await pg.wait_for_function("[...document.querySelectorAll('#p-bills [data-bill]')].some(x=>x.dataset.bill==='SE-JB0001')", timeout=8000)
+        await wf(pg, "[...document.querySelectorAll('#p-bills [data-bill]')].some(x=>x.dataset.bill==='SE-JB0001')", timeout=8000)
         n_rng = await pg.evaluate("document.querySelectorAll('#p-bills [data-bill]').length")
         assert n_rng > n_all, (n_rng, n_all)
         await pg.screenshot(path=f"{SHOTS}/39-bills-filter.png")
@@ -652,7 +667,7 @@ async def main():
         # 📅 अवधि रिपोर्ट
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(300)
         await pg.evaluate("S.repSel='rr';renderReport()"); await pg.wait_for_timeout(200)  # 📊 नया रिपोर्ट-क्षेत्र: पहले रिपोर्ट चुनो
-        await pg.click("[data-rropen]"); await pg.wait_for_function("document.querySelector('.rrc table.rrt')", timeout=8000)
+        await pg.click("[data-rropen]"); await wf(pg, "document.querySelector('.rrc table.rrt')", timeout=8000)
         rtx = await pg.inner_text(".rrc"); assert "कुल" in rtx and "फायदा" in rtx, rtx[:300]
         await pg.locator(".rrc").screenshot(path=f"{SHOTS}/40-range-report.png")
         print("bill filters + range ok", n_all, n_rng)
@@ -678,7 +693,7 @@ async def main():
         await pg.evaluate("window.__oA4=SE.printA4;window.__oSh=SX.shareBlob;window.__oOp=window.open;window.__opened=[];window.open=(u)=>{window.__opened.push(u);return null};window.__shared=[];SX.shareBlob=async(b,n,e,m,t)=>{const o={n,e,m,size:b.size,txt:e==='png'?'':await b.text().catch(()=>'')};if(e==='png')o.url=await new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)});window.__shared.push(o)};window.__a4=null;SE.printA4=async(t,h)=>{window.__a4={t,h}}")
         # 1) कल की मंडी सूची
         await pg.click('[data-tab="day"]'); await pg.wait_for_timeout(300); await pg.click('[data-dseg="maal"]'); await pg.wait_for_timeout(200)
-        await pg.click('[data-sxo="mandi"]'); await pg.wait_for_function("document.querySelector('#p-day .sxc table.rrt')", timeout=10000)
+        await pg.click('[data-sxo="mandi"]'); await wf(pg, "document.querySelector('#p-day .sxc table.rrt')", timeout=10000)
         mt = await pg.evaluate("SX.mandiText()"); assert "कल की मंडी सूची" in mt and "रोज़" not in mt and "₹" not in mt, mt
         await pg.click("[data-sxmandiwa]"); assert "wa.me" in (await pg.evaluate("window.__opened.slice(-1)[0]")) or "whatsapp" in (await pg.evaluate("window.__opened.slice(-1)[0]")).lower()
         await pg.evaluate("SF.dseg='all';SF.dsegApply()")
@@ -694,19 +709,19 @@ async def main():
         # 4) खराबी रिपोर्ट + 14/15/16 औज़ार
         await pg.click('[data-tab="report"]'); await pg.wait_for_timeout(300)
         await pg.evaluate("S.repSel='tools';renderReport()"); await pg.wait_for_timeout(200)
-        await pg.click('[data-sxo="waste"]'); await pg.wait_for_function("(document.querySelector('[data-sxo=waste]')||{}).closest&&!document.body.innerText.includes('30 दिन की खराबी देखी जा रही')", timeout=15000)
-        await pg.click('[data-sxmonth]'); await pg.wait_for_function("window.__a4", timeout=15000)
+        await pg.click('[data-sxo="waste"]'); await wf(pg, "(document.querySelector('[data-sxo=waste]')||{}).closest&&!document.body.innerText.includes('30 दिन की खराबी देखी जा रही')", timeout=15000)
+        await pg.click('[data-sxmonth]'); await wf(pg, "window.__a4", timeout=15000)
         a4 = await pg.evaluate("window.__a4"); assert "असली मुनाफ़ा" in a4["h"] and "दिन-वार" in a4["h"], a4["t"]
-        await pg.click('[data-sxvy="sale"]'); await pg.wait_for_function("window.__shared.length>=1", timeout=10000)
-        await pg.click('[data-sxvy="buy"]'); await pg.wait_for_function("window.__shared.length>=2", timeout=10000)
+        await pg.click('[data-sxvy="sale"]'); await wf(pg, "window.__shared.length>=1", timeout=10000)
+        await pg.click('[data-sxvy="buy"]'); await wf(pg, "window.__shared.length>=2", timeout=10000)
         sh = await pg.evaluate("window.__shared"); assert sh[0]["e"] == "csv" and "Invoice No" in sh[0]["txt"] and "Bill No" in sh[1]["txt"], sh
-        await pg.click("[data-sxbk]"); await pg.wait_for_function("window.__shared.length>=3", timeout=30000)
+        await pg.click("[data-sxbk]"); await wf(pg, "window.__shared.length>=3", timeout=30000)
         bk = await pg.evaluate("JSON.parse(window.__shared[2].txt)"); assert bk["items"] and bk["parties"] and "days" in bk, list(bk.keys())
         assert '"pin"' not in (await pg.evaluate("window.__shared[2].txt")), "backup must not hold PINs"
         await pg.evaluate("localStorage.removeItem('sx_bk');SX.autoBackup()"); await pg.wait_for_timeout(1500)
         assert await pg.evaluate("!!(window.__MOCK__.ownerCfg||{})['bk_'+dayAdd2(today(),-1)]".replace("dayAdd2(today(),-1)", "(()=>{const x=new Date(today()+'T12:00:00');x.setDate(x.getDate()-1);return today(x)})()")), "daily backup"
         # 8) भाव-पोस्टर
-        await pg.click("[data-sxposter]"); await pg.wait_for_function("window.__shared.length>=4", timeout=20000)
+        await pg.click("[data-sxposter]"); await wf(pg, "window.__shared.length>=4", timeout=20000)
         ps = await pg.evaluate("window.__shared[3]"); assert ps["e"] == "png" and ps["size"] > 30000, ps["size"]
         import base64; open(f"{SHOTS}/43-poster.png", "wb").write(base64.b64decode(ps["url"].split(",")[1]))
         # 5) हिसाब-लिंक + h.html
@@ -725,7 +740,7 @@ async def main():
             elif u.split("?")[0].endswith("/orders") and route.request.method == "POST": UPLOADS.append(("order", route.request.post_data)); await route.fulfill(json={"name": "x"})
             else: await route.fulfill(status=404, body="{}")
         await hp.route("https://firestore.googleapis.com/**", fsr)
-        await hp.goto(URL.replace("index.html", "h.html?t=" + tok)); await hp.wait_for_function("document.body.innerText.includes('तारीख-वार हिसाब')", timeout=8000)
+        await hp.goto(URL.replace("index.html", "h.html?t=" + tok)); await wf(hp, "document.body.innerText.includes('तारीख-वार हिसाब')", timeout=8000)
         htx = await hp.inner_text("body"); assert "JCO मेस" in htx and "UPI से अभी चुकाएँ" in htx, htx[:300]
         await hp.screenshot(path=f"{SHOTS}/41-hisab-link.png")
         # 7) ऑर्डर पेज + ऐप में ऑर्डर
@@ -735,7 +750,7 @@ async def main():
         await hp.screenshot(path=f"{SHOTS}/42a-order-grid.png")
         await hp.click('[data-p="aloo"]'); await hp.click('[data-p="aloo"]'); await hp.click('[data-p="tamatar"]'); await hp.click("#go"); await hp.wait_for_selector("#nm")
         await hp.fill("#nm", "टेस्ट ग्राहक"); await hp.fill("#ph", "98290 12345"); await hp.fill("#ad", "12/B JCO लाइन"); await hp.click("#go")
-        await hp.wait_for_function("document.body.innerText.includes('ऑर्डर मिल गया')", timeout=8000)
+        await wf(hp, "document.body.innerText.includes('ऑर्डर मिल गया')", timeout=8000)
         await hp.screenshot(path=f"{SHOTS}/42-order-page.png")
         ob = json.loads([u for u in UPLOADS if isinstance(u, tuple) and u[0] == "order"][-1][1])["fields"]
         assert ob["phone"]["stringValue"] == "9829012345" and ob["status"]["stringValue"] == "new" and len(ob["items"]["arrayValue"]["values"]) == 2, ob
@@ -767,7 +782,7 @@ async def main():
         assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
         print("opening edit ok")
         # 🪧 बोर्ड के भाव: एक बार अपने-आप
-        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;delete window.__MOCK__.ownerCfg.flags.winter1;delete window.__MOCK__.ownerCfg.flags.board3;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;delete window.__MOCK__.ownerCfg.flags.winter1;delete window.__MOCK__.ownerCfg.flags.board3;delete window.__MOCK__.ownerCfg.flags.supply1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
         bd = await pg.evaluate("[window.__MOCK__.items.tamatar.sale,window.__MOCK__.items.nimbu.sale,!!window.__MOCK__.items.parwal,window.__MOCK__.items.parwal&&window.__MOCK__.items.parwal.sale,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.note&&x.note.includes('बोर्ड')).length,window.__MOCK__.ownerCfg.flags.board1>0]")
         assert bd[0] == 30 and bd[1] == 200 and bd[2] and bd[3] == 90 and bd[4] >= 10 and bd[5], bd
         b2 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.board2>0,window.__MOCK__.items.harapyaj&&window.__MOCK__.items.harapyaj.sale,window.__MOCK__.items.kachchakela&&window.__MOCK__.items.kachchakela.sale,!window.__MOCK__.items.safalmatar,window.__MOCK__.items.methi.sale]")
@@ -791,6 +806,22 @@ async def main():
           await SX.seasonOn('ber');r.push(M.items.ber.active);SX.seasonSel={};return r})()""")
         assert w1 == [True, False, "winter", "pc", 20, True, True, True, True], w1
         print("winter pack ok")
+        sp = await pg.evaluate("""(()=>{const M=window.__MOCK__,SU=Object.values(M.suppliers||{}),PE=M.payees||{};const pv=SU.find(s=>String(s.name).includes('पवन'));
+          const g=M.suppliers.sup_gajanand,mi=M.suppliers.sup_misri;return [M.ownerCfg.flags.supply1>0,!!pv&&(pv.items||[]).includes('phoolgobhi'),pv&&pv.name,g&&g.rates.nariyal,mi&&mi.rates.phoolgobhi,
+          (PE.chat_managnechiya||{}).chat&&PE.chat_managnechiya.chat.total,SU.filter(s=>s.master==='supply1').length>=15]})()""")
+        assert sp == [True, True, "पवन सब्ज़ी भंडार", 45, 40, 92252, True], sp
+        await pg.evaluate("closeSheet()"); await pg.wait_for_timeout(200)
+        await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
+        await pg.fill("#pPh", ""); await pg.fill("#pShop", "मिश्री लाल"); await pg.wait_for_timeout(200)
+        su = await pg.evaluate("[!document.getElementById('supIt').hidden,document.getElementById('supIt').textContent.includes('मिश्री')&&document.getElementById('supIt').textContent.includes('फूलगोभी'),document.querySelector('#pgrid [data-pitem]').dataset.pitem,!!document.querySelector('#pgrid .supmine')]")
+        assert su == [True, True, "phoolgobhi", True], su
+        await pg.click("#supIt [data-pitem=phoolgobhi]"); await pg.wait_for_timeout(250)
+        supr = await pg.evaluate("(document.querySelector('.qpop .supr')||{}).textContent||''")
+        assert "₹40" in supr, supr
+        await pg.screenshot(path=f"{SHOTS}/8c-kharid-dukan.png")
+        await pg.click(".qpop [data-close]"); await pg.fill("#pShop", ""); await pg.wait_for_timeout(150)
+        assert await pg.evaluate("document.getElementById('supIt').hidden"), "supplier strip should hide"
+        print("supplier master ok")
         gl = await pg.evaluate("""(async()=>{const d=S.billsDate,c0=cashCalc(d).expected;SF.glF={kind:'out',why:''};const bad=await SF.glSave();
           await SF.glWrite([{id:'g1',ts:1,kind:'out',why:'विक्रम जी को दिए',amt:500,by:'u_x',byName:'कमल भाई'},{id:'g2',ts:2,kind:'in',why:'MH कैंटीन से लिए',amt:200,by:'u_x',byName:'कमल भाई'}]);
           const c1=cashCalc(d),h=SF.glCardHTML(),tile=SF.gallaTileHTML(),m=((window.__MOCK__['days/'+d+'/meta']||{}).galla||{}).log||[];
@@ -839,7 +870,7 @@ async def main():
         await pg.click("[data-sppaste]"); await pg.wait_for_selector("#spTxt"); await pg.fill("#spTxt", ai); await pg.click("[data-spcheck]"); await pg.wait_for_selector("[data-spsave2]")
         await pg.screenshot(path=f"{SHOTS}/17-upi-preview.png")
         await pg.click("[data-spsave2]"); await pg.wait_for_timeout(800)
-        pay = await pg.evaluate("window.__MOCK__.pay"); payees = await pg.evaluate("Object.values(window.__MOCK__.payees||{})")
+        pay = await pg.evaluate("window.__MOCK__.pay"); payees = await pg.evaluate("Object.values(window.__MOCK__.payees||{}).filter(p=>!p.supKey)")
         assert any(v.get("utr") == "429811112222" and v["payee"] == "RAJU RAM" for v in pay.values()) and any(v.get("kind") == "unmatched" for v in pay.values()), pay
         assert payees and payees[0]["name"] == "RAJU RAM" and "राजू" in payees[0]["shops"], payees
         await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
@@ -910,8 +941,8 @@ async def main():
         stx = await pg.inner_text("#sheet"); assert "यहाँ बने बिल" in stx and "₹" in stx, stx[:300]
         await pg.screenshot(path=f"{SHOTS}/32-stop-sheet.png")
         await pg.evaluate("closeSheet()")
-        await pg.click('[data-rpl="सरल लाइन"]'); await pg.wait_for_function("document.querySelector('#sheet')&&document.querySelector('#sheet').innerText.includes('ग्राहकों के नंबर')", timeout=8000)
-        await pg.click('#sheet [data-psn="7"]'); await pg.wait_for_function("document.querySelector('#sheet').innerText.includes('ग्राहकों के नंबर')", timeout=8000)
+        await pg.click('[data-rpl="सरल लाइन"]'); await wf(pg, "document.querySelector('#sheet')&&document.querySelector('#sheet').innerText.includes('ग्राहकों के नंबर')", timeout=8000)
+        await pg.click('#sheet [data-psn="7"]'); await wf(pg, "document.querySelector('#sheet').innerText.includes('ग्राहकों के नंबर')", timeout=8000)
         await pg.screenshot(path=f"{SHOTS}/33-place-sheet.png")
         await pg.evaluate("closeSheet()")
         await pg.click('[data-rwho]:not([data-rwho=""])'); await pg.wait_for_timeout(600)
@@ -944,7 +975,7 @@ async def main():
         print("owner approved cancel")
         await pg.evaluate("S.repSel='tools';renderReport()"); await pg.wait_for_timeout(200)
         await pg.evaluate("window.__qq=null;window.__oSh2=SX.shareBlob;SX.shareBlob=async(b,n,e)=>{if(n==='SabjiExpress_Order_QR')window.__qq={e,size:b?b.size:-1,url:SX._qr.toDataURL('image/png')}}")
-        await pg.click("[data-sxqr]"); await pg.wait_for_function("window.__qq", timeout=15000)
+        await pg.click("[data-sxqr]"); await wf(pg, "window.__qq", timeout=15000)
         q = await pg.evaluate("window.__qq"); assert q["e"] == "png" and q["size"] > 20000, q.get("size")
         await pg.evaluate("void(SX.shareBlob=window.__oSh2)")
         import base64, numpy as np, cv2

@@ -1162,7 +1162,33 @@ const WINTER1={date:"2026-11-13",flag:"winter1",src:"सर्दी का न�
    बोर्ड की "SAFAL MATAR" लाइन = रेगुलर मटर (स्थाई नियम); मटर/अनानास/नींबू का अंक फोटो में साफ़ नहीं — वे नहीं छुए. खाली लाइनों के पुराने भाव वही */
 const BOARD3={date:"2026-11-14",flag:"board3",src:"गाड़ी का बोर्ड 14-11-2026 (विक्रम जी की भेजी फोटो)",
   sale:{harimirch:180,toroi:40,adrak:160,dhaniya:200,kiwi:120,chandaliya:100,palak:60,tamatar:30,gajar:80,lauki:40,seb:150,bhindi:70,pattagobhi:40,kundru:30,papita:70,amrood:100,nariyal:60,mushroom:70}};
-const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1,BOARD3];
+/* 14-11: 🏪 कमल भाई की WhatsApp चैट (20-09 → 14-11, 245 भुगतान) की पर्चियों से पक्के दुकानदार — कौन क्या बेचता है, ताज़ा भाव.
+   मौजूद दुकान (नाम/फ़ोन मिले) में सिर्फ़ खाली फ़ील्ड जुड़ते हैं; payees (सिर्फ़ मालिक) में WhatsApp का कुल */
+const SD=(id,name,kind,items,rates,o)=>({id:"sup_"+id,key:id,name,kind,items,rates,...(o||{})});
+const SUPPLY1={date:"2026-11-14",flag:"supply1",src:"कमल भाई की WhatsApp चैट (पर्ची + भुगतान) 20-09 से 14-11",
+  sup:[SD("pavan","पवन कुमार","मिक्स हरी सब्ज़ी (थोक)",["phoolgobhi","pattagobhi","adrak","gajar","shimla","nimbu","bhindi","dhaniya","karela","motimirch","karipatta","matar","shakarkand","beans","gwarfali","makka","lauki","gilki","chukandar","amla","sahjan","bhartabaingan","arbi","singhada"],
+      {pattagobhi:20,phoolgobhi:40,adrak:70,gajar:50,shimla:60,nimbu:120,bhindi:45,dhaniya:130,karela:40,motimirch:50,matar:150,shakarkand:45,makka:35,lauki:20,amla:60,chukandar:50},{phone:"9610184273",rateDate:"2026-11-10",match:["पवन","pavan"],upi:["9610184273@axl","9610184273@ybl","paytm.s1t5o4j@pty"]}),
+    SD("veertejaji","वीर तेजाजी फ्रूट कम्पनी (मोहित फ्रूट)","फल — अनार, अमरूद, केला (कैरेट ₹650), कीवी",["anar","amrood","kela","kiwi","papita","seb"],{anar:170,amrood:55,kela:32.5},{rateDate:"2026-11-12",match:["तेजाजी","मोहित","mohit"],upi:["175693535398@hdfcbank"]}),
+    SD("managnechiya","माँ नागणेचिया सब्ज़ी भंडार","आलू-प्याज़ थोक (कट्टे में) — 'VIKRAM SINGH' वाला paytm QR भी यहीं का लगता है",["pyaj","aloo"],{pyaj:50,aloo:13},{rateDate:"2026-10-28",match:["नागणेच","nagnech"],upi:["Q062232367@ybl","paytmqr6umjiy@ptys"]}),
+    SD("kalla","कल्ला राम बाबू लाल","टमाटर, खीरा, धनिया-पुदीना",["tamatar","kheera","dhaniya","podina","palak"],{tamatar:20,kheera:30,dhaniya:70,podina:50},{rateDate:"2026-11-05",match:["कल्ला","kalla"],upi:["Getepay.gvi.SB0329328@icici"]}),
+    SD("gajanand","गजानंद फ्रूट भंडार","नारियल (बोरी ≈19 नग, ₹850–900)",["nariyal"],{nariyal:45},{rateDate:"2026-11-12",match:["गजानंद","gajanand"],upi:["175693574541@hdfcbank"]}),
+    SD("jayambe","जय अम्बे फ्रूट (सवाई माली)","सेब (kg से)",["seb"],{seb:80},{phone:"7014995118",rateDate:"2026-10-28",match:["अम्बे","अंबे","ambe"],upi:["172720980064@hdfcbank"]}),
+    SD("misri","मिश्री लाल","फूलगोभी, पत्तागोभी, भिंडी, बड़ी मिर्च",["phoolgobhi","pattagobhi","motimirch","bhindi","toroi","shakarkand"],{phoolgobhi:40,pattagobhi:25,motimirch:50,bhindi:60,toroi:60,shakarkand:50},{rateDate:"2026-11-11",match:["मिश्री","misri","mishri"],upi:["paytmqr6ebl7t@ptys","paytmqr6mz9gm@ptys"]}),
+    SD("sawai","सवाई राम","धनिया, पुदीना, कड़ीपत्ता, मेथी",["dhaniya","podina","karipatta","methi"],{dhaniya:80,podina:50},{rateDate:"2026-11-01",match:["सवाई राम","sawai"],upi:["paytm.s22ef9y@pty"]}),
+    SD("saroj","सरोज (खेताराम)","मटर, धनिया",["matar","dhaniya"],{matar:150,dhaniya:110},{rateDate:"2026-11-13",match:["सरोज","saroj"],upi:["paytm.s2fwnbu@pty"]}),
+    SD("prabhat","प्रभात कुमार","मशरूम (पैकेट ₹55)",["mushroom"],{mushroom:55},{rateDate:"2026-11-14",match:["प्रभात","prabhat"],upi:["gpay-12195960287@okbizaxis"]}),
+    SD("hindustani","हिन्दुस्तानी बाड़मेर","लहसुन-प्याज़ थोक (कृषि मंडी गेट 1)",["pyaj","aloo","lahsun"],{pyaj:50,aloo:15},{rateDate:"2026-10-17",match:["हिन्दुस्तान","हिंदुस्तान","hindustan"],upi:["175684185538@hdfcbank"]}),
+    SD("dhanaram","धनाराम माली (केले का कोल्ड स्टोर)","केला — कैरेट ₹650",["kela"],{kela:32.5},{rateDate:"2026-10-27",match:["धनाराम","कोल्ड"]}),
+    SD("rksons","आर.के. एंड संस","खीरा, पत्तागोभी",["kheera","pattagobhi"],{kheera:30},{rateDate:"2026-11-01",match:["आर.के","rk and"],upi:["gpay-12190215601@okbizaxis"]}),
+    SD("gante","श्री गंटे वाला","मूली, बथुआ, सरसों, हरा प्याज़",["mooli","bathua","sarson","harapyaj"],{mooli:14},{rateDate:"2026-11-11",match:["गंटे","gante"],upi:["Q101751924@ybl"]}),
+    SD("suresh","सुरेश","भिंडी",["bhindi"],{bhindi:45},{rateDate:"2026-10-20",match:["सुरेश","suresh"],upi:["paytm.s2bohqc@pty"]}),
+    SD("pankaj","पंकज","खीरा",["kheera"],{kheera:30},{rateDate:"2026-10-13",match:["पंकज","pankaj"],upi:["paytmqr6t02le@ptys"]}),
+    SD("sushil","सुशील","पत्तागोभी",["pattagobhi"],{pattagobhi:27},{phone:"9413183417",rateDate:"2026-10-07",match:["सुशील","sushil"],upi:["9413183417-2@ybl"]})],
+  chat:{pavan:[82490,35,"2026-09-20","2026-11-14"],veertejaji:[75674,32,"2026-09-21","2026-11-14"],managnechiya:[92252,36,"2026-09-20","2026-11-13"],gajanand:[25480,26,"2026-09-25","2026-11-12"],kalla:[22436,20,"2026-10-05","2026-11-07"],
+    jayambe:[14197,10,"2026-10-08","2026-11-06"],dhanaram:[5550,1,"2026-10-27","2026-10-27"],misri:[4900,8,"2026-10-06","2026-11-13"],sawai:[4790,10,"2026-09-30","2026-11-05"],hindustani:[3825,1,"2026-10-17","2026-10-17"],
+    saroj:[2960,5,"2026-10-24","2026-11-14"],rksons:[2160,4,"2026-09-23","2026-11-01"],gante:[1520,3,"2026-10-24","2026-11-11"],prabhat:[1055,4,"2026-09-25","2026-11-14"],pankaj:[870,2,"2026-10-12","2026-10-13"],sushil:[630,2,"2026-09-30","2026-10-07"],suresh:[340,2,"2026-10-11","2026-10-20"]}};
+SR.SUPPLY1=SUPPLY1;
+const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1,BOARD3,SUPPLY1];
 SR.BOARD=BOARD;SR.PACKS=PACKS;
 SR.applyBoard=async function(db){
   if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
@@ -1200,14 +1226,28 @@ SR.applyBoard=async function(db){
       let stk=0;if(P.stock){const ref=db.doc("days/"+P.stock.date+"/meta/stock");const cur=await ref.get();const I=(cur.exists&&cur.data().items)||{};
         if(!Object.values(I).some(o=>o&&o.close!==undefined&&o.close!=="")){const items2={...I};for(const [id,q] of Object.entries(P.stock.items)){if(!items.find(x=>x.id===id))continue;items2[id]={...(I[id]||{}),close:q,closeBy:"विक्रम जी",closeTs:now,closeNote:P.stock.note};stk++}
           await put(ref,{items:items2,nightBy:"विक्रम जी",nightTs:now,openNote:P.stock.note,ts:now,by:S.uid||"",byName:"विक्रम जी"},{merge:true})}}
+      let nsup=0;if(P.sup){const sq=await db.collection("suppliers").get();const SUPS=sq.docs.map(d=>({id:d.id,...d.data()}));
+        let PE=[];try{const pq=await db.collection("payees").get();PE=pq.docs.map(d=>({id:d.id,...d.data()}))}catch(e){}
+        const low=s=>String(s||"").toLowerCase();
+        for(const M of P.sup){const its=M.items.filter(id=>items.some(x=>x.id===id));const rt={};Object.entries(M.rates||{}).forEach(([k,v])=>{if(its.includes(k))rt[k]=v});
+          const add={items:its,rates:rt,rateDate:M.rateDate||P.date,kind:M.kind,upi:M.upi||[],master:P.flag};
+          const ex=SUPS.find(s=>s.id===M.id)||SUPS.find(s=>(M.phone&&String(s.phone||"")===M.phone)||(M.match||[]).some(k=>low(s.name).includes(low(k))));
+          if(ex){const d={};Object.entries(add).forEach(([k,v])=>{if(ex[k]===undefined)d[k]=v});if(M.phone&&!ex.phone)d.phone=M.phone;if(Object.keys(d).length){await upd(db.collection("suppliers").doc(ex.id),d);nsup++}}
+          else{await put(db.collection("suppliers").doc(M.id),{name:M.name,phone:M.phone||"",ts:now,lastTs:0,by:S.uid||"",byName:"विक्रम जी (WhatsApp चैट से)",...add});nsup++}
+          const C=P.chat&&P.chat[M.key];if(!C)continue;
+          const chat={total:C[0],count:C[1],from:C[2],to:C[3],src:P.src};
+          const pe=PE.find(p=>(M.upi||[]).some(u=>(p.upiIds||[]).includes(u)));
+          if(pe){const d={};if(pe.chat===undefined)d.chat=chat;if(pe.kind===undefined)d.kind=M.kind;if(pe.supKey===undefined)d.supKey=M.key;if(Object.keys(d).length)await upd(db.collection("payees").doc(pe.id),d)}
+          else await put(db.collection("payees").doc("chat_"+M.key),{name:M.name,upiIds:M.upi||[],phones:M.phone?[M.phone]:[],shops:[M.name],total:0,count:0,chat,kind:M.kind,supKey:M.key,lastTs:0,lastDate:C[3]})}}
       let ord=Math.max(0,...items.map(i=>+i.order||0));
       for(const a of (P.add||[])){if(items.some(x=>x.id===a.id||String(x.name||"").replace(/\s*\(.*\)/,"").trim()===a.name.replace(/\s*\(.*\)/,"").trim()))continue;
         const d={active:a.active!==false,...(a.season?{season:a.season,seasonMon:a.seasonMon||"",seasonTip:a.seasonTip||"",offNote:"मौसम का माल — खरीदें तब चालू करें"}:{}),name:a.name,unit:a.unit,cat:a.cat,emoji:a.emoji,hue:a.hue,sale:a.sale,cost:a.cost||0,order:++ord,photo:"",buyHist:a.cost?[{date:P.date,rate:a.cost,src:"कमल भाई की कॉपी (अक्टूबर)"}]:[],saleSet:{date:P.date,src:a.sale?src:"भाव बाकी — विक्रम जी बताएँगे"}};
         await put(db.collection("items").doc(a.id),d);add++}
-      await put(fr,{[P.flag]:now,[P.flag+"Changed"]:ch,[P.flag+"Added"]:add},{merge:true});
+      await put(fr,{[P.flag]:now,[P.flag+"Changed"]:ch,[P.flag+"Added"]:add,...(P.sup?{[P.flag+"Sup"]:nsup}:{})},{merge:true});
       if(W)await W.commit();
       if(cpn||nb){toast("🌙 "+fdate(P.night.date)+" का रात का बचा माल ("+cpn+" सब्ज़ी)"+(nb?" + "+nb+" छूटी खरीद":"")+" ऐप में चढ़ी — कॉपी से");if(nb&&window.SF&&SF.livePurch&&S.billsDate===P.date&&typeof renderDay==="function")setTimeout(()=>{try{renderDay()}catch(e){}},800);if(dayAdd(S.billsDate||today(),-1)===P.night.date)db.doc("days/"+P.night.date+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day"&&typeof renderDay==="function")renderDay()}).catch(()=>{});if(S.billsDate===P.date&&window.SF)SF.loadCopy(P.date);continue}
       if(ph||stk){toast("📸 "+ph+" फोटो लगीं"+(off?" · "+off+" सामान बंद (कभी खरीदा नहीं)":"")+(stk?" · 📦 "+stk+" सब्ज़ियों का शुरुआती स्टॉक चढ़ा":""));if(stk&&dayAdd(S.billsDate||today(),-1)===P.stock.date)db.doc("days/"+P.stock.date+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day"&&typeof renderDay==="function")renderDay()}).catch(()=>{});continue}
+      if(nsup)toast("🏪 "+nsup+" पक्के दुकानदार जुड़े — खरीद में दुकान चुनते ही उसका माल और भाव दिखेगा");
       if(ch.length||add||off)toast((P.cost?"💰 खरीद भाव पक्के: ":"🪧 "+P.date.slice(8)+"-"+P.date.slice(5,7)+" के भाव: ")+ch.length+" बदले · "+add+" नई सब्ज़ी"+(off?" · "+off+" बंद":""));
     }
   }catch(e){SR._board=0}

@@ -107,11 +107,24 @@ function rateBadge(id,rate){
   return d>0?`<span class="pill red">🔺 पिछली बार ${rs(l.rate)}${when} → ${rs(rate)} (+${pct}%)</span>`:`<span class="pill blue">🔻 पिछली बार ${rs(l.rate)}${when} → ${rs(rate)} (${pct}%)</span>`;
 }
 const uOf=it=>it?(UNITS[it.unit]||it.unit):"नग";
+/* 🏪 चुनी हुई दुकान — उसका आम माल ऊपर, उसी दुकान का पिछला भाव (14-11, WhatsApp चैट से बना दुकानदार-मास्टर) */
+const curSup=()=>P?shopKnown(P.shop,P.phone):null;
+function supRate(id,s){s=s||curSup();if(!s||!id)return null;let best=null;
+  S.purchHist.concat(S.purch).forEach(p=>{if(p.cancelled||p.supId!==s.id)return;(p.lines||[]).forEach(l=>{if(l.id===id&&num(l.rate)>0&&(!best||p.ts>best.ts))best={rate:num(l.rate),date:p.date,ts:p.ts}})});
+  if(best)return best;const r=s.rates?num(s.rates[id]):0;return r>0?{rate:r,date:s.rateDate||"",seed:1}:null}
+function supItHTML(){const s=curSup();if(!s||!(s.items||[]).length)return "";
+  const L=s.items.map(id=>item(id)).filter(Boolean);if(!L.length)return "";
+  return `<span>🏪 <b>${esc(s.name)}</b>${s.kind?` · ${esc(s.kind)}`:""}</span><div>${L.map(it=>{const r=supRate(it.id,s);return `<button type="button" data-pitem="${esc(it.id)}">${esc(it.name)}${r?` <i>₹${r.rate}</i>`:""}</button>`}).join("")}</div>`}
+function supRefresh(){const b=$("#supIt");if(b){const h=supItHTML();b.innerHTML=h;b.hidden=!h}const g=$("#pgrid");if(g)g.innerHTML=pGridHTML()}
+SF.supRate=supRate;SF.curSup=curSup;
 function pPick(){const qq=(P.q||"").trim().toLowerCase().replace(/\s*\d+([.,]\d+)?\s*(kg|किलो)?$/i,"").trim();
-  return S.items.filter(i=>i.active!==false&&!i.virtual&&(!qq||(i.name+" "+(i.alias||"")+" "+i.id+" "+(window.SN?SN.en(i):"")).toLowerCase().includes(qq)))}
+  const L=S.items.filter(i=>i.active!==false&&!i.virtual&&(!qq||(i.name+" "+(i.alias||"")+" "+i.id+" "+(window.SN?SN.en(i):"")).toLowerCase().includes(qq)));
+  const s=curSup(),pri=s&&(s.items||[]).length?s.items:null;if(!pri)return L;
+  const rk=id=>{const k=pri.indexOf(id);return k<0?999:k};return L.map((it,i)=>({it,i})).sort((a,b)=>rk(a.it.id)-rk(b.it.id)||a.i-b.i).map(x=>x.it)}
 function pGridHTML(){
   return pPick().map(it=>{const lr=lastRate(it.id);const inC=P.lines.filter(l=>l.id===it.id).reduce((a,l)=>a+num(l.qty),0);
-    return `<button class="card" data-pitem="${esc(it.id)}">${tileHTML(it)}${inC?`<span class="badge">${fq(inC,it.unit)}</span>`:""}<span class="nm">${esc(it.name)}${window.SN&&SN.en(it)?`<small class="en">${esc(SN.en(it))}</small>`:""}</span><span class="pr">${lr?`पिछली <b>${rs(lr.rate)}</b>/${uOf(it)}`:"पहली खरीद"}</span></button>`}).join("")
+    const sp=curSup(),mine=sp&&(sp.items||[]).includes(it.id);
+    return `<button class="card${mine?" supmine":""}" data-pitem="${esc(it.id)}">${tileHTML(it)}${inC?`<span class="badge">${fq(inC,it.unit)}</span>`:""}<span class="nm">${esc(it.name)}${window.SN&&SN.en(it)?`<small class="en">${esc(SN.en(it))}</small>`:""}</span><span class="pr">${lr?`पिछली <b>${rs(lr.rate)}</b>/${uOf(it)}`:"पहली खरीद"}</span></button>`}).join("")
   +`<button class="card addnew" data-pitem=""><span class="tile"><span class="em">📦</span></span><span class="nm">दूसरा सामान<small class="en">पॉलीथीन, रस्सी…</small></span><span class="pr">लिस्ट में नहीं</span></button>`;
 }
 SF.renderKharid=function(force){
@@ -128,6 +141,7 @@ SF.renderKharid=function(force){
   <div class="shoprow"><label class="fld">🏪 दुकान का नाम<input class="inp" id="pShop" value="${esc(P.shop)}" placeholder="कुछ भी — जैसे पवन, 12 नं दुकान" autocomplete="off"></label>
     <label class="fld">📞 मोबाइल<input class="inp" id="pPh" inputmode="tel" value="${esc(P.phone)}" placeholder="ज़रूरी नहीं" autocomplete="off"></label></div>
   <div class="shopsug" id="shopSug" hidden></div>
+  ${(()=>{const h=supItHTML();return `<div class="supit" id="supIt"${h?"":" hidden"}>${h}</div>`})()}
   <datalist id="shopList">${names.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
   <input class="inp" id="pq" type="search" placeholder="🔍 सब्ज़ी खोजें — जैसे टमाटर 25" value="${esc(P.q||"")}" autocomplete="off" aria-label="सब्ज़ी खोजें" style="margin:10px 0">
   <div class="grid" id="pgrid">${pGridHTML()}</div>
@@ -145,15 +159,15 @@ function supSummaryHTML(){
 /* सामान दबाते ही बिक्री जैसा छोटा पॉपअप: वज़न → Enter → भाव → Enter = जुड़ गया, फिर सीधा खोज */
 function pItemSheet(id,idx,qty0){
   const ln=idx!=null?P.lines[idx]:null;if(ln)id=ln.id;
-  const it=id?item(id):null,lr=it?lastRate(it.id):null,u=uOf(it),kg=!it||it.unit==="kg";
+  const it=id?item(id):null,lr=it?lastRate(it.id):null,sr=it?supRate(it.id):null,u=uOf(it),kg=!it||it.unit==="kg";
   const q0=ln?ln.qty:(qty0||""),r0=ln?ln.rate:"";
   const hd=$("header").getBoundingClientRect(),top=Math.max(8,Math.round(hd.bottom)+6);
   const chips=kg&&it?[[5,"5"],[10,"10"],[20,"20"],[50,"50"]]:[[1,"1"],[5,"5"],[10,"10"],[20,"20"]];
   $("#sheet").innerHTML=`<div class="qscrim" data-close></div><div class="qpop" style="top:${top}px" role="dialog" aria-label="खरीद: ${it?esc(it.name):"दूसरा सामान"}">
-    <div class="qh">${it?tileHTML(it):'<span class="tile"><span class="em">📦</span></span>'}<div class="qn"><b>${it?esc(it.name):"दूसरा सामान"}</b><span>${lr?`पिछली खरीद ${rs(lr.rate)}/${u}${lr.date?" · "+fdate(lr.date).slice(0,5):""}`:"पहली बार खरीद"}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+    <div class="qh">${it?tileHTML(it):'<span class="tile"><span class="em">📦</span></span>'}<div class="qn"><b>${it?esc(it.name):"दूसरा सामान"}</b><span>${lr?`पिछली खरीद ${rs(lr.rate)}/${u}${lr.date?" · "+fdate(lr.date).slice(0,5):""}`:"पहली बार खरीद"}</span>${sr?`<span class="supr">🏪 इस दुकान से ${sr.seed?"आम भाव":"पिछली"} ${rs(sr.rate)}/${u}${sr.date?" · "+fdate(sr.date).slice(0,5):""}</span>`:""}</div><button class="x" data-close aria-label="बंद करें">✕</button></div>
     ${it?"":`<label class="qf"><input id="piN" autocomplete="off" placeholder="क्या लिया — पॉलीथीन, रस्सी…" value="${esc(ln?ln.name:"")}" style="font-size:20px"></label>`}
     <div class="qrow"><label class="qf"><input id="piQ" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="0" value="${q0}" aria-label="वज़न"><span>${kg&&it?"कि.ग्रा":u}</span></label>
-      <span class="or">×</span><label class="qf"><span>₹</span><input id="piR" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="${lr?lr.rate:"भाव"}" value="${r0}" aria-label="भाव"><span>/${kg&&it?"kg":u}</span></label></div>
+      <span class="or">×</span><label class="qf"><span>₹</span><input id="piR" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="${sr?sr.rate:lr?lr.rate:"भाव"}" value="${r0}" aria-label="भाव"><span>/${kg&&it?"kg":u}</span></label></div>
     <div class="qchips2">${chips.map(([v,l])=>`<button type="button" data-piq="${v}">${l}${kg&&it?" किलो":""}</button>`).join("")}</div>
     <div id="piB" class="pbadge" style="min-height:0"></div>
     <button class="big" data-pisave disabled>वज़न और भाव लिखें</button>
@@ -320,11 +334,11 @@ SF.bindKharid=function(){
   el.addEventListener("focusin",e=>{if(e.target.id==="pShop")shopSug(e.target.value)});
   el.addEventListener("focusout",e=>{if(e.target.id==="pShop")setTimeout(()=>{const b=$("#shopSug");if(b&&!b.contains(document.activeElement))b.hidden=true},250)});
   el.addEventListener("pointerdown",e=>{const b=e.target.closest("[data-shopsug]");if(!b)return;e.preventDefault();const s=S.suppliers.find(x=>x.id===b.dataset.shopsug);if(!s)return;
-    P.shop=s.name;P.phone=s.phone||"";saveDraft();const a=$("#pShop"),p=$("#pPh");if(a)a.value=P.shop;if(p)p.value=P.phone;const box=$("#shopSug");if(box)box.hidden=true;const q=$("#pq");if(q)q.focus()});
+    P.shop=s.name;P.phone=s.phone||"";saveDraft();const a=$("#pShop"),p=$("#pPh");if(a)a.value=P.shop;if(p)p.value=P.phone;const box=$("#shopSug");if(box)box.hidden=true;supRefresh();const q=$("#pq");if(q)q.focus()});
   el.addEventListener("input",e=>{const t=e.target;
     if(t.id==="pq"){P.q=t.value;const g=$("#pgrid");if(g)g.innerHTML=pGridHTML();return}
-    if(t.id==="pShop"){P.shop=t.value;saveDraft();shopSug(t.value);return}
-    if(t.id==="pPh"){P.phone=t.value;saveDraft();return}
+    if(t.id==="pShop"){P.shop=t.value;saveDraft();shopSug(t.value);supRefresh();return}
+    if(t.id==="pPh"){P.phone=t.value;saveDraft();supRefresh();return}
   });
   el.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="pq"){e.preventDefault();const L=pPick();const m=String(P.q||"").match(/(\d+(?:[.,]\d+)?)\s*(kg|किलो)?\s*$/i);if(L.length)pItemSheet(L[0].id,null,m?num(m[1]):"")}});
   el.addEventListener("click",async e=>{
