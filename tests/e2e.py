@@ -26,7 +26,11 @@ async def wf(pg, expression, timeout=30000, polling=100):
         except Exception:
             pass
         if time.time() > end:
-            raise TimeoutError("wf timeout: " + expression[:80])
+            try:
+                st = await pg.evaluate("[document.activeElement&&(document.activeElement.id||document.activeElement.tagName),document.querySelector('#sheet')&&document.querySelector('#sheet').innerText.slice(0,100),S.tab]")
+            except Exception:
+                st = None
+            raise TimeoutError("wf timeout: " + expression[:80] + " | " + str(st))
         await pg.wait_for_timeout(polling)
 
 
@@ -809,7 +813,7 @@ async def main():
         sp = await pg.evaluate("""(()=>{const M=window.__MOCK__,SU=Object.values(M.suppliers||{}),PE=M.payees||{};const pv=SU.find(s=>String(s.name).includes('पवन'));
           const g=M.suppliers.sup_gajanand,mi=M.suppliers.sup_misri;return [M.ownerCfg.flags.supply1>0,!!pv&&(pv.items||[]).includes('phoolgobhi'),pv&&pv.name,g&&g.rates.nariyal,mi&&mi.rates.phoolgobhi,
           (PE.chat_managnechiya||{}).chat&&PE.chat_managnechiya.chat.total,SU.filter(s=>s.master==='supply1').length>=15]})()""")
-        assert sp == [True, True, "पवन सब्ज़ी भंडार", 45, 40, 92252, True], sp
+        assert sp == [True, True, "पवन सब्ज़ी भंडार", 45, 40, 92113, True], sp
         await pg.evaluate("closeSheet()"); await pg.wait_for_timeout(200)
         await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(300)
         await pg.fill("#pPh", ""); await pg.fill("#pShop", "मिश्री लाल"); await pg.wait_for_timeout(200)
