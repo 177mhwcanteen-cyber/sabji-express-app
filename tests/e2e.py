@@ -134,7 +134,7 @@ async def main():
 
         # ---------- 1) मालिक ----------
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1, "winter1": 1, "board3": 1, "supply1": 1}}}, users)
+        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1, "winter1": 1, "board3": 1, "supply1": 1, "chat1": 1}}}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
@@ -786,7 +786,7 @@ async def main():
         assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
         print("opening edit ok")
         # 🪧 बोर्ड के भाव: एक बार अपने-आप
-        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;delete window.__MOCK__.ownerCfg.flags.winter1;delete window.__MOCK__.ownerCfg.flags.board3;delete window.__MOCK__.ownerCfg.flags.supply1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;delete window.__MOCK__.ownerCfg.flags.winter1;delete window.__MOCK__.ownerCfg.flags.board3;delete window.__MOCK__.ownerCfg.flags.supply1;delete window.__MOCK__.ownerCfg.flags.chat1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
         bd = await pg.evaluate("[window.__MOCK__.items.tamatar.sale,window.__MOCK__.items.nimbu.sale,!!window.__MOCK__.items.parwal,window.__MOCK__.items.parwal&&window.__MOCK__.items.parwal.sale,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.note&&x.note.includes('बोर्ड')).length,window.__MOCK__.ownerCfg.flags.board1>0]")
         assert bd[0] == 30 and bd[1] == 200 and bd[2] and bd[3] == 90 and bd[4] >= 10 and bd[5], bd
         b2 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.board2>0,window.__MOCK__.items.harapyaj&&window.__MOCK__.items.harapyaj.sale,window.__MOCK__.items.kachchakela&&window.__MOCK__.items.kachchakela.sale,!window.__MOCK__.items.safalmatar,window.__MOCK__.items.methi.sale]")
@@ -825,6 +825,19 @@ async def main():
         await pg.screenshot(path=f"{SHOTS}/8c-kharid-dukan.png")
         await pg.click(".qpop [data-close]"); await pg.fill("#pShop", ""); await pg.wait_for_timeout(150)
         assert await pg.evaluate("document.getElementById('supIt').hidden"), "supplier strip should hide"
+        cb = await pg.evaluate("""(()=>{const P=Object.values(window.__MOCK__.purchases||{}).filter(p=>p.src==='chat'),C=window.__MOCK__.purchases['ch_20261104-WA0022']||{},pv=P.find(p=>p.date==='2026-11-10'&&p.total===3600)||{};
+          return [window.__MOCK__.ownerCfg.flags.chat1>0,P.length>=230,C.pay,C.total,pv.supName,(pv.lines||[{}])[0].id,P.filter(p=>p.pay==='galla').length]})()""")
+        assert cb == [True, True, "galla", 2980, "पवन सब्ज़ी भंडार", "", 3], cb
+        hi = await pg.evaluate("""(()=>{S.purch.push({id:'hx1',date:today(),ts:Date.now(),supName:'मिश्री लाल',byName:'कमल भाई',hiRate:[{name:'फूलगोभी',rate:50,usual:40,pct:25}]});const h=SF.hiRateHTML();S.purch.pop();return [h.includes('फूलगोभी ₹50'),h.includes('+25%')]})()""")
+        assert hi == [True, True], hi
+        await pg.click('[data-tab="kharid"]'); await pg.wait_for_timeout(200)
+        await pg.fill("#pPh", ""); await pg.fill("#pShop", "मिश्री लाल"); await pg.wait_for_timeout(200)
+        await pg.click("#supIt [data-pitem=phoolgobhi]"); await pg.wait_for_selector("#piQ")
+        await pg.fill("#piQ", "5"); await pg.fill("#piR", "50"); await pg.click("[data-pisave]"); await pg.wait_for_timeout(300)
+        await pg.click("[data-pbill]"); await pg.wait_for_selector("[data-psave]"); await pg.click("[data-psave]"); await pg.wait_for_timeout(1500)
+        hp2 = await pg.evaluate("(Object.values(window.__MOCK__.purchases).find(p=>p.supName==='मिश्री लाल'&&p.src!=='chat')||{}).hiRate")
+        assert hp2 and hp2[0]["usual"] == 40 and hp2[0]["rate"] == 50, hp2
+        print("chat purchases + hi-rate ok")
         print("supplier master ok")
         gl = await pg.evaluate("""(async()=>{const d=S.billsDate,c0=cashCalc(d).expected;SF.glF={kind:'out',why:''};const bad=await SF.glSave();
           await SF.glWrite([{id:'g1',ts:1,kind:'out',why:'विक्रम जी को दिए',amt:500,by:'u_x',byName:'कमल भाई'},{id:'g2',ts:2,kind:'in',why:'MH कैंटीन से लिए',amt:200,by:'u_x',byName:'कमल भाई'}]);

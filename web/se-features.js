@@ -117,6 +117,12 @@ function supItHTML(){const s=curSup();if(!s||!(s.items||[]).length)return "";
   return `<span>🏪 <b>${esc(s.name)}</b>${s.kind?` · ${esc(s.kind)}`:""}</span><div>${L.map(it=>{const r=supRate(it.id,s);return `<button type="button" data-pitem="${esc(it.id)}">${esc(it.name)}${r?` <i>₹${r.rate}</i>`:""}</button>`}).join("")}</div>`}
 function supRefresh(){const b=$("#supIt");if(b){const h=supItHTML();b.innerHTML=h;b.hidden=!h}const g=$("#pgrid");if(g)g.innerHTML=pGridHTML()}
 SF.supRate=supRate;SF.curSup=curSup;
+SF.hiRateHTML=function(){if(!S.isOwner)return "";const from=dayAdd(today(),-7);const seen=new Set();
+  const L=S.purchHist.concat(S.purch).filter(p=>{if(seen.has(p.id))return false;seen.add(p.id);return !p.cancelled&&!p.hiOk&&(p.hiRate||[]).length&&p.date>=from}).sort((a,b)=>b.ts-a.ts);
+  if(!L.length)return "";
+  return `<div class="card2" style="border:2px solid var(--chili);margin-bottom:10px"><h3 style="margin:0 0 6px;color:var(--chili)">🔺 दुकान के आम भाव से महँगी खरीद (15%+)</h3><div class="list">${L.map(p=>`<div class="li"><div class="mid"><b>${esc(p.supName||"दुकान")} · ${fdate(p.date).slice(0,5)} · ${esc(p.byName||"")}</b><span>${p.hiRate.map(h=>`${esc(h.name)} ₹${h.rate} (आम ₹${h.usual}, +${h.pct}%)`).join(" · ")}</span></div><button class="lnk" data-hiok="${esc(p.id)}">ठीक है</button></div>`).join("")}</div></div>`};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-hiok]");if(!b||!S.isOwner)return;const id=b.dataset.hiok;
+  [S.purch,S.purchHist].forEach(A=>A.forEach(p=>{if(p.id===id)p.hiOk=true}));if(!S.demo&&S.db)S.db.collection("purchases").doc(id).update({hiOk:true}).catch(()=>{});if(typeof renderReport==="function")renderReport()});
 function pPick(){const qq=(P.q||"").trim().toLowerCase().replace(/\s*\d+([.,]\d+)?\s*(kg|किलो)?$/i,"").trim();
   const L=S.items.filter(i=>i.active!==false&&!i.virtual&&(!qq||(i.name+" "+(i.alias||"")+" "+i.id+" "+(window.SN?SN.en(i):"")).toLowerCase().includes(qq)));
   const s=curSup(),pri=s&&(s.items||[]).length?s.items:null;if(!pri)return L;
@@ -268,7 +274,9 @@ async function savePurchase(){
   const lines=P.lines.map(l=>{const it=l.id?item(l.id):null;const lr=it?lastRate(it.id):null;const amt=lAmt(l);
     return {id:l.id||"",name:it?it.name:String(l.name).trim(),unit:it?it.unit:(l.unit||"pc"),qty:r2(num(l.qty)*1000)/1000,rate:r2(num(l.rate)),amt:disc>0?r2(amt*f):amt,billAmt:amt,prev:lr?lr.rate:0}});
   const pdate=P.day==="yday"?dayAdd(today(),-1):today();
-  const doc={date:pdate,ts,...(P.day==="yday"?{late:true}:{}),...((window.SR&&SR.locNow&&SR.locNow())?{loc:SR.locNow()}:{}),by:S.uid||"",byName:biller(),supId:sup.id,supName:shop,supPhone:ph.length===10?ph:(ph||""),lines,gross,disc,total:net,pay:P.pay,paid:r2(paid),due:r2(net-paid),note:String(P.note||"").trim(),photos:[],photoPending:draftPhotos.length,cancelled:false};
+  /* दुकान के आम भाव से 15% से ज़्यादा महँगा — सिर्फ़ मालिक को सूचना (कर्मचारी को कुछ नहीं दिखता) */
+  const hiRate=lines.map(l=>{if(!l.id)return null;const u=supRate(l.id,sup);return u&&u.rate>0&&l.rate>u.rate*1.15?{name:l.name,rate:l.rate,usual:u.rate,pct:Math.round((l.rate/u.rate-1)*100)}:null}).filter(Boolean);
+  const doc={date:pdate,ts,...(P.day==="yday"?{late:true}:{}),...((window.SR&&SR.locNow&&SR.locNow())?{loc:SR.locNow()}:{}),by:S.uid||"",byName:biller(),supId:sup.id,supName:shop,supPhone:ph.length===10?ph:(ph||""),lines,gross,disc,total:net,pay:P.pay,paid:r2(paid),due:r2(net-paid),note:String(P.note||"").trim(),photos:[],photoPending:draftPhotos.length,cancelled:false,...(hiRate.length?{hiRate}:{})};
   try{
     if(S.demo){S.purch.push({id,...doc});}
     else{

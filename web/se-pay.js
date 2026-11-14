@@ -35,7 +35,7 @@ const allPurch=()=>{const m=new Map();ST.purch.concat(S.purch||[]).forEach(p=>{i
 function need(){
   const done=new Set(ST.pay.map(x=>x.ref));
   const L=[];
-  allPurch().forEach(p=>{if((p.pay==="vikram"||p.pay==="upi")&&num(p.paid)>0&&!done.has("p:"+p.id))L.push({ref:"p:"+p.id,kind:"खरीद",p,date:p.date,ts:p.ts,amt:num(p.paid),shop:p.supName||"",phone:p.supPhone||"",by:p.byName||"",mode:p.pay,items:(p.lines||[]).map(l=>l.name+" "+fq(l.qty,l.unit)+"×₹"+l.rate).join(", ")})});
+  allPurch().forEach(p=>{if(p.src!=="chat"&&(p.pay==="vikram"||p.pay==="upi")&&num(p.paid)>0&&!done.has("p:"+p.id))L.push({ref:"p:"+p.id,kind:"खरीद",p,date:p.date,ts:p.ts,amt:num(p.paid),shop:p.supName||"",phone:p.supPhone||"",by:p.byName||"",mode:p.pay,items:(p.lines||[]).map(l=>l.name+" "+fq(l.qty,l.unit)+"×₹"+l.rate).join(", ")})});
   ST.supPay.forEach(x=>{if((x.mode==="vikram"||x.mode==="upi")&&!done.has("s:"+x.id))L.push({ref:"s:"+x.id,kind:"बाकी का भुगतान",date:x.date,ts:x.ts,amt:num(x.amt),shop:x.supName||"",phone:"",by:x.byName||"",mode:x.mode,items:"पुराना बाकी"})});
   return L.sort((a,b)=>b.ts-a.ts);
 }

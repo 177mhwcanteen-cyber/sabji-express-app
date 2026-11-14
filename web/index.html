@@ -1516,7 +1516,7 @@ function renderReport(){
     ...(window.SFM&&SFM.html?[R("firms","long","🏢","सभी फर्म · 177 MH का महीना","",()=>SFM.html())]:[])];
   const G={day:"📅 आज का हिसाब",item:"🥬 सब्ज़ी और माल",party:"👥 ग्राहक और पार्टी",long:"🗓️ लंबा समय और औज़ार"};
   let fav=[];try{fav=JSON.parse(lsGet("rep_fav")||(window.SFM?'["full","items","firms"]':'["full","items","galla"]'))}catch(e){}
-  const alerts=(window.SF?SF.cancelReqsHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML();
+  const alerts=(window.SF?SF.cancelReqsHTML():"")+(window.SF&&SF.hiRateHTML?SF.hiRateHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML();
   const GO={daybook:"bills",kharch:"day",stock:"day",ledger:"udhar",route:"route"};REP.forEach(r=>{if(GO[r.id])r.tab=GO[r.id]});
   const sel=REP.find(r=>r.id===S.repSel&&!r.tab);
   const row=r=>`<div class="rp-r${r.warn?" warn":""}"><button type="button" class="rp-go" ${r.tab?`data-rtab="${r.tab}"`:`data-rsel="${r.id}"`}><i>${r.ic}</i><b>${r.t}</b>${r.hint?`<small>${esc(r.hint)}</small>`:""}<em>${r.tab?"↗":"›"}</em></button><button type="button" class="rp-st${fav.includes(r.id)?" on":""}" data-rfav="${r.id}" aria-label="पसंदीदा">${fav.includes(r.id)?"★":"☆"}</button></div>`;
