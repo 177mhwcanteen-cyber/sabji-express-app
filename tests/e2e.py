@@ -134,7 +134,7 @@ async def main():
 
         # ---------- 1) मालिक ----------
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1, "winter1": 1, "board3": 1, "supply1": 1, "chat1": 1}}}, users)
+        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1, "winter1": 1, "board3": 1, "supply1": 1, "chat1": 1, "cheeku1": 1}}}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
@@ -786,13 +786,15 @@ async def main():
         assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
         print("opening edit ok")
         # 🪧 बोर्ड के भाव: एक बार अपने-आप
-        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;delete window.__MOCK__.ownerCfg.flags.winter1;delete window.__MOCK__.ownerCfg.flags.board3;delete window.__MOCK__.ownerCfg.flags.supply1;delete window.__MOCK__.ownerCfg.flags.chat1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;delete window.__MOCK__.ownerCfg.flags.winter1;delete window.__MOCK__.ownerCfg.flags.board3;delete window.__MOCK__.ownerCfg.flags.supply1;delete window.__MOCK__.ownerCfg.flags.chat1;delete window.__MOCK__.ownerCfg.flags.cheeku1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
         bd = await pg.evaluate("[window.__MOCK__.items.tamatar.sale,window.__MOCK__.items.nimbu.sale,!!window.__MOCK__.items.parwal,window.__MOCK__.items.parwal&&window.__MOCK__.items.parwal.sale,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.note&&x.note.includes('बोर्ड')).length,window.__MOCK__.ownerCfg.flags.board1>0]")
         assert bd[0] == 30 and bd[1] == 200 and bd[2] and bd[3] == 90 and bd[4] >= 10 and bd[5], bd
         b2 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.board2>0,window.__MOCK__.items.harapyaj&&window.__MOCK__.items.harapyaj.sale,window.__MOCK__.items.kachchakela&&window.__MOCK__.items.kachchakela.sale,!window.__MOCK__.items.safalmatar,window.__MOCK__.items.methi.sale]")
         assert b2 == [True, 80, 60, True, 200], b2
         b3 = await pg.evaluate("(()=>{const I=window.__MOCK__.items;return [window.__MOCK__.ownerCfg.flags.board3>0,I.harimirch.sale,I.toroi.sale,I.palak.sale,I.nariyal.sale,I.tamatar.ratePrev,I.aloo.sale,I.matar.sale]})()")
         assert b3 == [True, 180, 40, 60, 60, 20, 20, 200], b3
+        ck = await pg.evaluate("(()=>{const I=window.__MOCK__.items.cheeku||{},B=window.__MOCK__.items.bathua||{};return [window.__MOCK__.ownerCfg.flags.cheeku1>0,I.active,I.sale,I.photo,B.active,B.sale,B.photo]})()")
+        assert ck == [True, True, 100, "b", True, 160, "b"], ck  # 🍈 चीकू चालू ₹100 + फोटो (27-11)
         c1 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.cost1>0,window.__MOCK__.items.tamatar.cost,window.__MOCK__.items.aloo.cost,(window.__MOCK__.items.aloo.lastBuy||{}).rate,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.field==='cost').length]")
         assert c1[0] and c1[1] == 8 and c1[2] == 13 and c1[3] == 13 and c1[4] >= 20, c1
         p1 = await pg.evaluate("""(()=>{const M=window.__MOCK__,I=M.items,st=(M['days/2026-11-01/meta']||{}).stock||{};return [M.ownerCfg.flags.photo1>0,I.moongfali&&I.moongfali.active,I.sitafal.active,I.parwal.photo,I.dragonfruit.photo,(st.items||{}).seb&&st.items.seb.close,(st.items||{}).shimla&&st.items.shimla.close,Object.keys(st.items||{}).length,SE.bundled.has('lalaloo')]})()""")
@@ -805,7 +807,7 @@ async def main():
         c3 = await pg.evaluate("""(()=>{const M=window.__MOCK__,st=((M['days/2026-11-03/meta']||{}).stock)||{},cp=((M['days/2026-11-03/meta']||{}).copy)||{};const I=st.items||{},P=M.purchases||{};
           const mm=Object.entries(M.items).find(([k,v])=>v.name==='मोटी मिर्च');return [M.ownerCfg.flags.copy2>0,I.seb&&I.seb.close,I.kiwi&&I.kiwi.close,I.kheera&&I.kheera.close,!!I.tamatar&&I.tamatar.close!==undefined,P.cp2_0311_seb&&P.cp2_0311_seb.total,P.cp2_0311_papita&&P.cp2_0311_papita.total,P.cp2_0311_papita&&P.cp2_0311_papita.pay,cp.day&&cp.day.sale.online,(cp.day&&cp.day.kharid.length),mm?(I[mm[0]]||{}).close:0.5]})()""")
         assert c3 == [True, 8, 7, 0, False, 1500, 350, "galla", 7201, 28, 0.5], c3
-        w1 = await pg.evaluate("""(async()=>{const M=window.__MOCK__,I=M.items;const r=[M.ownerCfg.flags.winter1>0,I.bathua&&I.bathua.active,I.ber&&I.ber.season,I.strawberry&&I.strawberry.unit,Object.values(I).filter(x=>x.season).length,I.tamatar.active!==false];
+        w1 = await pg.evaluate("""(async()=>{const M=window.__MOCK__,I=M.items;const r=[M.ownerCfg.flags.winter1>0,I.ber&&I.ber.active,I.ber&&I.ber.season,I.strawberry&&I.strawberry.unit,Object.values(I).filter(x=>x.season).length,I.tamatar.active!==false];
           const it=S.items.find(x=>x.id==='ber');if(!it)return r.concat(['noitem']);SX.seasonSel={ber:true};r.push(SX.seasonText().includes('बेर'));r.push(SX.seasonHTML().includes('मौसम का नया माल'));
           await SX.seasonOn('ber');r.push(M.items.ber.active);SX.seasonSel={};return r})()""")
         assert w1 == [True, False, "winter", "pc", 20, True, True, True, True], w1
