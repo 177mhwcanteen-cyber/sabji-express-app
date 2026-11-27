@@ -709,7 +709,7 @@ function bindRoute(el){
 
 
 /* ======================= ⚡ जल्दी वाले काम: खराबी, खर्चा, भाव, रात का स्टॉक ======================= */
-SR.quickStripHTML=function(){return `<div class="qstrip"><button data-qwaste>🗑️<span>खराबी</span></button><button data-qkharch>💸<span>खर्चा</span></button><button data-qrate>✏️<span>भाव बदलें</span></button><button data-qnight>🌙<span>रात का स्टॉक</span></button></div>`};
+SR.quickStripHTML=function(){return `<div class="qstrip"><button data-qwaste>🗑️<span>खराबी</span></button><button data-qkharch>💸<span>खर्चा</span></button><button data-qrate>✏️<span>भाव बदलें</span></button><button data-qnight>🌙<span>रात का स्टॉक</span></button><button data-gcopen>💵<span>गल्ला गिनें</span></button></div>`};
 const KH=["गाड़ी किराया","पेट्रोल / डीज़ल","गाड़ी रिपेयर","मंडी भाड़ा","हम्माली","पॉलीथीन / थैली","चाय-नाश्ता","अन्य"];
 SR.kharchSheet=function(){
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="खर्चा"><div class="grab"></div>

@@ -1439,6 +1439,48 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-nag]");if(
   if(k==="none"){const d={by:S.uid||"",byName:biller(),ts:Date.now()};SF.nobuy=d;if(!S.demo&&S.db)S.db.doc("days/"+today()+"/meta/nobuy").set(d).catch(()=>{});toast("ठीक है — आज खरीद की याद नहीं आएगी")}});
 setTimeout(()=>{try{SF.buyNag()}catch(e){}},15*60000);setInterval(()=>{try{SF.buyNag()}catch(e){}},5*60000);
 
+/* ⏱️ हर घंटे गल्ला गिनती (विक्रम जी 27-11-2026): दिन में कई बार गिनती — हर गिनती अलग लाइन में रहती है (पुरानी कभी नहीं मिटती),
+   उस पल का "होना चाहिए" उसी समय पक्का; कर्मचारी को सिर्फ़ "गिनें" — होना चाहिए/फर्क कभी नहीं। मालिक तय करे: हर 1/2/3 घंटे या बंद (settings/main.gcEvery)。
+   ⏳ भुगतान बाकी वाले बिल पहले सेटल — वरना उनका पैसा गल्ले में "ज़्यादा" दिखता है (या जेब में चला जाता है)। */
+SF.gcEvery=()=>{const v=S.settings&&S.settings.gcEvery;return v===0||v==="0"?0:(num(v)||1)};
+SF.gcHist=()=>{const c=S.close||{};const h=(c.hist||[]).slice();if(!h.length&&c.counted!=null&&c.counted!=="")h.push({ts:c.ts||0,counted:num(c.counted),expected:num(c.expected),diff:c.diff,byName:c.byName||""});return h.sort((a,b)=>a.ts-b.ts)};
+SF.pendBills=()=>(S.dayBills||[]).filter(b=>b.settled===false&&!b.cancelled&&b.mode!=="inst");
+SF.gcSave=async function(float,counted){const d=S.billsDate,c=cashCalc(d),fl=float==null?c.float:float;
+  const expected=r2(fl+c.cashSale+c.jamaCash+c.gIn-c.khCash-c.gOut),ts=Date.now();
+  const hist=((S.close&&S.close.hist)||SF.gcHist()).slice();
+  if(counted!=null)hist.push({ts,counted,expected,diff:r2(counted-expected),by:S.uid||"",byName:biller(),pend:SF.pendBills().length});
+  const doc={float:fl,counted,expected,diff:counted==null?null:r2(counted-expected),ts,by:S.uid||"",byName:biller(),hist:hist.slice(-48)};
+  if(!S.demo)await S.db.doc("days/"+d+"/meta/close").set(doc);S.close=doc;try{localStorage.setItem("se_gc_"+d,String(ts))}catch(e){}return doc};
+SF.gcPendHTML=function(){const P=SF.pendBills();if(!P.length)return "";
+  return `<div class="ud-w" style="margin:4px 0 8px">⏳ ${P.length} बिल का भुगतान अभी बाकी है${S.isOwner?" ("+rs(P.reduce((a,b)=>a+num(b.total),0))+")":""} — पहले इन्हें सेटल करें, फिर गल्ला गिनें:
+    <div class="seg" style="margin-top:4px">${P.slice(0,6).map(b=>`<button class="chip" data-sbopen="${esc(b.no)}">${esc(b.partyName||"ग्राहक")} · ${ftime(b.ts)}</button>`).join("")}</div></div>`};
+SF.gcOwnerHTML=function(){if(!S.isOwner)return "";const H=SF.gcHist(),ev=SF.gcEvery();
+  return `<div class="gc-own"><b>⏱️ आज की गिनतियाँ (${H.length})</b>${H.length?H.slice().reverse().map(h=>`<div class="stkmeta"><span>${ftime(h.ts)} · ${esc(h.byName||"")}${h.pend?` · <small class="note">⏳ ${h.pend} बिल बाकी थे</small>`:""}<br><small class="note">गिना ${rs(h.counted)} · होना चाहिए ${rs(h.expected)}</small></span><b>${diffPill(h.diff)}</b></div>`).join(""):'<p class="note" style="margin:2px 0">अभी कोई गिनती नहीं</p>'}
+  <div class="seg" style="margin:6px 0 0"><span class="note" style="align-self:center">साथी को याद:</span>${[[1,"हर घंटे"],[2,"हर 2 घंटे"],[3,"हर 3 घंटे"],[0,"बंद"]].map(([v,l])=>`<button class="chip" data-gcev="${v}" aria-pressed="${ev===v}">${l}</button>`).join("")}</div></div>`};
+SF.gcSheet=function(){$("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="गल्ला गिनती"><div class="grab"></div>
+  <div class="sh-head"><div><h3>💵 गल्ला गिनें</h3><span class="note">नोट और सिक्के गिनकर कुल रकम लिखें — बस इतना</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  ${SF.gcPendHTML()}<label class="fld">अभी गल्ले में कुल ₹<input class="inp" id="gcIn" inputmode="decimal" autocomplete="off" placeholder="जैसे 2350"></label>
+  <button class="big" data-gcsave>✓ गिनती सेव करें</button></div></div>`;const f=$("#gcIn");if(f)f.focus();
+  $("#sheet").onclick=async e=>{if(e.target.matches("[data-close]")){closeSheet();return}
+    if(e.target.closest("[data-gcsave]")){const v=String(($("#gcIn")||{}).value||"").trim();if(v===""){toast("गल्ले की रकम लिखें");return}
+      if(!biller()){openBiller(SF.gcSheet);return}
+      try{await SF.gcSave(null,r2(num(v)));closeSheet();toast("✓ गिनती सेव हुई — धन्यवाद 🙏");if(S.tab==="day")renderDay()}catch(x){toast("सेव नहीं हुआ — इंटरनेट देखें")}}}};
+SF.gcNag=function(force){
+  if(S.isOwner||(!S.db&&!S.demo)||!biller()||S.billsDate!==today())return false;const ev=SF.gcEvery();if(!ev&&!force)return false;
+  const h=new Date().getHours();if(!force&&(h<9||h>=22))return false;
+  if(document.querySelector("#sheet .scrim")||document.getElementById("gcNag")||document.getElementById("buyNag"))return false;
+  const H=SF.gcHist(),lastC=H.length?H[H.length-1].ts:0;let lastN=0;try{lastN=+localStorage.getItem("se_gcn_"+today())||0}catch(e){}
+  const gap=ev*3600e3;if(!force&&(Date.now()-lastC<gap||Date.now()-lastN<gap))return false;
+  try{localStorage.setItem("se_gcn_"+today(),String(Date.now()))}catch(e){}
+  const el=document.createElement("div");el.id="gcNag";el.className="buynag";el.setAttribute("role","status");
+  el.innerHTML=`<b>💵 गल्ला गिनने का समय</b><span>${esc(biller())} जी, एक मिनट — गल्ला गिनकर रकम लिख दें 🙏</span><div><button class="nag-go" data-gcn="go">💵 अभी गिनें</button><button data-gcn="later">⏰ बाद में</button></div>`;
+  document.body.appendChild(el);return true};
+document.addEventListener("click",e=>{const t=e.target;if(!t.closest)return;
+  const n=t.closest("[data-gcn]");if(n){const el=document.getElementById("gcNag");if(el)el.remove();if(n.dataset.gcn==="go")SF.gcSheet();return}
+  if(t.closest("[data-gcopen]")){SF.gcSheet();return}
+  const v=t.closest("[data-gcev]");if(v&&S.isOwner){const x=+v.dataset.gcev;S.settings.gcEvery=x;saveSetting({gcEvery:x}).then(()=>renderDay());return}});
+setInterval(()=>{try{SF.gcNag()}catch(e){}},5*60000);
+
 /* 📑 दिन का हिसाब (मालिक) — खंड-पट्टी */
 const DSEG=[["sar","📊 सार"],["paisa","💵 पैसा"],["maal","📦 माल"],["ai","🤖 कॉपी·AI"]];
 SF.dseg=(()=>{try{return localStorage.getItem("se_dseg")||"sar"}catch(e){return "sar"}})();

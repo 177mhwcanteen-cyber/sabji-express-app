@@ -202,7 +202,7 @@ SX.monthA4=async function(ym){if(!S.isOwner)return;toast("📄 "+ym+" का ह
     o.sale+=num(b.total);o.cash+=num(b.pay&&b.pay.cash);o.upi+=num(b.pay&&b.pay.upi);o.ud+=num(b.pay&&b.pay.udhar);try{o.pf+=num((SF.billProfit(b)||{}).p)}catch(e){}
     const s=per[b.byName||"—"]||(per[b.byName||"—"]={n:0,sale:0});s.n++;s.sale+=num(b.total)});
   try{const P=(await S.db.collection("purchases").where("date",">=",first).get()).docs.map(d=>d.data()).filter(p=>!p.cancelled&&p.date<=to);buy=P.reduce((a,p)=>a+num(p.total),0)}catch(e){}
-  for(const d of Object.keys(days).sort()){try{const k=(await S.db.collection("days/"+d+"/kharch").get()).docs.map(x=>x.data());const kd=k.reduce((a,x)=>a+num(x.amt),0);days[d].kh=kd;kh+=kd;
+  for(const d of Object.keys(days).sort()){try{const k=(await S.db.collection("days/"+d+"/kharch").get()).docs.map(x=>x.data()).filter(x=>!x.void);const kd=k.reduce((a,x)=>a+num(x.amt),0);days[d].kh=kd;kh+=kd;
       const st=await S.db.doc("days/"+d+"/meta/stock").get();const wl=st.exists?(st.data().wlog||[]):[];const wv=wl.reduce((a,w)=>{const it=item(w.id);return a+num(w.qty)*(it?num(SF.costOf(it)):0)},0);days[d].ws=wv;ws+=wv}catch(e){}}
   const D=Object.keys(days).sort();const T={n:0,sale:0,cash:0,upi:0,ud:0,inst:0,pf:0};D.forEach(d=>Object.keys(T).forEach(k=>T[k]+=num(days[d][k])));
   const real=r2(T.pf-kh-ws);const udTot=r2((S.parties||[]).filter(p=>!p.hide).reduce((a,p)=>a+Math.max(0,bal(p.id)),0));

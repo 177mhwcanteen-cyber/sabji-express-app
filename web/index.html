@@ -390,7 +390,7 @@ main{padding-block:10px 120px}
 .big-in{font-size:22px!important;font-weight:800;text-align:center}
 .pbarbtn{background:#6d28d9;color:#fff}
 /* v24 */
-.qstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px}
+.qstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 12px}.gc-own{margin:8px 0 4px;padding:8px;border-radius:12px;background:var(--chip-bg)}
 .qstrip button{display:grid;justify-items:center;gap:2px;border:0;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:10px 4px;font-size:22px;color:var(--ink)}
 .qstrip button span{font-size:12.5px;font-weight:800}
 .card .mg{display:block;font-size:11px;font-weight:800;padding:0 9px 7px;color:#15803d}.card .mg.mid{color:#b45309}.card .mg.bad{color:var(--chili)}
@@ -987,7 +987,7 @@ function receiptText(b){
   {const q=window.SF&&SF.qrFor&&SF.qrFor(b);if(q)t+=`${L}\n📱 *UPI:* ${upiId()}\n${q.label}\n`}if(b.byName&&b.mode!=='inst')t+=`🧑‍🌾 बिलिंग: *${b.byName}*\n`;t+=`${L}\n🙏 धन्यवाद! फिर पधारें\n`;
   if(SF.orderPh())t+=`\n📲 *घर बैठे ताज़ी सब्ज़ी मँगाएँ*\nWhatsApp या कॉल करें: *${SF.fmtPh(SF.orderPh())}*\nhttps://wa.me/91${SF.orderPh()}\n`;
   if(b.pay.udhar)t+=`💳 UPI: ${upiId()}\n`;
-  return t+`🧑‍🌾 बिलर: ${b.byName}`;
+  return t.replace(/\n$/,""); /* बिलर का नाम ऊपर एक बार ("बिलिंग") — पहले दो बार छपता था */
 }
 function receiptHTML(b){if(window.SF)return SF.paperHTML(b,{qr:true});
   return `<div class="receipt"><h4>सब्ज़ी एक्सप्रेस</h4><div class="meta"><span>${esc(b.no)}</span><span>${fdate(b.date)} · ${ftime(b.ts)}</span></div>
@@ -1379,14 +1379,14 @@ function renderDay(){
   <div class="kpis" ${S.isOwner?"hidden":""}><div class="kpi"><span>आज की खरीद (मंडी)</span><b>${rs(buyTot)}</b></div><div class="kpi red"><span>खर्चा</span><b>${rs(c.khAll)}</b></div>
   ${S.isOwner?`<div class="kpi ${shortTot>0?"red":""}"><span>माल में कमी (बिक्री रेट)</span><b>${rs(shortTot)}</b></div><div class="kpi"><span>गल्ला</span><b style="font-size:16px;padding-top:6px">${diffPill(c.diff)}</b></div>`:""}</div>
 
-  <div class="card2" data-ds="paisa"><h3>गल्ला मिलान</h3>
+  <div class="card2" data-ds="paisa"><h3>गल्ला मिलान</h3>${window.SF&&SF.gcPendHTML?SF.gcPendHTML():""}
     ${S.isOwner?`<div class="stkmeta"><span>सुबह खुला पैसा</span><b>${rs(c.float)}</b></div>
     <div class="stkmeta"><span>+ नकद बिक्री</span><b>${rs(c.cashSale)}</b></div>
     <div class="stkmeta"><span>+ उधारी वसूली (नकद)</span><b>${rs(c.jamaCash)}</b></div>
     <div class="stkmeta"><span>− नकद खर्चा + गल्ले से खरीद</span><b>${rs(c.khCash)}</b></div>
     ${c.gIn?`<div class="stkmeta"><span>+ बाहर से गल्ले में आया</span><b>${rs(c.gIn)}</b></div>`:""}${c.gOut?`<div class="stkmeta"><span>− गल्ले से निकाला</span><b>${rs(c.gOut)}</b></div>`:""}
     ${c.prev!=null&&Math.abs(c.prev-c.float)>5?`<p class="ud-w" style="margin:4px 0">⚠ कल रात ${rs(c.prev)} गिना था, आज सुबह ${rs(c.float)} खुला लिखा — ${rs(Math.abs(r2(c.prev-c.float)))} का फर्क</p>`:""}
-    <div class="amtline" style="margin:0"><span>गल्ले में होना चाहिए</span><b>${rs(c.expected)}</b></div>`:'<p class="note" style="margin:0 0 6px">सुबह खुला पैसा और रात को गल्ला गिनकर लिखें — बस इतना।</p>'}
+    <div class="amtline" style="margin:0"><span>गल्ले में होना चाहिए</span><b>${rs(c.expected)}</b></div>${window.SF&&SF.gcOwnerHTML?SF.gcOwnerHTML():""}`:'<p class="note" style="margin:0 0 6px">सुबह खुला पैसा और रात को गल्ला गिनकर लिखें — बस इतना।</p>'}
     <div class="row2" style="margin:0"><label class="fld">सुबह खुला पैसा ₹<input class="inp" id="dFloat" inputmode="decimal" value="${c.float||""}"></label><label class="fld">अभी गिनकर कितना है? ₹<input class="inp" id="dCount" inputmode="decimal" value="${c.counted??""}"></label></div>
     <button class="big" data-saveclose>गल्ला मिलान सेव करें</button>
     ${!S.isOwner&&c.counted!=null?'<p class="note" style="margin:0">✓ गिनती सेव हुई — धन्यवाद 🙏</p>':c.diff!=null?`<p style="margin:0;font-size:17px">नतीजा: ${diffPill(c.diff)}${S.close?.byName?` <span class="note">· ${esc(S.close.byName)} ने ${ftime(S.close.ts)} पर गिना</span>`:""}</p>`:""}
@@ -1426,13 +1426,14 @@ $("#p-day").addEventListener("click",async e=>{
     const k={what,amt:r2(amt),mode:kMode,ts:Date.now(),by:S.uid||"",byName:biller()};
     try{if(S.demo)S.kharch.push({id:"k"+k.ts,...k});else await S.db.collection("days/"+S.billsDate+"/kharch").doc("k"+k.ts.toString(36)).set(k);toast(what+" "+rs(amt)+" जुड़ा");renderDay()}catch(err){toast("खर्चा सेव नहीं हुआ")}return}
   const dk=e.target.closest("[data-delkh]");if(dk){if(dk.dataset.sure!=="1"){dk.dataset.sure="1";dk.textContent="पक्का?";return}
-    try{await S.db.doc("days/"+S.billsDate+"/kharch/"+dk.dataset.delkh).delete();toast("खर्चा हटाया")}catch(err){toast("नहीं हटा")}return}
+    /* पत्थर का नियम 1: खर्चा मिटता नहीं — "हटाया" का ठप्पा (void), रिपोर्ट/बैकअप में दिखता रहे */
+    try{if(S.demo){const k=S.kharch.find(x=>x.id===dk.dataset.delkh);if(k)k.void=1;S.kharch=S.kharch.filter(x=>!x.void)}else await S.db.doc("days/"+S.billsDate+"/kharch/"+dk.dataset.delkh).update({void:true,voidTs:Date.now(),voidBy:biller()});toast("खर्चा हटाया (रिकॉर्ड में रहेगा)");renderDay()}catch(err){toast("नहीं हटा")}return}
   if(e.target.closest("[data-saveclose]")){
     const c=cashCalc(S.billsDate);const fl=$("#dFloat").value.trim(),ct=$("#dCount").value.trim();
     const float=fl===""?c.float:parseFloat(fl)||0,counted=ct===""?null:parseFloat(ct)||0;
-    const expected=r2(float+c.cashSale+c.jamaCash+c.gIn-c.khCash-c.gOut);
-    const doc={float,counted,expected,diff:counted==null?null:r2(counted-expected),ts:Date.now(),by:S.uid||"",byName:biller()};
-    try{if(S.demo)S.close=doc;else await S.db.doc("days/"+S.billsDate+"/meta/close").set(doc);S.close=doc;renderDay();toast("गल्ला मिलान सेव हुआ")}catch(err){toast("सेव नहीं हुआ")}return}
+    if(!biller()){openBiller();return}
+    /* हर गिनती hist में जुड़ती है — पहले वाली गिनती कभी नहीं मिटती (SF.gcSave) */
+    try{if(window.SF&&SF.gcSave)await SF.gcSave(float,counted);else{const expected=r2(float+c.cashSale+c.jamaCash+c.gIn-c.khCash-c.gOut);const doc={float,counted,expected,diff:counted==null?null:r2(counted-expected),ts:Date.now(),by:S.uid||"",byName:biller()};if(!S.demo)await S.db.doc("days/"+S.billsDate+"/meta/close").set(doc);S.close=doc}renderDay();toast("गल्ला मिलान सेव हुआ")}catch(err){toast("सेव नहीं हुआ")}return}
   const ac=e.target.closest("[data-applycost]");if(ac){const r=stockRows().find(x=>x.it.id===ac.dataset.applycost);if(!r)return;const old=+r.it.cost||0;await saveItem(r.it.id,{cost:r.buyRate});logPrice(r.it.id,"cost",old,r.buyRate);renderDay();return}
 });
 
@@ -1694,7 +1695,7 @@ function subBills(){
   S.unsubBills=S.db.collection("days/"+S.billsDate+"/bills").onSnapshot(s=>{const got=s.docs.map(d=>d.data()),nos=new Set(got.map(x=>x.no)),gd=S.billsDate;if(S.isOwner)guardQ(()=>guardBills(gd,got));S.dayBills=got.concat(outbox().map(x=>x.bill).filter(x=>x.date===S.billsDate&&!nos.has(x.no)));renderPane();if(S.tab==="bill")renderBill()},err=>toast("बिल लोड नहीं हुए"));
   S.unsubDay.forEach(f=>{try{f()}catch(e){}});S.stock={};S.kharch=[];S.close=null;S.gl=null;{const pd=dayPlus(S.billsDate,-1);S.db.doc("days/"+pd+"/meta/close").get().then(x=>{S.prevClose={d:pd,...(x.exists?x.data():{})};if(S.tab==="day")renderPane()}).catch(()=>{})}const d="days/"+S.billsDate;
   S.unsubDay=[S.db.doc(d+"/meta/stock").onSnapshot(s=>{S.stock=s.exists?s.data():{};if(S.tab!=="day")renderPane()},()=>{}),
-    S.db.collection(d+"/kharch").onSnapshot(s=>{S.kharch=s.docs.map(x=>({id:x.id,...x.data()}));renderPane(S.tab!=="day")},()=>{}),
+    S.db.collection(d+"/kharch").onSnapshot(s=>{S.kharchAll=s.docs.map(x=>({id:x.id,...x.data()}));S.kharch=S.kharchAll.filter(k=>!k.void);renderPane(S.tab!=="day")},()=>{}),
     S.db.doc(d+"/meta/close").onSnapshot(s=>{S.close=s.exists?s.data():null;if(S.tab!=="day")renderPane()},()=>{}),
     S.db.doc(d+"/meta/galla").onSnapshot(s=>{S.gl=s.exists?s.data():null;renderPane(S.tab!=="day")},()=>{})];
 }
