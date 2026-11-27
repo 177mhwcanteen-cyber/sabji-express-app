@@ -6,7 +6,7 @@ const num=v=>{const n=parseFloat(String(v??"").replace(",","."));return isFinite
 const FV=()=>window.firebase&&firebase.firestore&&firebase.firestore.FieldValue;
 const outboxGet=()=>{try{return JSON.parse(localStorage.getItem("se_outbox")||"[]")}catch(e){return []}};
 const outboxSet=o=>{try{localStorage.setItem("se_outbox",JSON.stringify(o))}catch(e){}};
-const findBill=no=>(S.dayBills||[]).find(b=>b.no===no);
+const findBill=no=>(S.dayBills||[]).find(b=>b.no===no)||(SB.old||[]).find(b=>b.no===no);
 const unpaid=()=>(S.dayBills||[]).filter(b=>b.settled===false&&!b.cancelled&&b.date===today());
 SB.unpaid=unpaid;
 /* सर्वर पर या फोन (बिना नेट) में बिल बदलो */
@@ -148,6 +148,9 @@ async function doSettle(b,st){
     if(pay.udhar>0&&party){const ent={ts:b.ts,date:b.date,partyId:party.id,partyName:party.name,type:"udhar",amt:pay.udhar,billNo:b.no,by:S.uid||"",byName:biller()};
       if(S.demo)S.ledger.push({id:b.no,...ent});else{const o=outboxGet();const inBox=o.some(x=>x.bill.no===b.no&&!(x.done&&x.done.l));if(!inBox)await S.db.collection("ledger").doc(b.no).set(ent);if(!S.ledger.find(x=>x.id===b.no))S.ledger.push({id:b.no,...ent})}}
     if(pay.udhar>0)SB._lastUd=b;
+    /* पुराने दिन का बिल आज सेटल: नकद आज के गल्ले में आया → आज की "बाहर से आया" एंट्री (वरना आज गल्ला ज़्यादा दिखे) */
+    if(b.date!==today()){SB.old=(SB.old||[]).filter(x=>x.no!==b.no);if(pay.cash>0&&window.SF&&SF.glWrite&&S.billsDate===today()){const ts=Date.now();
+      try{await SF.glWrite(((S.gl&&S.gl.log)||[]).concat([{id:"g"+ts.toString(36),ts,kind:"in",why:"पुराने बिल का पैसा",amt:pay.cash,note:"बिल "+b.no+" ("+fdate(b.date)+")",by:S.uid||"",byName:biller(),auto:1}]))}catch(x){}}}
     SB.afterSettle(b);
   }catch(err){toast("सेटल नहीं हुआ: "+(err.code||err.message||""))}
 }
@@ -235,9 +238,17 @@ async function saveEdit(b,E){
 }
 
 /* ================= जगह-जगह जुड़ाव ================= */
+/* ⏳ पिछले 3 दिन के "भुगतान बाकी" बिल (27-11) — अगले दिन भी साथी को दिखें, मालिक को लाल चेतावनी; आज सेटल करें तो नकद आज के गल्ले में */
+SB.old=[];
+SB.loadOld=async function(){if(S.demo||!S.db)return;const L=[];for(let i=1;i<=3;i++){const d=dayPlus(today(),-i);
+  try{const q=await S.db.collection("days/"+d+"/bills").where("settled","==",false).get();q.docs.forEach(x=>{const b=x.data();if(!b.cancelled&&(S.isOwner||b.by===S.uid))L.push(b)})}catch(e){}}
+  const ch=L.length!==(SB.old||[]).length;SB.old=L.sort((a,b)=>a.ts-b.ts);try{if(ch&&typeof renderPane==="function"&&!document.querySelector("#sheet .scrim")&&!document.querySelector("#sheet .qpop"))renderPane(true)}catch(e){}};
+SB.oldHTML=function(){const L=SB.old||[];if(!L.length)return "";
+  return `<div class="sb-pend" style="border-color:var(--chili)"><b style="color:var(--chili)">⏳ पिछले दिन के ${L.length} बिल का भुगतान अभी बाकी${S.isOwner?" · "+rs(L.reduce((a,b)=>a+num(b.total),0)):""}</b><div>${L.slice(0,8).map(b=>`<button data-sbopen="${esc(b.no)}">${esc(fdate(b.date).slice(0,5))} · ${esc(b.partyName&&b.partyName!=="VIP ग्राहक"?b.partyName:b.no)} · ${rs(b.total)}${S.isOwner?" · "+esc(b.byName||""):""}</button>`).join("")}</div></div>`};
+setTimeout(()=>{try{SB.loadOld()}catch(e){}},12000);setInterval(()=>{try{SB.loadOld()}catch(e){}},30*60000);
 SB.pendingHTML=function(){
-  const U=unpaid();if(!U.length)return "";
-  return `<div class="sb-pend"><b>⏳ ${U.length} बिल का भुगतान बाकी</b><div>${U.slice(0,6).map(b=>`<button data-sbopen="${esc(b.no)}">${esc(b.partyName&&b.partyName!=="VIP ग्राहक"?b.partyName:b.no)} · ${rs(b.total)}</button>`).join("")}</div></div>`;
+  const U=unpaid();if(!U.length)return SB.oldHTML();
+  return `<div class="sb-pend"><b>⏳ ${U.length} बिल का भुगतान बाकी</b><div>${U.slice(0,6).map(b=>`<button data-sbopen="${esc(b.no)}">${esc(b.partyName&&b.partyName!=="VIP ग्राहक"?b.partyName:b.no)} · ${rs(b.total)}</button>`).join("")}</div></div>`+SB.oldHTML();
 };
 SB.receiptActionsHTML=function(b){
   if(b.cancelled)return "";
@@ -248,9 +259,9 @@ SB.receiptActionsHTML=function(b){
 };
 SB.editsHTML=function(){
   if(!S.isOwner)return "";const L=(S.dayBills||[]).filter(b=>b.edits&&b.edits.length);const U=unpaid();
-  if(!L.length&&!U.length)return "";
+  if(!L.length&&!U.length)return SB.oldHTML();
   return `<div class="card2" style="border:2px solid #7c3aed">${L.length?`<h3>✏️ सेव के बाद बदले गए बिल (${L.length})</h3>${L.map(b=>`<div class="creq-row"><div><b>${esc(b.no)} · ${esc(b.partyName||"")} · अब ${rs(b.total)}</b>${b.edits.map(x=>`<span class="note">${esc(x.byName)} · ${ftime(x.ts)} · ${esc(x.diff)} · ${rs(x.totalBefore)} → ${rs(x.totalAfter)}</span>`).join("")}</div></div>`).join("")}`:""}
-  ${U.length?`<p style="margin:8px 0 0"><b>⏳ ${U.length} बिल का भुगतान अभी बाकी:</b> ${U.map(b=>esc(b.no)+" "+rs(b.total)+" ("+esc(b.byName||"")+")").join(", ")}</p>`:""}</div>`;
+  ${U.length?`<p style="margin:8px 0 0"><b>⏳ ${U.length} बिल का भुगतान अभी बाकी:</b> ${U.map(b=>esc(b.no)+" "+rs(b.total)+" ("+esc(b.byName||"")+")").join(", ")}</p>`:""}</div>`+SB.oldHTML();
 };
 document.addEventListener("click",e=>{
   const o=e.target.closest("[data-sbopen]");if(o){const b=findBill(o.dataset.sbopen);if(b)SB.settleSheet(b);return}

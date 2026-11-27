@@ -127,15 +127,30 @@ SX.ordersSheet=function(){const L=SX.orders;$("#sheet").innerHTML=`<div class="s
   <div class="sh-head"><div><h3>📥 ग्राहकों के ऑर्डर (${L.length})</h3><span class="note">ऑर्डर-लिंक: ${esc(pubBase()+"o.html")}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
   ${L.length?L.map(o=>`<div class="card2 sx-o"><div class="rr-h"><b>${esc(o.name||"ग्राहक")} · ${esc(o.phone||"")}</b><small class="note">${ftime(o.ts)}${o.status==="billing"?" · 🧾 बिल बन रहा":""}</small></div>
     ${o.addr?`<p class="note" style="margin:2px 0">📍 ${esc(o.addr)}</p>`:""}<p style="margin:4px 0">${(o.items||[]).map(x=>esc(x.n)+" "+fq(num(x.q),x.u||"kg")).join(", ")}</p>${o.note?`<p class="note" style="margin:0">📝 ${esc(o.note)}</p>`:""}
-    <div class="row2" style="margin-top:6px"><button class="big" data-sxobill="${esc(o.id)}">🧾 बिल बनाएँ</button><a class="big ghost" target="_blank" rel="noopener" href="${waLink(`🙏 नमस्ते ${o.name||""} जी, आपका ऑर्डर मिल गया — सब्ज़ी एक्सप्रेस की गाड़ी जल्द आपके पास पहुँचेगी 🚐🥬`,o.phone||"")}">✓ WhatsApp पुष्टि</a></div>
-    <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxodone="${esc(o.id)}">✓ पूरा हो गया</button><button class="big ghost" data-sxono="${esc(o.id)}" style="color:var(--chili)">✕ रद्द</button></div></div>`).join(""):'<div class="empty">अभी कोई ऑर्डर नहीं</div>'}
+    <div class="row2" style="margin-top:6px"><button class="big" data-sxobill="${esc(o.id)}">🧾 बिल बनाएँ</button><a class="big ghost" data-sxoacc="${esc(o.id)}" target="_blank" rel="noopener" href="${waLink(`🙏 नमस्ते ${o.name||""} जी, आपका ऑर्डर मिल गया — सब्ज़ी एक्सप्रेस की गाड़ी जल्द आपके पास पहुँचेगी 🚐🥬`,o.phone||"")}">✓ WhatsApp पुष्टि</a></div>
+    <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxoout="${esc(o.id)}">${o.out?"✓ रास्ते में":"🛵 रास्ते में"}</button><button class="big ghost" data-sxodone="${esc(o.id)}">✓ पूरा हो गया</button></div>
+    <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxono="${esc(o.id)}" style="color:var(--chili)">✕ रद्द</button><span></span></div></div>`).join(""):'<div class="empty">अभी कोई ऑर्डर नहीं</div>'}
   <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxolink>🔗 ऑर्डर-लिंक भेजें</button><button class="big ghost" data-sxqr>📲 घर-घर का QR</button></div></div></div>`};
-SX.orderBill=async function(id){const o=SX.orders.find(x=>x.id===id);if(!o)return;closeSheet();S.tab="bill";showTab();
+SX.orderBill=async function(id){const o=SX.orders.find(x=>x.id===id);if(!o)return;(SX._oall||(SX._oall={}))[id]=o;closeSheet();S.tab="bill";showTab();
   if(String(o.phone||"").length===10){S.mode="walk";S.cust={phone:o.phone,name:o.name||""}}
   (o.items||[]).forEach(x=>{const it=item(x.id);if(it&&num(x.q)>0)try{quickAdd(it,num(x.q))}catch(e){}});
-  try{if(!S.demo)await S.db.collection("orders").doc(id).update({status:"billing",byName:biller()||"",bts:Date.now()})}catch(e){}
+  try{if(!S.demo)await S.db.collection("orders").doc(id).update({status:"billing",byName:biller()||"",bts:Date.now()})}catch(e){}SX.pubOt(id,"pack");
   S.sxOrder={id,phone:o.phone,ts:Date.now()};try{refreshAfterCart()}catch(e){}toast("📥 ऑर्डर का सामान बिल में — तौलकर मात्रा ठीक करें, फिर सेव करें")};
-SX.orderSet=async function(id,status,extra){try{if(!S.demo)await S.db.collection("orders").doc(id).update({status,dts:Date.now(),byName:biller()||"",...(extra||{})})}catch(e){toast("नहीं हुआ: "+(e.code||""))}};
+SX.orderSet=async function(id,status,extra){try{if(!S.demo)await S.db.collection("orders").doc(id).update({status,dts:Date.now(),byName:biller()||"",...(extra||{})})}catch(e){toast("नहीं हुआ: "+(e.code||""))}
+  SX.pubOt(id,{billing:"pack",done:"done",cancel:"cancel"}[status],extra)};
+/* 📦 ग्राहक की ट्रैकिंग (27-11): ऑर्डर-पेज (177 रिपो) से आया ऑर्डर नोट में "🆔<id>" रखता है → यहाँ हर कदम pub/ot_<id> (सिर्फ़ हालत, कोई निजी जानकारी नहीं)
+   ऑर्डर-पेज सब्ज़ी के ऑर्डर की हालत यहीं से पढ़ता है: मिला (acc) → पैक (pack) → रास्ते में (out) → पहुँचा (done) / रद्द */
+SX.mid=o=>{const m=String((o&&o.note)||"").match(/🆔([A-Za-z0-9]+)/);return m?m[1]:""};
+SX.pubOt=async function(id,st,extra){const o=SX.orders.find(x=>x.id===id)||(SX._oall||{})[id],mid=SX.mid(o);if(!mid||!st||S.demo||!S.db)return;
+  try{await S.db.collection("pub").doc("ot_"+mid).set({st,ts:Date.now(),by:biller()||"",msg:st==="out"?"🛵 Sabji Express van is coming":st==="pack"?"Weighing fresh vegetables for you":"",...(extra&&extra.billNo?{billNo:extra.billNo}:{})},{merge:true})}catch(e){}};
+/* ⚠ मालिक: पिछले 3 दिन में "पूरा" हुए ऑनलाइन ऑर्डर जिनका बिल नहीं बना (माल गया, हिसाब नहीं) */
+SX.noBill=[];
+SX.loadNoBill=async function(){if(!S.isOwner||S.demo||!S.db)return;try{const q=await S.db.collection("orders").where("status","==","done").get();const t0=Date.now()-3*864e5;
+  SX.noBill=q.docs.map(d=>({id:d.id,...d.data()})).filter(o=>!o.billNo&&num(o.dts)>t0&&!o.nbOk).sort((a,b)=>num(b.dts)-num(a.dts))}catch(e){}};
+SX.ownAlertsHTML=function(){if(!S.isOwner||!SX.noBill.length)return "";
+  return `<div class="card2" style="border:2px solid var(--chili)"><h3 style="color:var(--chili)">📥 ${SX.noBill.length} ऑनलाइन ऑर्डर बिना बिल पूरे हुए</h3><p class="note" style="margin:0 0 6px">माल गया पर ऐप में बिक्री नहीं चढ़ी — साथी से पूछें, पैसा कहाँ गया।</p>
+  ${SX.noBill.map(o=>`<div class="stkmeta"><span>${esc(o.name||"")} · ${esc(o.phone||"")}<br><small class="note">${fdate(today(new Date(num(o.dts))))} ${ftime(num(o.dts))} · ${esc(o.byName||"")} · ${(o.items||[]).map(x=>esc(x.n)).slice(0,4).join(", ")}</small></span><b><button class="lnk" data-sxnbok="${esc(o.id)}">✓ देख लिया</button></b></div>`).join("")}</div>`};
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-sxnbok]");if(!b||!S.isOwner)return;const id=b.dataset.sxnbok;SX.noBill=SX.noBill.filter(o=>o.id!==id);try{S.db.collection("orders").doc(id).update({nbOk:Date.now()})}catch(x){}try{renderReport()}catch(x){}});
 /* बिल सेव हुआ तो उसी ग्राहक का ऑर्डर अपने-आप पूरा */
 SX.checkOrderDone=function(){const o=S.sxOrder;if(!o)return;const b=(S.dayBills||[]).find(x=>!x.cancelled&&x.ts>o.ts&&(!o.phone||x.custPhone===o.phone));if(b){S.sxOrder=null;SX.orderSet(o.id,"done",{billNo:b.no});toast("✓ ऑर्डर पूरा — बिल "+b.no)}};
 SX.pubRates=async function(force){if(S.demo||!S.db||!(S.isOwner||S.uid))return;/* साथी के फोन से भी भाव जाएँ — तीन-दुकान ऑर्डर-पेज इन्हीं से चलता है */const k="sx_pubr";const last=LS.get(k)||0;
@@ -285,7 +300,9 @@ document.addEventListener("click",async e=>{const t=e.target;
   const hl=t.closest("[data-sxhl]");if(hl){SX.hisabLink(hl.dataset.sxhl);return}
   if(t.closest("[data-sxorders]")){SX.ordersSheet();return}
   const ob=t.closest("[data-sxobill]");if(ob){SX.orderBill(ob.dataset.sxobill);return}
-  const od=t.closest("[data-sxodone]");if(od){SX.orderSet(od.dataset.sxodone,"done");closeSheet();return}
+  const od=t.closest("[data-sxodone]");if(od){/* बिना बिल "पूरा" — पक्का पूछो और मालिक की रिपोर्ट में दिखे */if(!od.dataset.sure){od.dataset.sure="1";od.textContent="⚠ बिना बिल पूरा? (मालिक को दिखेगा)";return}SX.orderSet(od.dataset.sxodone,"done",{noBill:true});closeSheet();toast("✓ ऑर्डर पूरा — बिल नहीं बना, मालिक को दिखेगा");return}
+  const oo=t.closest("[data-sxoout]");if(oo){const id=oo.dataset.sxoout;SX.pubOt(id,"out");try{if(!S.demo)S.db.collection("orders").doc(id).update({out:Date.now()})}catch(x){}const o=SX.orders.find(x=>x.id===id);if(o)o.out=Date.now();oo.textContent="✓ रास्ते में";toast("🛵 ग्राहक को दिख गया — गाड़ी रास्ते में");return}
+  const oa=t.closest("[data-sxoacc]");if(oa){SX.pubOt(oa.dataset.sxoacc,"acc")}
   const on=t.closest("[data-sxono]");if(on){if(!on.dataset.sure){on.dataset.sure="1";on.textContent="पक्का रद्द?";return}SX.orderSet(on.dataset.sxono,"cancel");closeSheet();return}
   if(t.closest("[data-sxqr]")){SX.qrCard();return}
   if(t.closest("[data-sxolink]")){window.open(waLink("🥬 सब्ज़ी एक्सप्रेस — अब घर बैठे ऑर्डर करें! सब्ज़ी चुनें, भेजें, गाड़ी आपकी गली में 🚐\n"+pubBase()+"o.html",""),"_blank");return}
@@ -296,6 +313,6 @@ document.addEventListener("click",async e=>{const t=e.target;
 });
 document.addEventListener("change",e=>{if(e.target.id==="sxvF")SX.vy.from=e.target.value||SX.vy.from;if(e.target.id==="sxvT")SX.vy.to=e.target.value||SX.vy.to});
 /* शुरुआत: मालिक — रोज़ का बैकअप + भाव सूची (हल्के, देर से); सब — ऑर्डर सुनें */
-SX.start=function(){if(SX._st)return;SX._st=1;setTimeout(()=>{SX.watchOrders();SX.pubRates();if(S.isOwner){setTimeout(SX.autoBackup,20000)}},8000);setInterval(()=>{try{SX.checkOrderDone()}catch(e){}},15000);if(S.isOwner)setInterval(()=>{try{SX.pubRates()}catch(e){}},10*60000)};
+SX.start=function(){if(SX._st)return;SX._st=1;setTimeout(()=>{SX.watchOrders();SX.pubRates();if(S.isOwner){setTimeout(SX.autoBackup,20000);SX.loadNoBill();setInterval(SX.loadNoBill,15*60000)}},8000);setInterval(()=>{try{SX.checkOrderDone()}catch(e){}},15000);if(S.isOwner)setInterval(()=>{try{SX.pubRates()}catch(e){}},10*60000)};
 const wait=setInterval(()=>{if(window.S&&S.db&&S.items&&S.items.length&&(S.isOwner||S.uid)){clearInterval(wait);SX.start()}},2000);
 })();

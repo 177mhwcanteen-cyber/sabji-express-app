@@ -263,6 +263,8 @@ SF.pBillSheet=pBillSheet;
 async function savePurchase(){
   const gross=pTotal();if(!(gross>0)){toast("पहले सामान, मात्रा और भाव लिखें");return}
   const bad=P.lines.find(l=>!(num(l.qty)>0)||!(num(l.rate)>0)||(!l.id&&!String(l.name||"").trim()));if(bad){toast("हर लाइन में मात्रा और भाव दोनों लिखें");return}
+  /* 27-11: बिना दुकान के नाम खरीद नहीं (NAKSHA चरण 4) — "मंडी" से किसी दुकान का भाव/हिसाब नहीं मिलता */
+  if(!String(P.shop||"").trim()&&!S.isOwner){toast("🏪 पहले दुकान का नाम लिखें — किससे खरीदा?");const f=$("#pShop");if(f)f.focus();return}
   if(S.saving)return;S.saving=true;
   const shop=String(P.shop||"").trim()||"मंडी",ph=String(P.phone||"").replace(/\D/g,"").slice(-10);
   let sup=shopKnown(shop,ph);
@@ -477,7 +479,9 @@ function nightVal(N){let v=0;Object.entries(N).forEach(([id,q])=>{if(q===""||q==
 function nightSheet(){
   if(S.billsDate!==today()&&!S.isOwner){toast("रात का स्टॉक आज का ही भरें");return}
   const I=S.stock.items||{};const N={};Object.entries(I).forEach(([id,o])=>{if(o&&o.close!==undefined&&o.close!=="")N[id]=num(o.close)});
-  let q="",pop=null;const KG=[0.25,0.5,1,2,5,10];
+  let q="",pop=null,sure=0;const KG=[0.25,0.5,1,2,5,10];const W={};/* 🌙 पक्का (27-11): आज जिसका माल था, हर एक पर वज़न/खत्म — खाली नहीं; खराबी उसी खिड़की में */
+  const R=(()=>{try{return dayRows().filter(r=>r.active&&r.avail>0)}catch(e){return []}})(),need=()=>R.filter(r=>N[r.it.id]===undefined||N[r.it.id]==="");
+  const over=()=>R.filter(r=>N[r.it.id]!==undefined&&N[r.it.id]!==""&&num(N[r.it.id])-num(r.avail)>(r.it.unit==="kg"?0.3:0.99));
   const list=()=>S.items.filter(i=>i.active!==false&&!i.virtual&&!i.track&&!i.pending);
   const match=qq=>{const t=qq.toLowerCase().replace(/\s*\d+([.,]\d+)?\s*(kg|किलो|किग्रा|pc|पीस|नग)?\s*$/i,"").trim();return t?list().filter(i=>(i.name+" "+(window.SN?SN.en(i):"")+" "+i.id+" "+(i.alias||"")).toLowerCase().includes(t)):list()};
   const draw=(keepFocus)=>{
@@ -485,11 +489,12 @@ function nightSheet(){
     $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px ns2" role="dialog" aria-label="रात का बचा माल"><div class="grab"></div>
     <div class="sh-head"><div><h3>🌙 रात का बचा माल · ${fdate(S.billsDate).slice(0,5)}</h3><span class="note">भरने वाले: <b>${esc(biller()||"—")}</b> · गाड़ी में जो बचा है, तौलकर/गिनकर डालें</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
     <input class="inp" id="nsq" type="search" placeholder="🔍 खोजें — जैसे: आलू 15 (Enter)" value="${esc(q)}" autocomplete="off" enterkeyhint="done" aria-label="सब्ज़ी खोजें">
+    ${need().length?`<div class="ns-need"><b>⚠ ये ${need().length} सब्ज़ी अभी बाकी — हर एक दबाकर वज़न या "खत्म" लिखें:</b><div>${need().map(r=>`<button data-nst="${esc(r.it.id)}">${esc(r.it.name)}</button>`).join("")}</div></div>`:R.length?`<p class="note" style="margin:8px 0 0;color:var(--leaf)">✓ आज की सारी सब्ज़ी भर दी</p>`:""}
     <div class="ns-grid" id="nsg">${L.slice(0,q?24:60).map(it=>{const v=N[it.id];return `<button class="ns-t ${v!==undefined&&v!==""?"on":""}" data-nst="${esc(it.id)}">${tileHTML(it)}<span>${esc(it.name)}</span>${v!==undefined&&v!==""?`<b>${num(v)>0?fq(num(v),it.unit):"खत्म"}</b>`:""}</button>`}).join("")||'<p class="note">नहीं मिली — दूसरा नाम लिखें</p>'}</div>
     <h4 style="margin:10px 0 4px">📋 बचा माल (${ent.length})</h4>
     <div class="ns-l">${ent.length?ent.map(([id,v])=>{const it=item(id);const c=num(SF.costOf(it));return `<div class="ns-r" data-nse="${esc(id)}"><span class="ns-n">${esc(it.name)}</span><b>${num(v)>0?fq(num(v),it.unit):"खत्म (0)"}</b><small>${c>0&&num(v)>0?"₹"+r2(num(v)*c):""}</small><button class="pp-x" data-nsx="${esc(id)}" aria-label="${esc(it.name)} हटाएँ">✕</button></div>`}).join(""):'<p class="note" style="margin:0">ऊपर खोजें या टाइल दबाएँ — जैसे "आलू 15"</p>'}</div>
     <div class="ns-sum"><span>आज लगभग बचा माल (खरीद भाव से)</span><b>₹${val}</b></div>
-    <button class="big" data-nsave ${ent.length?"":"disabled"}>✓ रात का स्टॉक सेव करें · ${ent.length} सब्ज़ी</button>
+    <button class="big" data-nsave ${ent.length&&(!need().length||S.isOwner)?"":"disabled"}>${need().length&&!S.isOwner?"पहले बाकी "+need().length+" सब्ज़ी भरें":sure?"⚠ फिर भी सेव करें":"✓ रात का स्टॉक सेव करें · "+ent.length+" सब्ज़ी"}</button>
     ${pop?popHTML(pop):""}</div></div>`;
     if(keepFocus){const f=$("#nsq");if(f){f.focus();try{f.setSelectionRange(q.length,q.length)}catch(e){}}}
     if(pop){const f=$("#nsQ");if(f){f.focus();f.select()}}
@@ -499,7 +504,9 @@ function nightSheet(){
     <div class="qh">${tileHTML(it)}<div class="qn"><b>${esc(it.name)}</b><span>रात को कितना बचा? (${kg?"किलो":"गिनती / पीस"})</span></div><button class="x" data-nspx aria-label="बंद करें">✕</button></div>
     ${kg?`<div class="ns-kg">${KG.map(k=>`<button data-nsk="${k}">${k<1?(k===0.25?"¼":"½"):k} kg</button>`).join("")}</div>`:`<div class="ns-pc"><button data-nsm aria-label="कम">−</button><button data-nsp aria-label="ज़्यादा">+</button></div>`}
     <div class="ns-in"><input class="inp big-in" id="nsQ" inputmode="decimal" value="${v!==undefined&&v!==""?num(v):""}" placeholder="${kg?"किलो":"गिनती"}" aria-label="मात्रा"><span>${kg?"किलो":"पीस"}</span></div>
+    <label class="ns-in ns-w"><span>🗑️ खराब हुआ</span><input class="inp" id="nsW" inputmode="decimal" value="${W[id]||""}" placeholder="0" aria-label="कितना खराब हुआ"><span>${kg?"किलो":"पीस"}</span></label>
     <div class="row2" style="margin:8px 0 0"><button class="big ghost" data-ns0>खत्म (0)</button><button class="big" data-nsok>✓ जोड़ें</button></div></div></div>`};
+  const takeW=()=>{const f=$("#nsW");if(f&&pop){const w=num(f.value);if(w>0)W[pop]=r2(w*1000)/1000;else delete W[pop]}};
   const setQ=(id,v)=>{if(v===""||v==null||isNaN(v))return false;N[id]=Math.max(0,r2(num(v)*1000)/1000);return true};
   draw();
   const sh=$("#sheet");
@@ -508,7 +515,7 @@ function nightSheet(){
     if(e.key==="Enter"&&e.target.id==="nsq"){e.preventDefault();const m=/(\d+([.,]\d+)?)\s*(kg|किलो|किग्रा|pc|पीस|नग)?\s*$/i.exec(q);const L=match(q);
       if(L.length===1&&m){setQ(L[0].id,num(m[1]));q="";draw(true);toast("✓ "+L[0].name+" "+fq(N[L[0].id],L[0].unit));return}
       if(L.length>=1){pop=L[0].id;if(m)N[pop]=num(m[1]);draw();return}toast("नहीं मिली");return}
-    if(e.key==="Enter"&&e.target.id==="nsQ"){e.preventDefault();if(setQ(pop,num(e.target.value))||e.target.value.trim()===""){pop=null;q="";draw(true)}}};
+    if(e.key==="Enter"&&e.target.id==="nsQ"){e.preventDefault();takeW();if(setQ(pop,num(e.target.value))||e.target.value.trim()===""){pop=null;q="";draw(true)}}};
   sh.onclick=async e=>{
     if(e.target.matches("[data-close]")){closeSheet();return}
     if(e.target.closest("[data-nspx]")){pop=null;draw();return}
@@ -517,12 +524,16 @@ function nightSheet(){
     const r=e.target.closest("[data-nse]");if(r){pop=r.dataset.nse;draw();return}
     const k=e.target.closest("[data-nsk]");if(k){const f=$("#nsQ");if(f)f.value=k.dataset.nsk;return}
     if(e.target.closest("[data-nsm]")||e.target.closest("[data-nsp]")){const f=$("#nsQ");if(f){const v=Math.max(0,num(f.value)+(e.target.closest("[data-nsp]")?1:-1));f.value=v}return}
-    if(e.target.closest("[data-ns0]")){setQ(pop,0);pop=null;draw();return}
-    if(e.target.closest("[data-nsok]")){const f=$("#nsQ");if(!f||f.value.trim()===""){toast("मात्रा लिखें");return}setQ(pop,num(f.value));pop=null;q="";draw(true);return}
+    if(e.target.closest("[data-ns0]")){takeW();setQ(pop,0);pop=null;sure=0;draw();return}
+    if(e.target.closest("[data-nsok]")){const f=$("#nsQ");if(!f||f.value.trim()===""){toast("मात्रा लिखें");return}takeW();setQ(pop,num(f.value));pop=null;q="";sure=0;draw(true);return}
     if(e.target.closest("[data-nsave]")){
+      const nd=need();if(nd.length&&!S.isOwner){toast("पहले बाकी "+nd.length+" सब्ज़ी भरें");return}
+      /* उपलब्ध से ज़्यादा लिखा → सिर्फ़ "दोबारा तौलें?" (कारण/आँकड़े नहीं), दूसरी बार दबाएँ तो सेव */
+      const ov=over();if((ov.length||(nd.length&&S.isOwner))&&!sure){sure=1;draw();toast(ov.length?"⚖️ दोबारा तौलकर देखें: "+ov.map(r=>r.it.name).join(", "):"⚠ "+nd.length+" सब्ज़ी बाकी — फिर भी सेव करें?");return}
       const items=S.stock.items||(S.stock.items={});let n=0;const now=Date.now(),by=biller();
       Object.keys(N).filter(k=>k.startsWith("__rm_")).forEach(k=>{const id=k.slice(5);if(items[id]&&N[id]===undefined){delete items[id].close;delete items[id].closeBy;delete items[id].closeTs}});
       Object.entries(N).forEach(([id,v])=>{if(id.startsWith("__rm_")||v===""||v==null)return;const o=items[id]||(items[id]={});o.close=num(v);o.closeBy=by;o.closeTs=now;n++});
+      Object.entries(W).forEach(([id,w])=>{const it=item(id);if(!it||!(w>0))return;const o=items[id]||(items[id]={});o.waste=r2((+o.waste||0)+w);(S.stock.wlog||(S.stock.wlog=[])).push({id,name:it.name,unit:it.unit,qty:w,reason:"रात की गिनती में",ts:now,by:S.uid||"",byName:by})});
       S.stock.nightBy=by;S.stock.nightTs=now;S.stock.nightVal=nightVal(Object.fromEntries(Object.entries(N).filter(([k])=>!k.startsWith("__rm_"))));S.stock.nightN=n;
       await saveStock();renderDay();SF.nightDoneSheet();
       if(!S.isOwner&&!(S.close&&S.close.counted!=null&&S.close.counted!==""))setTimeout(()=>toast("💵 अब गल्ला गिनकर लिखें — नीचे 'गल्ला मिलान' में"),1500);

@@ -50,3 +50,4 @@
 - गल्ला गिनती: `SF.gcSave` — हर गिनती `meta/close.hist` में (पुरानी नहीं मिटती); `SF.gcNag` हर `settings/main.gcEvery` घंटे (1/2/3, 0=बंद) साथी को याद; `SF.gcSheet` (पट्टी में 💵); `SF.gcPendHTML` ⏳ बाकी बिल; मालिक `SF.gcOwnerHTML`। जाँच `tests/galla.py`।
 - खर्चा मिटता नहीं — `void:true` (S.kharchAll में सब, S.kharch में बिना void)।
 - ऑनलाइन (177 रिपो): सब्ज़ी का Pay now सब्ज़ी के UPI पर; सब्ज़ी का ऑर्डर इस ऐप के `orders` (📥) में भी आता है।
+- 27-11 दूसरा दौर: 🌙 रात का स्टॉक पक्का (need/over/W in nightSheet), 📦 ग्राहक-ट्रैकिंग `SX.pubOt` → `pub/ot_<🆔>`, ⚠ बिना बिल ऑर्डर `SX.noBill`, ⏳ पुराने बाकी बिल `SB.loadOld/SB.old/oldHTML`, खरीद में दुकान ज़रूरी। सब `tests/galla.py` में।

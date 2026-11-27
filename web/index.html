@@ -390,7 +390,7 @@ main{padding-block:10px 120px}
 .big-in{font-size:22px!important;font-weight:800;text-align:center}
 .pbarbtn{background:#6d28d9;color:#fff}
 /* v24 */
-.qstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 12px}.gc-own{margin:8px 0 4px;padding:8px;border-radius:12px;background:var(--chip-bg)}
+.qstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 12px}.gc-own{margin:8px 0 4px;padding:8px;border-radius:12px;background:var(--chip-bg)}.ns-need{margin:8px 0 0;padding:8px;border-radius:12px;background:var(--chili-bg);color:var(--ink)}.ns-need b{display:block;color:var(--chili);font-size:14px;margin-bottom:6px}.ns-need div{display:flex;flex-wrap:wrap;gap:6px}.ns-need button{border:1.5px solid var(--chili);background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 11px;font-weight:800;font-size:14px}.ns-w{margin-top:6px}.ns-w>span:first-child{font-size:13px;font-weight:800;white-space:nowrap}
 .qstrip button{display:grid;justify-items:center;gap:2px;border:0;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:10px 4px;font-size:22px;color:var(--ink)}
 .qstrip button span{font-size:12.5px;font-weight:800}
 .card .mg{display:block;font-size:11px;font-weight:800;padding:0 9px 7px;color:#15803d}.card .mg.mid{color:#b45309}.card .mg.bad{color:var(--chili)}
@@ -1517,7 +1517,7 @@ function renderReport(){
     ...(window.SFM&&SFM.html?[R("firms","long","🏢","सभी फर्म · 177 MH का महीना","",()=>SFM.html())]:[])];
   const G={day:"📅 आज का हिसाब",item:"🥬 सब्ज़ी और माल",party:"👥 ग्राहक और पार्टी",long:"🗓️ लंबा समय और औज़ार"};
   let fav=[];try{fav=JSON.parse(lsGet("rep_fav")||(window.SFM?'["full","items","firms"]':'["full","items","galla"]'))}catch(e){}
-  const alerts=(window.SF?SF.cancelReqsHTML():"")+(window.SF&&SF.hiRateHTML?SF.hiRateHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+guardHTML();
+  const alerts=(window.SF?SF.cancelReqsHTML():"")+(window.SF&&SF.hiRateHTML?SF.hiRateHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+(window.SX&&SX.ownAlertsHTML?SX.ownAlertsHTML():"")+guardHTML();
   const GO={daybook:"bills",kharch:"day",stock:"day",ledger:"udhar",route:"route"};REP.forEach(r=>{if(GO[r.id])r.tab=GO[r.id]});
   const sel=REP.find(r=>r.id===S.repSel&&!r.tab);
   const row=r=>`<div class="rp-r${r.warn?" warn":""}"><button type="button" class="rp-go" ${r.tab?`data-rtab="${r.tab}"`:`data-rsel="${r.id}"`}><i>${r.ic}</i><b>${r.t}</b>${r.hint?`<small>${esc(r.hint)}</small>`:""}<em>${r.tab?"↗":"›"}</em></button><button type="button" class="rp-st${fav.includes(r.id)?" on":""}" data-rfav="${r.id}" aria-label="पसंदीदा">${fav.includes(r.id)?"★":"☆"}</button></div>`;

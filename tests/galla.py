@@ -53,6 +53,23 @@ async def main():
         # बिल पर बिलर का नाम एक बार
         rt = await pg.evaluate("receiptText({no:'X',ts:Date.now(),date:today(),mode:'walk',partyName:'VIP ग्राहक',lines:[{name:'टमाटर',qty:1,unit:'kg',rate:30,amt:30}],total:30,pay:{cash:30},byName:'कमल भाई'})")
         assert rt.count("कमल भाई") == 1, rt
+        # 🌙 रात का स्टॉक पक्का: आज जिसका माल था, वह खाली छोड़कर सेव नहीं; खराबी उसी खिड़की में
+        await pg.evaluate("closeSheet();S.isOwner=false;S.stock={items:{}};S.prevStock={tamatar:{close:5}};SF.nightSheet()"); await pg.wait_for_timeout(200)
+        t = await pg.inner_text("#sheet"); assert "1 सब्ज़ी अभी बाकी" in t and await pg.locator("[data-nsave][disabled]").count() == 1, t[:400]
+        await pg.screenshot(path=os.path.join(SHOTS, "night-need.png"))
+        await pg.click('.ns-need [data-nst="tamatar"]'); await pg.fill("#nsQ", "2"); await pg.fill("#nsW", "0.5"); await pg.click("[data-nsok]"); await pg.wait_for_timeout(150)
+        assert await pg.locator("[data-nsave]:not([disabled])").count() == 1
+        await pg.click("[data-nsave]"); await pg.wait_for_timeout(300)
+        st = await pg.evaluate("[S.stock.items.tamatar.close,S.stock.items.tamatar.waste,(S.stock.wlog||[]).length]"); assert st == [2, 0.5, 1], st
+        # ज़्यादा लिखा → पहले "दोबारा तौलें", दूसरी बार सेव
+        await pg.evaluate("closeSheet();S.stock={items:{}};SF.nightSheet()"); await pg.wait_for_timeout(150)
+        await pg.click('.ns-need [data-nst="tamatar"]'); await pg.fill("#nsQ", "9"); await pg.click("[data-nsok]"); await pg.click("[data-nsave]"); await pg.wait_for_timeout(150)
+        assert "फिर भी" in await pg.inner_text("[data-nsave]") and not (await pg.evaluate("(S.stock.items.tamatar||{}).close"))
+        await pg.click("[data-nsave]"); await pg.wait_for_timeout(200); assert await pg.evaluate("S.stock.items.tamatar.close") == 9
+        # ⏳ पिछले दिन के बाकी बिल साथी को भी दिखें
+        await pg.evaluate("closeSheet();SB.old=[{no:'OLD1',date:dayPlus(today(),-1),ts:Date.now()-864e5,total:80,partyName:'रमेश जी',settled:false,pay:{},lines:[]}]")
+        h = await pg.evaluate("SB.pendingHTML()"); assert "पिछले दिन के 1 बिल" in h and "OLD1" in h and "₹80" not in h.split("</b>")[0], h
+        # 🛒 कर्मचारी: बिना दुकान के नाम खरीद नहीं
         await b.close()
     assert not errs, errs
     print("✅ पूरा टेस्ट पास (गल्ला गिनती)")
