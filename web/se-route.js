@@ -1195,7 +1195,12 @@ const CHAT1={date:"2026-11-14",flag:"chat1",src:"कमल भाई की What
 SR.CHAT1=CHAT1;
 /* 27-11: 🍈 चीकू ₹100 + 🌿 बथुआ ₹160 चालू — विक्रम जी ने फोटो भेजी (on = बंद मौसमी सामान चालू) */
 const CHIKU1={date:"2026-11-27",flag:"cheeku1",src:"विक्रम जी 27-11-2026 (फोटो + भाव)",sale:{cheeku:100,bathua:160},on:["cheeku","bathua"],photo:["cheeku","bathua"]};
-const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1,BOARD3,SUPPLY1,CHAT1,CHIKU1];
+/* 27-11 रात: कमल भाई की कॉपी "अवेलेबल सब्ज़ी 27/11/26" (विक्रम जी की भेजी फोटो) → उस रात का बचा माल। जो साथी ने पहले भर दिया, वह नहीं छुआ।
+   कॉपी में "1·5" जैसा लिखा = 1.5 किलो (लौकी, आंवला, अनार "105" = 1.5); आलू "32·5"। */
+const COPY3={date:"2026-11-27",flag:"copy3",src:"कमल भाई की कॉपी 27-11 (विक्रम जी की भेजी फोटो)",
+  night:{date:"2026-11-27",by:"कॉपी से (Claude) · विक्रम जी",
+    items:{aloo:32.5,pyaj:21,tamatar:5.6,cheeku:10,seb:5,anar:1.5,amrood:4,papita:2,kiwi:8,matar:3.5,makka:4,phoolgobhi:0.7,gwarfali:1,lauki:1.5,shimla:1,amla:1.5,motamirch:0.4,mushroom:2,adrak:1.5,kheera:3,bhindi:3,beans:1,karela:2,semfali:0.4,lahsun:0.4},waste:{}}};
+const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1,BOARD3,SUPPLY1,CHAT1,CHIKU1,COPY3];
 SR.BOARD=BOARD;SR.PACKS=PACKS;
 SR.applyBoard=async function(db){
   if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
