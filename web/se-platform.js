@@ -241,7 +241,29 @@ SE.printer={
 };
 function wrapLines(ctx,text,maxW){const words=String(text).split(" ");const out=[];let cur="";for(const w of words){const t=cur?cur+" "+w:w;if(ctx.measureText(t).width>maxW&&cur){out.push(cur);cur=w}else cur=t}if(cur)out.push(cur);return out}
 /* कागज़ जैसी रसीद की तस्वीर — प्रिंट, PDF और WhatsApp तीनों में यही */
+/* 🧾 छोटी पर्ची (विक्रम जी 27-11, docs/PARCHI-PROMPT): नाम · बिल नं+समय · सामान · कुल · बड़ा QR (रकम भरी) · धन्यवाद — बस */
+SE.slimCanvas=function(b,o,widthPx){
+  const W=widthPx||SE.printer.width,P=Math.round(W*0.025),F='"Mukta","Noto Sans Devanagari","Noto Sans",sans-serif',FB='"Baloo 2","Mukta","Noto Sans Devanagari",sans-serif';
+  const k=W/384,fs=n=>Math.round(n*k);const c=document.createElement("canvas");c.width=W;c.height=4000;const x=c.getContext("2d");
+  x.fillStyle="#fff";x.fillRect(0,0,W,c.height);x.fillStyle="#000";x.textBaseline="top";let y=fs(4);
+  const T=(t,sz,al,bold,fam)=>{x.font=`${bold?"800 ":"600 "}${sz}px ${fam||F}`;for(const ln of wrapLines(x,t,W-2*P)){const w=x.measureText(ln).width;x.fillText(ln,al==="c"?(W-w)/2:al==="r"?W-P-w:P,y);y+=Math.round(sz*1.25)}};
+  const DASH=()=>{y+=fs(2);for(let i=P;i<W-P;i+=fs(9))x.fillRect(i,y,fs(5),Math.max(2,fs(2)));y+=fs(6)};
+  T(o.shop||"सब्ज़ी एक्सप्रेस",fs(32),"c",true,FB);
+  T("बिल "+b.no+" · "+(o.date||""),fs(17),"c",true);DASH();
+  const sz=fs(19);(b.lines||[]).forEach(l=>{const am="₹"+r2(l.amt);x.font=`800 ${sz}px ${F}`;const aw=x.measureText(am).width;
+    const left=(l.name||"")+" "+o.fq(l.qty,l.unit).replace(" कि.ग्रा","kg").replace(" किलो","kg")+(l.free?" (मुफ्त)":" × "+l.rate);
+    x.font=`600 ${sz}px ${F}`;const L=wrapLines(x,left,W-2*P-aw-fs(8));L.forEach((ln,i)=>{x.font=`600 ${sz}px ${F}`;x.fillText(ln,P,y);if(i===0){x.font=`800 ${sz}px ${F}`;x.fillText(am,W-P-aw,y)}y+=Math.round(sz*1.22)})});
+  DASH();
+  {x.font=`800 ${fs(34)}px ${FB}`;const t="कुल ₹"+r2(b.total),w=x.measureText(t).width;x.fillText(t,(W-w)/2,y);y+=fs(42)}
+  const p=b.pay;if(p&&o.paid!==false){const parts=[p.upi?"UPI ₹"+p.upi:"",p.cash?"नकद ₹"+p.cash:"",p.udhar?"📒 उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T((p.udhar&&!p.upi&&!p.cash?"":"✅ ")+parts.join(" · "),fs(17),"c",true)}
+  if(o.qr){y+=fs(4);T(o.qrLabel||"📱 स्कैन करके भुगतान करें",fs(19),"c",true);y+=fs(12);/* QR के चारों ओर सफ़ेद जगह = कैमरा जल्दी पकड़े */
+    const s=Math.round(W*0.8);x.imageSmoothingEnabled=false;x.drawImage(o.qr,Math.round((W-s)/2),y,s,s);y+=s+fs(12);
+    if(o.upi)T("UPI: "+o.upi,fs(14),"c")}
+  T("🙏 धन्यवाद",fs(18),"c",true);y+=fs(14);
+  const out=document.createElement("canvas");out.width=W;out.height=Math.ceil(y);out.getContext("2d").drawImage(c,0,0);return out;
+};
 SE.receiptCanvas=function(b,o,widthPx){
+  if(o&&o.slim)return SE.slimCanvas(b,o,widthPx);
   const W=widthPx||SE.printer.width,P=Math.round(W*0.03),F='"Mukta","Noto Sans Devanagari","Noto Sans",sans-serif',FB='"Baloo 2","Mukta","Noto Sans Devanagari",sans-serif';
   const k=W/384;const fs=n=>Math.round(n*k);
   const c=document.createElement("canvas");c.width=W;c.height=6000;const x=c.getContext("2d");
@@ -340,7 +362,10 @@ SE.printReceipt=async function(b,o){
   if(SE.isNative){
     if(!SE.printer.addr)throw {code:"noprinter",msg:"पहले \"रेट व सेटिंग\" में प्रिंटर चुनें"};
     const data=SE.printer.type==="tspl"?SE.tspl(cv,{gap:0}):canvasToEscPos(cv);
-    await N.BtPrinter.print({address:SE.printer.addr,data});return "bt"}
+    /* पक्का जुड़ना: पहली बार न जुड़े (प्रिंटर अभी जागा/दूर) तो 0.8 सेकंड बाद एक बार और */
+    try{await N.BtPrinter.print({address:SE.printer.addr,data})}catch(e1){await new Promise(r=>setTimeout(r,800));
+      try{await N.BtPrinter.print({address:SE.printer.addr,data})}catch(e2){throw {code:"bt",msg:"🖨️ प्रिंटर से नहीं जुड़ा — प्रिंटर चालू है? पास है? कागज़ है? फिर 🖨️ दबाएँ"}}}
+    return "bt"}
   const url=cv.toDataURL("image/png");
   printHTMLWeb(`<!doctype html><html><head><meta charset="utf-8"><style>@page{size:${SE.printer.mm}mm auto;margin:0}body{margin:0}img{width:100%;display:block}</style></head><body><img src="${url}"></body></html>`);
   return "web";

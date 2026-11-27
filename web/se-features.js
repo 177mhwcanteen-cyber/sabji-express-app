@@ -999,10 +999,10 @@ SF.reserveBillNo=async function(){
 };
 
 /* =============== 🧾 कागज़ जैसी रसीद + सेटल + शेयर =============== */
-SF.qrCanvas=function(amount,no){
+SF.qrCanvas=function(amount,no,px){
   if(!window.QRCode||!upiId())return null;const box=document.createElement("div");
   const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${amount>0?"&am="+(+amount).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`;
-  try{new QRCode(box,{text:upi,width:240,height:240,correctLevel:QRCode.CorrectLevel.M})}catch(e){return null}
+  try{new QRCode(box,{text:upi,width:px||240,height:px||240,correctLevel:QRCode.CorrectLevel.M})}catch(e){return null}
   return box.querySelector("canvas");
 };
 /* ग्राहक पर छपने वाला निशान + घर बैठे ऑर्डर नंबर */
@@ -1029,7 +1029,14 @@ SF.stampPay=function(b,hint){
 SF.stampBy=function(b){return {cls:"by",l1:"🧑‍🌾 बिलिंग",l2:b.byName||"—",l3:ftime(b.ts||Date.now())}};
 const stampHTML=s=>`<div class="stmp ${s.cls}"><b>${esc(s.l1)}</b>${s.l2?`<span>${esc(s.l2)}</span>`:""}${s.l3?`<small>${esc(s.l3)}</small>`:""}</div>`;
 SF.stampHTML=stampHTML;
+/* 🧾 छोटी पर्ची के विकल्प — QR सिर्फ़ जब पैसा लेना बाकी हो (रकम भरी), बाकी में कागज़ बचे */
+SF.slimOn=()=>{try{return localStorage.getItem("se_slim")!=="0"}catch(e){return true}};
+SF.autoPrn=()=>{try{return localStorage.getItem("se_autoprn")!=="0"}catch(e){return true}};
+SF.slimOpts=function(b){const q=SF.qrFor(b);const due=q&&q.amt>0&&(b.settled===false||!b.pay||(b.partyId&&q.amt>0));
+  return {slim:true,shop:"सब्ज़ी एक्सप्रेस",date:fdate(b.date||today())+" "+ftime(b.ts||Date.now()),fq,paid:!!b.pay,
+    qr:due?SF.qrCanvas(q.amt,b.no,Math.round(SE.printer.width*0.8)):null,qrLabel:due?(b.settled===false||!b.pay?"📱 स्कैन करें — ₹"+q.amt:"📒 खाते में बाकी ₹"+q.amt+" — स्कैन करें"):"",upi:upiId()}};
 SF.rcptOpts=function(b,withQr){
+  if(b&&b.mode!=="inst"&&SF.slimOn()&&withQr!=="full")return SF.slimOpts(b);
   const due=b.pay?(b.pay.udhar||0):b.total;
   const inst=b.mode==="inst";
   return {shop:"सब्ज़ी एक्सप्रेस",tag:inst?"माल चालान — "+(b.partyName||""):"ताज़ी सब्ज़ी, आपके दरवाज़े पर",addr:"जालीपा कैंट, बाड़मेर",phone:inst?"":SF.fmtPh(SF.orderPh()),nutri:!inst,custTag:SF.custTag(b),vip:b.mode!=="inst"&&b.mode!=="udhar",
@@ -1105,7 +1112,7 @@ function draftBill(){
 SF.shareBill=function(b,phone,saved){if(window.SR&&SR.shareAsk)return SR.shareAsk(b,phone,saved);return SF._shareNow(b,phone,saved)};
 SF._shareNow=async function(b,phone,saved){
   try{toast("📄 बिल का PDF बन रहा है…");
-    const how=await SE.shareReceipt(b,SF.rcptOpts(b,!saved||(b.pay&&b.pay.udhar>0)),phone,receiptText(b));
+    const how=await SE.shareReceipt(b,SF.rcptOpts(b,"full"),phone,receiptText(b));
     if(how==="download")toast("बिल की फोटो डाउनलोड हुई — WhatsApp में भेज दें")}
   catch(e){if(e&&e.code==="oldapk"){toast(e.msg);location.href=waLink(receiptText(b),phone);return}toast(e.msg||("शेयर नहीं हुआ: "+(e.message||"")))}
 };

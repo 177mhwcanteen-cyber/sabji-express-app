@@ -390,7 +390,7 @@ main{padding-block:10px 120px}
 .big-in{font-size:22px!important;font-weight:800;text-align:center}
 .pbarbtn{background:#6d28d9;color:#fff}
 /* v24 */
-.qstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 12px}.updbox{margin:10px 0}.updbox .big.upd{background:linear-gradient(120deg,var(--leaf),#4f46e5);color:#fff;font-weight:800}.updbox .big.upd:disabled{opacity:.6}.updbar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:8px}.updbar i{display:block;height:100%;width:0;background:var(--leaf);transition:width .25s}.gc-own{margin:8px 0 4px;padding:8px;border-radius:12px;background:var(--chip-bg)}.ns-need{margin:8px 0 0;padding:8px;border-radius:12px;background:var(--chili-bg);color:var(--ink)}.ns-need b{display:block;color:var(--chili);font-size:14px;margin-bottom:6px}.ns-need div{display:flex;flex-wrap:wrap;gap:6px}.ns-need button{border:1.5px solid var(--chili);background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 11px;font-weight:800;font-size:14px}.ns-w{margin-top:6px}.ns-w>span:first-child{font-size:13px;font-weight:800;white-space:nowrap}
+.qstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 12px}.chk{display:flex;gap:10px;align-items:center;font-weight:700;padding:7px 0;font-size:15px}.chk input{width:22px;height:22px;accent-color:var(--leaf)}.updbox{margin:10px 0}.updbox .big.upd{background:linear-gradient(120deg,var(--leaf),#4f46e5);color:#fff;font-weight:800}.updbox .big.upd:disabled{opacity:.6}.updbar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:8px}.updbar i{display:block;height:100%;width:0;background:var(--leaf);transition:width .25s}.gc-own{margin:8px 0 4px;padding:8px;border-radius:12px;background:var(--chip-bg)}.ns-need{margin:8px 0 0;padding:8px;border-radius:12px;background:var(--chili-bg);color:var(--ink)}.ns-need b{display:block;color:var(--chili);font-size:14px;margin-bottom:6px}.ns-need div{display:flex;flex-wrap:wrap;gap:6px}.ns-need button{border:1.5px solid var(--chili);background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 11px;font-weight:800;font-size:14px}.ns-w{margin-top:6px}.ns-w>span:first-child{font-size:13px;font-weight:800;white-space:nowrap}
 .qstrip button{display:grid;justify-items:center;gap:2px;border:0;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:10px 4px;font-size:22px;color:var(--ink)}
 .qstrip button span{font-size:12.5px;font-weight:800}
 .card .mg{display:block;font-size:11px;font-weight:800;padding:0 9px 7px;color:#15803d}.card .mg.mid{color:#b45309}.card .mg.bad{color:var(--chili)}
@@ -960,7 +960,7 @@ async function saveBill(){
     lines,sub:cartTotal(),disc:+c.disc||0,total:S.mode==="inst"?cartTotal():tot,pay,payMode:c.pay,cost,
     rateChanged:lines.some(l=>l.changed),cancelled:false,settled:c.pay!=="pending"};if(window.SR)SR.stamp(bill);if(bill.mode==="inst"&&window.SB)SB.instReprice(bill);
   S.saving=true;drawCheckout();
-  if(S.demo){S.dayBills=[bill,...S.dayBills];if(pay.udhar>0)S.ledger.push({id:c.no,ts:now,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:pay.udhar,billNo:c.no,byName:biller()});await adjStock(trackedPairs(lines,-1),"बिल "+c.no);S.saving=false;closeCurTab();refreshAfterCart();if(bill.settled===false&&window.SB)SB.settleSheet(bill);else showReceipt(bill,true);return}
+  if(S.demo){S.dayBills=[bill,...S.dayBills];if(pay.udhar>0)S.ledger.push({id:c.no,ts:now,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:pay.udhar,billNo:c.no,byName:biller()});await adjStock(trackedPairs(lines,-1),"बिल "+c.no);S.saving=false;closeCurTab();refreshAfterCart();if(bill.settled===false&&window.SB)SB.settleSheet(bill);else showReceipt(bill,true);autoPrint(bill);return}
   const item={bill,done:{}};let offline=false;
   try{if(navigator.onLine===false)throw {code:"offline"};await commitBill(item)}
   catch(err){
@@ -972,6 +972,7 @@ async function saveBill(){
     if(!S.dayBills.find(x=>x.no===bill.no))S.dayBills=[bill,...S.dayBills];
   }
   if(window.SR&&bill.custPhone)SR.custHist(bill,bill.custPhone);S.saving=false;closeCurTab();refreshAfterCart();if(bill.settled===false&&window.SB)SB.settleSheet(bill,offline);else showReceipt(bill,true,offline);netbar();beat();
+  autoPrint(bill);
 }
 function receiptText(b){
   if(b.mode==="inst"&&window.SB)return SB.instText(b,null);
@@ -1642,7 +1643,10 @@ function shrink(file){return new Promise((res,rej)=>{const img=new Image();const
 
 
 /* ---------- प्रिंट ---------- */
-async function printBill(b){
+/* 🖨️ बिल बनते ही छोटी पर्ची अपने-आप (प्रिंटर चुना हो + "बिल बनते ही छापें" चालू) — खिड़की नहीं रुकती */
+function autoPrint(bill){if(bill.mode!=="inst"&&window.SF&&SF.autoPrn()&&(SE.isNative?SE.printer.addr:S._fakePrn))setTimeout(()=>printBill(bill,true),150)}
+async function printBill(b,auto){
+  if(S._fakePrn){S._fakePrn.push({no:b.no,o:window.SF?SF.rcptOpts(b):null,auto:!!auto});return}
   try{
     const o=window.SF?SF.rcptOpts(b,!b.pay||(b.pay.udhar>0)):{shop:"सब्ज़ी एक्सप्रेस",date:fdate(b.date)+" "+ftime(b.ts),fq};
     const how=await SE.printReceipt(b,o);
@@ -1684,8 +1688,22 @@ function openBiller(next){
   <button class="big" data-ok>सेव करें</button></div></div>`;
   $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}if(e.target.closest("[data-ok]")){const v=$("#bName").value.trim();if(!v){toast("नाम लिखें");return}S.staff=v;lsSet("se_staff",v);closeSheet();renderTabs();next&&next()}};
 }
-$("#who").onclick=()=>{if(!S.demo){$("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिलर"><div class="grab"></div><div class="sh-head"><h3>👤 ${esc(biller())}</h3><button class="x" data-close aria-label="बंद करें">✕</button></div><p class="note">इस फोन पर अभी आपके नाम से बिल बन रहे हैं${S.isOwner?" (मालिक)":""}।</p>${updBoxHTML()}<button class="big ghost" data-logout>लॉग-आउट — दूसरा व्यक्ति</button><p class="verline">ऐप संस्करण ${esc(SE.version)}${SE.isNative?" · Android":" · वेब"}</p></div></div>`;$("#sheet").onclick=e=>{if(e.target.matches("[data-close]")||e.target.closest("[data-close].x")){closeSheet();return}if(e.target.closest("[data-logout]")){closeSheet();logoutStaff()}};return}openBiller()};
+$("#who").onclick=()=>{if(!S.demo){$("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिलर"><div class="grab"></div><div class="sh-head"><h3>👤 ${esc(biller())}</h3><button class="x" data-close aria-label="बंद करें">✕</button></div><p class="note">इस फोन पर अभी आपके नाम से बिल बन रहे हैं${S.isOwner?" (मालिक)":""}।</p><button class="big ghost" data-prnsheet>🖨️ प्रिंटर${SE.printer.addr?" · "+esc(SE.printer.name):" जोड़ें"}</button>${updBoxHTML()}<button class="big ghost" data-logout>लॉग-आउट — दूसरा व्यक्ति</button><p class="verline">ऐप संस्करण ${esc(SE.version)}${SE.isNative?" · Android":" · वेब"}</p></div></div>`;$("#sheet").onclick=e=>{if(e.target.matches("[data-close]")||e.target.closest("[data-close].x")){closeSheet();return}if(e.target.closest("[data-logout]")){closeSheet();logoutStaff()}};return}openBiller()};
 /* 🔄 ऐप अपडेट करें (177 MH जैसा) — 👤 खिड़की और सेटिंग में; अपने-आप भी हर 30 मिनट/वापस आते ही (SE.autoUpdateLoop) */
+/* 🖨️ प्रिंटर (हर फोन का अपना, हर साथी खुद जोड़ सके) — Xprinter XP-P502A 58mm जैसे; docs/PARCHI-PROMPT-2026-11-27.md */
+function prnSheet(){const on=k=>{try{return localStorage.getItem(k)!=="0"}catch(e){return true}};
+  $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="प्रिंटर"><div class="grab"></div>
+  <div class="sh-head"><div><h3>🖨️ बिल का प्रिंटर</h3><span class="note">${SE.printer.addr?"जुड़ा: <b>"+esc(SE.printer.name)+"</b> · "+esc(SE.printer.mm)+"mm":"पहले फोन की Bluetooth सेटिंग में प्रिंटर pair करें (PIN 0000 या 1234), फिर नीचे चुनें"}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
+  ${SE.isNative?`<button class="big" data-prnpick="58">🔍 2 इंच (58mm) प्रिंटर खोजें</button><button class="big ghost" data-prnpick="80" style="margin-top:6px">3 इंच (80mm) प्रिंटर</button><div id="prnList"></div>`:'<p class="note">प्रिंटर Android ऐप में जुड़ता है — वेब में फोन का प्रिंट खुलेगा।</p>'}
+  <label class="chk" style="margin-top:10px"><input type="checkbox" data-prnopt="se_autoprn" ${on("se_autoprn")?"checked":""}> बिल बनते ही अपने-आप छापें</label>
+  <label class="chk"><input type="checkbox" data-prnopt="se_slim" ${on("se_slim")?"checked":""}> छोटी पर्ची (नाम · सामान · कुल · बड़ा QR)</label>
+  <button class="big ghost" data-prntest style="margin-top:8px">🧾 टेस्ट पर्ची छापें</button></div></div>`;
+  $("#sheet").onclick=async e=>{if(e.target.matches("[data-close]")){closeSheet();return}
+    const pp=e.target.closest("[data-prnpick]");if(pp){try{const list=await SE.printer.list();$("#prnList").innerHTML=list.length?list.map(d=>`<button class="big ghost" data-prnset="${esc(d.address)}" data-n="${esc(d.name||d.address)}" data-w="${pp.dataset.prnpick}">🖨️ ${esc(d.name||d.address)}</button>`).join(""):'<p class="note">कोई pair किया प्रिंटर नहीं मिला — फोन की Bluetooth सेटिंग में पहले pair करें।</p>'}catch(err){toast(err.msg||err.message||"Bluetooth की अनुमति दें")}return}
+    const ps=e.target.closest("[data-prnset]");if(ps){SE.printer.pick(ps.dataset.prnset,ps.dataset.n,ps.dataset.w);toast("✓ प्रिंटर जुड़ा: "+ps.dataset.n);prnSheet();return}
+    if(e.target.closest("[data-prntest]")){printBill({no:"TEST",date:today(),ts:Date.now(),mode:"walk",settled:false,partyName:"",lines:[{name:"टमाटर",qty:1.5,unit:"kg",rate:30,amt:45},{name:"धनिया",qty:0.25,unit:"kg",rate:120,amt:30}],total:75,byName:biller()});return}};
+  $("#sheet").onchange=e=>{const t=e.target.closest("[data-prnopt]");if(t){try{localStorage.setItem(t.dataset.prnopt,t.checked?"1":"0")}catch(x){}toast("✓ सेव")}}}
+document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("[data-prnsheet]"))prnSheet()});
 function updBoxHTML(){return `<div class="updbox"><button class="big upd" data-updnow>🔄 ऐप अपडेट करें</button><div class="updbar" hidden><i></i></div><p class="note updmsg" style="margin:6px 0 0;text-align:center">अभी: ${esc(SE.version)} · नया संस्करण GitHub से आता है, आपका कोई डेटा नहीं मिटता</p></div>`}
 async function runUpdate(){const B=[...document.querySelectorAll("[data-updnow]")];if(B.some(b=>b.disabled))return;
   if(S.saving){toast("बिल सेव हो रहा है — एक पल रुकें");return}
