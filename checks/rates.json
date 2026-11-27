@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": 404,
+    "message": "Document \"projects/sabji-express-9a8f0/databases/(default)/documents/pub/rates\" not found.",
+    "status": "NOT_FOUND"
+  }
+}
