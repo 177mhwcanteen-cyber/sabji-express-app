@@ -1,0 +1,14 @@
+# 🪧 आज के भाव (pub/rates — ऐप जो ग्राहक-पेज पर छापता है) → checks/rates.json, ताकि Claude भाव-सूची बना सके (27-11-2026)
+name: rates
+on: { workflow_dispatch: {} }
+permissions: { contents: write }
+jobs:
+  get:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          mkdir -p checks
+          curl -sf "https://firestore.googleapis.com/v1/projects/sabji-express-9a8f0/databases/(default)/documents/pub/rates?key=AIzaSyBBaZF1E58Ybxemy5HPj8T3L0gnyg9eOPI" -o checks/rates.json
+          git config user.name "rates-bot"; git config user.email "rates-bot@users.noreply.github.com"
+          git add checks/rates.json && git commit -m "आज के भाव [skip ci]" && git pull --rebase -q && git push || echo "कोई बदलाव नहीं"
