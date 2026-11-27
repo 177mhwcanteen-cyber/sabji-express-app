@@ -7,7 +7,8 @@ const FV=()=>window.firebase&&firebase.firestore&&firebase.firestore.FieldValue;
 const outboxGet=()=>{try{return JSON.parse(localStorage.getItem("se_outbox")||"[]")}catch(e){return []}};
 const outboxSet=o=>{try{localStorage.setItem("se_outbox",JSON.stringify(o))}catch(e){}};
 const findBill=no=>(S.dayBills||[]).find(b=>b.no===no)||(SB.old||[]).find(b=>b.no===no);
-const unpaid=()=>(S.dayBills||[]).filter(b=>b.settled===false&&!b.cancelled&&b.date===today());
+const hid=b=>window.SF&&SF.reqHidden&&SF.reqHidden(b.no);
+const unpaid=()=>(S.dayBills||[]).filter(b=>b.settled===false&&!b.cancelled&&b.date===today()&&!hid(b));
 SB.unpaid=unpaid;
 /* सर्वर पर या फोन (बिना नेट) में बिल बदलो */
 SB.patchBill=(b,ch)=>patchBill(b,ch);
@@ -160,7 +161,7 @@ SB.cancelSheet=function(b){
   const own=S.isOwner&&!S.demo;
   $("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिल रद्द"><div class="grab"></div>
   <div class="sh-head"><div><h3>🚫 बिल ${esc(b.no)} रद्द करें</h3><span class="note">${rs(b.total)} · ${(b.lines||[]).map(l=>esc(l.name)).join(", ")}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
-  <p class="note" style="margin:0 0 6px">${own?"रद्द होते ही माल स्टॉक में वापस जुड़ेगा, उधार हो तो खाते से हटेगा। बिल मिटेगा नहीं — \"रद्द\" का निशान रहेगा।":"बिल अभी रद्द होगा, माल स्टॉक में वापस जुड़ेगा और विक्रम जी को सूचना जाएगी (वजह के साथ)।"}</p>
+  <p class="note" style="margin:0 0 6px">${own?"रद्द होते ही माल स्टॉक में वापस जुड़ेगा, उधार हो तो खाते से हटेगा। बिल मिटेगा नहीं — \"रद्द\" का निशान रहेगा।":"📩 अर्ज़ी विक्रम जी के पास जाएगी — यह बिल आपकी सूची से हट जाएगा, आगे वही देखेंगे (मंज़ूरी पर रद्द)।"}</p>
   <label class="fld">रद्द करने की वजह (ज़रूरी)<input class="inp" id="crWhy" placeholder="जैसे ग्राहक ने सामान नहीं लिया / गलत बिल बना" autocomplete="off"></label>
   <button class="big" data-cxgo style="margin-top:8px;background:var(--chili);color:#fff">🚫 बिल रद्द करें</button>
   <button class="big ghost" data-cxback style="margin-top:8px">← वापस बिल पर</button></div></div>`;
@@ -171,7 +172,7 @@ SB.cancelSheet=function(b){
     if(e.target.closest("[data-cxback]")){SB.settleSheet(b);return}
     const go=e.target.closest("[data-cxgo]");if(!go)return;
     const why=($("#crWhy").value||"").trim();if(why.length<3){toast("पहले रद्द करने की वजह लिखें");$("#crWhy").focus();return}
-    if(go.dataset.sure!=="1"){go.dataset.sure="1";go.textContent="पक्का रद्द करें? दोबारा दबाएँ";return}
+    if(go.dataset.sure!=="1"){go.dataset.sure="1";go.textContent=own?"पक्का रद्द करें? दोबारा दबाएँ":"📩 पक्का — अर्ज़ी भेजें";return}
     if(!own){if(window.SF)SF.sendCancelReq(b);return}
     try{await SF.doCancel(b,why);closeSheet();try{renderPane()}catch(x){}toast("🚫 बिल "+b.no+" रद्द — माल स्टॉक में वापस")}catch(err){toast("रद्द नहीं हुआ: "+(err.code||err.message||""))}
   };
@@ -243,7 +244,7 @@ SB.old=[];
 SB.loadOld=async function(){if(S.demo||!S.db)return;const L=[];for(let i=1;i<=3;i++){const d=dayPlus(today(),-i);
   try{const q=await S.db.collection("days/"+d+"/bills").where("settled","==",false).get();q.docs.forEach(x=>{const b=x.data();if(!b.cancelled&&(S.isOwner||b.by===S.uid))L.push(b)})}catch(e){}}
   const ch=L.length!==(SB.old||[]).length;SB.old=L.sort((a,b)=>a.ts-b.ts);try{if(ch&&typeof renderPane==="function"&&!document.querySelector("#sheet .scrim")&&!document.querySelector("#sheet .qpop"))renderPane(true)}catch(e){}};
-SB.oldHTML=function(){const L=SB.old||[];if(!L.length)return "";
+SB.oldHTML=function(){const L=(SB.old||[]).filter(b=>!hid(b));if(!L.length)return "";
   return `<div class="sb-pend" style="border-color:var(--chili)"><b style="color:var(--chili)">⏳ पिछले दिन के ${L.length} बिल का भुगतान अभी बाकी${S.isOwner?" · "+rs(L.reduce((a,b)=>a+num(b.total),0)):""}</b><div>${L.slice(0,8).map(b=>`<button data-sbopen="${esc(b.no)}">${esc(fdate(b.date).slice(0,5))} · ${esc(b.partyName&&b.partyName!=="VIP ग्राहक"?b.partyName:b.no)} · ${rs(b.total)}${S.isOwner&&b.byName?" · "+esc(b.byName):""}</button>`).join("")}</div></div>`};
 setTimeout(()=>{try{SB.loadOld()}catch(e){}},12000);setInterval(()=>{try{SB.loadOld()}catch(e){}},30*60000);
 SB.pendingHTML=function(){

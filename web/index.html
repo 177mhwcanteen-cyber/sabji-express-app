@@ -1103,7 +1103,7 @@ function openParty(pid){
 /* ---------- bills list ---------- */
 function renderBills(){
   if(S.isOwner&&window.SF&&SF.renderBills)return SF.renderBills();
-  const bills=[...S.dayBills].sort((a,b)=>b.ts-a.ts).filter(b=>S.isOwner||b.settled===false||b.pending||(b.date===today()&&Date.now()-b.ts<2*3600e3));
+  const bills=[...S.dayBills].sort((a,b)=>b.ts-a.ts).filter(b=>S.isOwner||(!(window.SF&&SF.reqHidden&&SF.reqHidden(b.no))&&(b.settled===false||b.pending||(b.date===today()&&Date.now()-b.ts<2*3600e3))));
   const live=bills.filter(b=>!b.cancelled);
   const sum=k=>r2(live.reduce((a,b)=>a+(b.pay?.[k]||0),0));
   $("#p-bills").innerHTML=liveHTML()+`<div class="daterow"><h2 class="sec" style="margin:0;flex:1">बिल</h2>${S.isOwner?`<input class="inp" type="date" id="billsDate" value="${S.billsDate}" aria-label="तारीख">`:""}</div>

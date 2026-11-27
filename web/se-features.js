@@ -192,7 +192,8 @@ function pItemSheet(id,idx,qty0){
     if(ln){pBillSheet();return}
     setTimeout(()=>{const s2=$("#pq");if(s2){s2.focus();s2.scrollIntoView({block:"center"})}},60);
   };
-  upd();setTimeout(()=>{const f=it?(q0?Rt:Q):$("#piN");if(f){f.focus();try{f.select()}catch(e){}}},40);
+  /* 27-11: तेज़ टाइप करने वाले का कर्सर वापस वज़न पर न कूदे — पहले से कोई खाना चुना हो तो छेड़ो मत */
+  upd();setTimeout(()=>{const ae=document.activeElement;if(ae&&sh.contains(ae)&&ae.tagName==="INPUT")return;const f=it?(q0?Rt:Q):$("#piN");if(f){f.focus();try{f.select()}catch(e){}}},40);
   sh.oninput=upd;
   sh.onkeydown=e=>{if(e.key!=="Enter")return;e.preventDefault();if(e.target.id==="piN"){Q.focus();return}if(e.target===Q){if(num(Q.value)>0){Rt.focus();try{Rt.select()}catch(x){}}return}save()};
   sh.onclick=e=>{
@@ -1127,16 +1128,20 @@ SF.drawCheckout=function(){
 S.cancelReqs=[];
 SF.watchCancelReqs=function(db){
   db.collection("cancelReq").where("status","==","pending").onSnapshot(s=>{S.cancelReqs=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.ts-a.ts);
-    if(S.isOwner){renderTabs();if(S.tab==="report")renderReport();if(S.cancelReqs.length&&!SF._crToast){SF._crToast=1;toast("🚫 "+S.cancelReqs.length+" बिल रद्द करने की अर्ज़ी आई है — रिपोर्ट में देखें")}}},()=>{});
+    if(S.isOwner){renderTabs();if(S.tab==="report")renderReport();const n=S.cancelReqs.length;if(n>(SF._crN||0)){toast("🚫 "+n+" बिल रद्द करने की अर्ज़ी आई है — रिपोर्ट में सबसे ऊपर");try{beep(false)}catch(e){}}SF._crN=n}
+    else{try{renderPane(true)}catch(e){}}},()=>{});
 };
+/* 🚫 27-11 (विक्रम जी, 177 MH जैसा): साथी की अर्ज़ी जाते ही बिल उसकी सूची/भुगतान-बाकी से हट जाता है; रद्द सिर्फ़ मालिक की मंज़ूरी पर।
+   मालिक मना करे → बिल फिर साथी की सूची में (भुगतान बाकी हो तो वहीं)। */
+SF.reqHidden=no=>!S.isOwner&&(S.cancelReqs||[]).some(r=>r.no===no);
 SF.cancelReqHTML=function(b,fresh){
   if(S.isOwner||S.demo||b.cancelled||b.pending)return "";
   const mine=S.cancelReqs.find(r=>r.no===b.no);
-  if(mine&&mine.done===false)return `<div class="warn" style="margin-top:10px">⏳ इस बिल को रद्द करने की अर्ज़ी विक्रम जी के पास गई है</div>`;
+  if(mine)return `<div class="warn" style="margin-top:10px">📩 इस बिल की अर्ज़ी विक्रम जी के पास है — वही देखेंगे</div>`;
   return `<details class="creq"><summary>🚫 यह बिल रद्द करना है?</summary>
     <label class="fld">रद्द करने की वजह<input class="inp" id="crWhy" placeholder="जैसे ग्राहक ने सामान लौटाया / गलत बिल बना"></label>
-    <p class="note" style="margin:4px 0 0">बिल अभी रद्द होगा, माल स्टॉक में वापस जुड़ेगा, विक्रम जी को सूचना जाएगी।</p>
-    <button class="big ghost" data-creq style="margin-top:8px;color:var(--chili)">🚫 बिल रद्द करें</button></details>`;
+    <p class="note" style="margin:4px 0 0">अर्ज़ी विक्रम जी के पास जाएगी — यह बिल आपकी सूची से हट जाएगा, आगे वही देखेंगे।</p>
+    <button class="big ghost" data-creq style="margin-top:8px;color:var(--chili)">📩 रद्द की अर्ज़ी भेजें</button></details>`;
 };
 /* 🚫 कर्मचारी वजह लिखकर रद्द करे → बिल तुरंत रद्द (माल स्टॉक में वापस, उधार खाते से हटे), मालिक को सिर्फ़ सूचना (ऐप + चाहें तो WhatsApp) */
 SF.doCancel=async function(b,why){
@@ -1148,14 +1153,14 @@ SF.doCancel=async function(b,why){
 };
 SF.sendCancelReq=async function(b){
   const why=($("#crWhy")?.value||"").trim();if(why.length<3){toast("पहले रद्द करने की वजह लिखें");return}
-  let done=true;
-  try{await SF.doCancel(b,why)}catch(e){done=false}
+  /* साथी खुद रद्द नहीं करता — सिर्फ़ अर्ज़ी (मालिक ✓ करें तब स्टॉक/उधार वापस) */
+  const done=false;
   const req={no:b.no,date:b.date,total:b.total,partyName:b.partyName||"",byName:biller(),by:S.uid||"",reason:why,ts:Date.now(),status:"pending",billBy:b.byName||"",settled:b.settled!==false,done};if(window.SR&&SR.locNow&&SR.locNow())req.loc=SR.locNow();
-  try{await S.db.collection("cancelReq").doc(b.no).set(req)}catch(e){if(!done){toast("रद्द नहीं हुआ: "+(e.code||""));return}}
+  try{if(!S.demo)await S.db.collection("cancelReq").doc(b.no).set(req)}catch(e){toast("अर्ज़ी नहीं गई — इंटरनेट देखें ("+(e.code||"")+")");return}
   S.cancelReqs.push({id:b.no,...req});
   const txt=`🚫 *बिल ${done?"रद्द किया गया":"रद्द करने की अर्ज़ी"}*\nसब्ज़ी एक्सप्रेस\n━━━━━━━━━━━━\n🧾 बिल नं: ${b.no}\n📅 ${fdate(b.date)} · ${ftime(b.ts)}\n👤 ग्राहक: ${b.partyName||""}\n💰 रकम: ₹${b.total}\n🥬 ${(b.lines||[]).map(l=>l.name+" "+fq(l.qty,l.unit)).join(", ")}\n📝 वजह: ${why}\n🧑‍🌾 रद्द किया: ${biller()} · ${ftime(Date.now())}\n━━━━━━━━━━━━\n${done?"माल स्टॉक में वापस जुड़ गया। ठीक न लगे तो ऐप की \"रिपोर्ट\" से बिल वापस चालू कर सकते हैं।":"विक्रम जी, ऐप की \"रिपोर्ट\" में मंज़ूर करें।"}`;
   closeSheet();try{renderPane()}catch(x){}
-  toast(done?"🚫 बिल "+b.no+" रद्द — माल स्टॉक में वापस · विक्रम जी को सूचना गई":"📩 अर्ज़ी विक्रम जी को गई");
+  toast("📩 अर्ज़ी विक्रम जी को गई — बिल "+b.no+" आपकी सूची से हटा");
   const ph=String(S.settings.ownerPh||"").replace(/\D/g,"").slice(-10);
   if(ph.length===10)setTimeout(()=>{SB.waNotice&&SB.waNotice(txt,ph)},400);
 };
@@ -1479,7 +1484,7 @@ document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!S.i
    ⏳ भुगतान बाकी वाले बिल पहले सेटल — वरना उनका पैसा गल्ले में "ज़्यादा" दिखता है (या जेब में चला जाता है)। */
 SF.gcEvery=()=>{const v=S.settings&&S.settings.gcEvery;return v===0||v==="0"?0:(num(v)||1)};
 SF.gcHist=()=>{const c=S.close||{};const h=(c.hist||[]).slice();if(!h.length&&c.counted!=null&&c.counted!=="")h.push({ts:c.ts||0,counted:num(c.counted),expected:num(c.expected),diff:c.diff,byName:c.byName||""});return h.sort((a,b)=>a.ts-b.ts)};
-SF.pendBills=()=>(S.dayBills||[]).filter(b=>b.settled===false&&!b.cancelled&&b.mode!=="inst");
+SF.pendBills=()=>(S.dayBills||[]).filter(b=>b.settled===false&&!b.cancelled&&b.mode!=="inst"&&!SF.reqHidden(b.no));
 SF.gcSave=async function(float,counted){const d=S.billsDate,c=cashCalc(d),fl=float==null?c.float:float;
   const expected=r2(fl+c.cashSale+c.jamaCash+c.gIn-c.khCash-c.gOut),ts=Date.now();
   const hist=((S.close&&S.close.hist)||SF.gcHist()).slice();

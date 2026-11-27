@@ -406,10 +406,10 @@ async def main():
         assert await pg.query_selector("#crWhy"), "reason required"
         await pg.fill("#crWhy", "ग्राहक ने सामान नहीं लिया"); await pg.screenshot(path=f"{SHOTS}/30-cancel.png"); await pg.click("[data-cxgo]"); await pg.click("[data-cxgo]"); await pg.wait_for_timeout(800)
         cr = await pg.evaluate(f"(window.__MOCK__.cancelReq||{{}})['{cxno}']")
-        assert cr and cr["status"] == "pending" and cr.get("loc") and cr["settled"] is False and cr["done"] is True, cr
+        assert cr and cr["status"] == "pending" and cr.get("loc") and cr["settled"] is False and cr["done"] is False and cr["reason"] == "ग्राहक ने सामान नहीं लिया" and cr["byName"] == "कमल भाई", cr
         cxb = await pg.evaluate(f"Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).find(b=>b.no==='{cxno}')")
-        assert cxb["cancelled"] and cxb["cancelReason"] == "ग्राहक ने सामान नहीं लिया" and cxb["cancelByName"] == "कमल भाई", cxb
-        assert not await pg.evaluate(f"SB.unpaid().some(b=>b.no==='{cxno}')"), "cancelled bill must leave pending list"
+        assert not cxb.get("cancelled"), "27-11: साथी खुद रद्द नहीं करता — सिर्फ़ अर्ज़ी (मालिक की मंज़ूरी पर रद्द)"
+        assert not await pg.evaluate(f"SB.unpaid().some(b=>b.no==='{cxno}')"), "अर्ज़ी वाला बिल साथी की भुगतान-बाकी सूची से हटे"
         await pg.evaluate("closeSheet();S.settings.ownerPh=window.__oph")
         mb = await pg.evaluate("SF.missingBuy().map(x=>x.it.id+':'+x.need)")
         print("cancel request ok", cxno, "missing buy:", mb)
@@ -500,6 +500,7 @@ async def main():
         cr = await pg.evaluate("Object.values(window.__MOCK__.cancelReq||{})")
         cr = [x for x in cr if x["reason"] == "ग्राहक ने सामान लौटाया"]
         assert len(cr) == 1 and cr[0]["status"] == "pending", cr
+        await pg.evaluate("renderBills()"); assert await pg.locator(f'#p-bills [data-bill="{_bn}"]').count() == 0, "अर्ज़ी वाला बिल साथी की बिल-सूची से हटे"
         print("cancel request", cr[0]["no"], cr[0]["reason"])
         mock = await pg.evaluate("window.__MOCK__")
         await gallery(pg, "staff")
@@ -977,11 +978,11 @@ async def main():
         await pg.click("[data-npok]"); await pg.wait_for_timeout(500)
         assert not [v for v in (await pg.evaluate("Object.values(window.__MOCK__.items)")) if v.get("pending")], "approve failed"
         ctx = await pg.inner_text("#p-report")
-        assert "रद्द हुए बिल" in ctx and "रद्द हो गया" in ctx and "वापस चालू" in ctx, ctx[:300]
-        # ↩ मालिक: उधार वाला बिल वापस चालू — बिल फिर चालू, उधार खाते में वापस
+        assert "रद्द हुए बिल" in ctx and "अर्ज़ी — अभी रद्द नहीं" in ctx and "मना करें" in ctx, ctx[:300]
+        # ✗ मालिक: मना — बिल चालू ही रहे (कभी रद्द हुआ ही नहीं)
         await pg.click(f'[data-crno="{_bn}"]'); await pg.wait_for_timeout(900)
         rb = await pg.evaluate(f"Object.entries(window.__MOCK__).filter(([k])=>k.endsWith('/bills')).flatMap(([k,v])=>Object.values(v)).find(b=>b.no==='{_bn}')")
-        assert rb["cancelled"] is False and rb.get("restoredTs") and (not (rb.get("pay") or {}).get("udhar") or await pg.evaluate(f"!!(window.__MOCK__.ledger||{{}})['{_bn}']")), rb
+        assert not rb.get("cancelled"), rb
         print("owner restored cancelled bill ok")
         for _ in range(4):
             if not await pg.query_selector('[data-crok]'): break
