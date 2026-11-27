@@ -1,0 +1,17 @@
+{
+  "documents": [
+    {
+      "name": "projects/sabji-express-9a8f0/databases/(default)/documents/pub/hmtt8uwkecn9eeh5",
+      "fields": {
+        "type": {
+          "stringValue": "hisab"
+        },
+        "ts": {
+          "integerValue": "1793863521273"
+        }
+      },
+      "createTime": "2026-11-04T05:20:25.114630Z",
+      "updateTime": "2026-11-05T07:25:21.817870Z"
+    }
+  ]
+}
