@@ -244,7 +244,7 @@ SB.loadOld=async function(){if(S.demo||!S.db)return;const L=[];for(let i=1;i<=3;
   try{const q=await S.db.collection("days/"+d+"/bills").where("settled","==",false).get();q.docs.forEach(x=>{const b=x.data();if(!b.cancelled&&(S.isOwner||b.by===S.uid))L.push(b)})}catch(e){}}
   const ch=L.length!==(SB.old||[]).length;SB.old=L.sort((a,b)=>a.ts-b.ts);try{if(ch&&typeof renderPane==="function"&&!document.querySelector("#sheet .scrim")&&!document.querySelector("#sheet .qpop"))renderPane(true)}catch(e){}};
 SB.oldHTML=function(){const L=SB.old||[];if(!L.length)return "";
-  return `<div class="sb-pend" style="border-color:var(--chili)"><b style="color:var(--chili)">⏳ पिछले दिन के ${L.length} बिल का भुगतान अभी बाकी${S.isOwner?" · "+rs(L.reduce((a,b)=>a+num(b.total),0)):""}</b><div>${L.slice(0,8).map(b=>`<button data-sbopen="${esc(b.no)}">${esc(fdate(b.date).slice(0,5))} · ${esc(b.partyName&&b.partyName!=="VIP ग्राहक"?b.partyName:b.no)} · ${rs(b.total)}${S.isOwner?" · "+esc(b.byName||""):""}</button>`).join("")}</div></div>`};
+  return `<div class="sb-pend" style="border-color:var(--chili)"><b style="color:var(--chili)">⏳ पिछले दिन के ${L.length} बिल का भुगतान अभी बाकी${S.isOwner?" · "+rs(L.reduce((a,b)=>a+num(b.total),0)):""}</b><div>${L.slice(0,8).map(b=>`<button data-sbopen="${esc(b.no)}">${esc(fdate(b.date).slice(0,5))} · ${esc(b.partyName&&b.partyName!=="VIP ग्राहक"?b.partyName:b.no)} · ${rs(b.total)}${S.isOwner&&b.byName?" · "+esc(b.byName):""}</button>`).join("")}</div></div>`};
 setTimeout(()=>{try{SB.loadOld()}catch(e){}},12000);setInterval(()=>{try{SB.loadOld()}catch(e){}},30*60000);
 SB.pendingHTML=function(){
   const U=unpaid();if(!U.length)return SB.oldHTML();

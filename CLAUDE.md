@@ -51,3 +51,4 @@
 - खर्चा मिटता नहीं — `void:true` (S.kharchAll में सब, S.kharch में बिना void)।
 - ऑनलाइन (177 रिपो): सब्ज़ी का Pay now सब्ज़ी के UPI पर; सब्ज़ी का ऑर्डर इस ऐप के `orders` (📥) में भी आता है।
 - 27-11 दूसरा दौर: 🌙 रात का स्टॉक पक्का (need/over/W in nightSheet), 📦 ग्राहक-ट्रैकिंग `SX.pubOt` → `pub/ot_<🆔>`, ⚠ बिना बिल ऑर्डर `SX.noBill`, ⏳ पुराने बाकी बिल `SB.loadOld/SB.old/oldHTML`, खरीद में दुकान ज़रूरी। सब `tests/galla.py` में।
+- 27-11 तीसरा दौर: `SX.start` अब `typeof S` से (पहले कभी नहीं चलता था — ऑनलाइन भाव/ऑर्डर/बैकअप बंद थे); `SX.ratesSoon`; `SF.buyGapHTML`; 🔄 `SE.updateNow` + `updBoxHTML/runUpdate` (177 MH से); `rates.yml` औज़ार।

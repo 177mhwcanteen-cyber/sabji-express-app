@@ -155,7 +155,7 @@ document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest
 SX.checkOrderDone=function(){const o=S.sxOrder;if(!o)return;const b=(S.dayBills||[]).find(x=>!x.cancelled&&x.ts>o.ts&&(!o.phone||x.custPhone===o.phone));if(b){S.sxOrder=null;SX.orderSet(o.id,"done",{billNo:b.no});toast("✓ ऑर्डर पूरा — बिल "+b.no)}};
 SX.pubRates=async function(force){if(S.demo||!S.db||!(S.isOwner||S.uid))return;/* साथी के फोन से भी भाव जाएँ — तीन-दुकान ऑर्डर-पेज इन्हीं से चलता है */const k="sx_pubr";const last=LS.get(k)||0;
   const L=S.items.filter(i=>i.active!==false&&!i.virtual&&!i.pending&&num(i.sale)>0&&i.id!=="xyz"&&!i.track).map(i=>{const ps=SE.photoSrc(i);return {id:i.id,n:i.name,e:window.SN&&SN.en?SN.en(i):"",u:i.unit,s:num(i.sale),c:i.cat||"",p:ps&&!/^data:/.test(ps)?ps:"",h:num(i.hue)}});
-  const h=JSON.stringify(L.map(i=>[i.id,i.s,i.p]));if(!force&&Date.now()-last<6*3600e3&&LS.get("sx_pubh")===h)return;
+  const h=JSON.stringify(L.map(i=>[i.id,i.s,i.p,i.n]));if(!force&&LS.get("sx_pubh")===h&&Date.now()-last<6*3600e3)return;if(!L.length)return;
   try{await S.db.collection("pub").doc("rates").set({type:"rates",items:L,ts:Date.now(),phone:String(S.settings.ownerPh||"").replace(/\D/g,"").slice(-10)});LS.set(k,Date.now());LS.set("sx_pubh",h)}catch(e){}};
 
 /* ======================= 8) रोज़ का भाव-पोस्टर ======================= */
@@ -313,6 +313,10 @@ document.addEventListener("click",async e=>{const t=e.target;
 });
 document.addEventListener("change",e=>{if(e.target.id==="sxvF")SX.vy.from=e.target.value||SX.vy.from;if(e.target.id==="sxvT")SX.vy.to=e.target.value||SX.vy.to});
 /* शुरुआत: मालिक — रोज़ का बैकअप + भाव सूची (हल्के, देर से); सब — ऑर्डर सुनें */
-SX.start=function(){if(SX._st)return;SX._st=1;setTimeout(()=>{SX.watchOrders();SX.pubRates();if(S.isOwner){setTimeout(SX.autoBackup,20000);SX.loadNoBill();setInterval(SX.loadNoBill,15*60000)}},8000);setInterval(()=>{try{SX.checkOrderDone()}catch(e){}},15000);if(S.isOwner)setInterval(()=>{try{SX.pubRates()}catch(e){}},10*60000)};
-const wait=setInterval(()=>{if(window.S&&S.db&&S.items&&S.items.length&&(S.isOwner||S.uid)){clearInterval(wait);SX.start()}},2000);
+SX.start=function(){if(SX._st)return;SX._st=1;setTimeout(()=>{SX.watchOrders();SX.pubRates();if(S.isOwner){setTimeout(SX.autoBackup,20000);SX.loadNoBill();setInterval(SX.loadNoBill,15*60000)}},8000);setInterval(()=>{try{SX.checkOrderDone()}catch(e){}},15000);setInterval(()=>{try{SX.pubRates()}catch(e){}},10*60000)};
+/* 27-11: पहले यहाँ window.S जाँचा जाता था — S (index.html) const है, window पर नहीं होता → SX.start कभी नहीं चला:
+   ऑनलाइन भाव (pub/rates), 📥 ऑर्डर सुनना, रोज़ का बैकअप — तीनों बंद पड़े थे। अब typeof S से। */
+const wait=setInterval(()=>{if(typeof S!=="undefined"&&S.db&&S.items&&S.items.length&&(S.isOwner||S.uid)){clearInterval(wait);SX.start()}},2000);
+/* भाव बदलते ही (मालिक, साथी का "भाव बदलें", औज़ार/पैक) ऑनलाइन पेज पर भी — सामान बदलने के 20 सेकंड बाद (हैश वही हो तो कुछ नहीं जाता) */
+SX.ratesSoon=function(){clearTimeout(SX._rs);SX._rs=setTimeout(()=>{try{if(SX._st)SX.pubRates()}catch(e){}},20000)};
 })();

@@ -69,7 +69,18 @@ async def main():
         # ⏳ पिछले दिन के बाकी बिल साथी को भी दिखें
         await pg.evaluate("closeSheet();SB.old=[{no:'OLD1',date:dayPlus(today(),-1),ts:Date.now()-864e5,total:80,partyName:'रमेश जी',settled:false,pay:{},lines:[]}]")
         h = await pg.evaluate("SB.pendingHTML()"); assert "पिछले दिन के 1 बिल" in h and "OLD1" in h and "₹80" not in h.split("</b>")[0], h
-        # 🛒 कर्मचारी: बिना दुकान के नाम खरीद नहीं
+        # 🛒 खरीदा, पर बिक्री में नहीं: बंद सामान (▶ चालू) + ऐप में न होने वाला नाम (➕ बनाएँ)
+        await pg.evaluate("S.isOwner=true;S.items.find(i=>i.id==='palak').active=false;S.purchHist=[{id:'p1',ts:Date.now(),date:today(),lines:[{id:'palak',name:'पालक',qty:5,rate:20,unit:'kg'},{name:'बथुआ',qty:4,rate:80,unit:'kg'}]},{id:'c1',src:'chat',lines:[{name:'पुरानी चीज़',qty:1,rate:5}]}]")
+        h = await pg.evaluate("SF.buyGapHTML()"); assert "खरीदा, पर बिक्री में नहीं (2)" in h and "बथुआ" in h and "पालक" in h and "पुरानी" not in h, h[:500]
+        await pg.evaluate("S.tab='report';showTab()"); await pg.wait_for_timeout(300)
+        await pg.fill('[data-bgr="palak"]', "35"); await pg.click('[data-bgon="palak"]'); await pg.wait_for_timeout(200)
+        assert await pg.evaluate("[item('palak').active,item('palak').sale]") == [True, 35]
+        await pg.click('[data-bgnew="0"]'); await pg.wait_for_timeout(200)
+        assert await pg.evaluate("S.items.some(i=>i.name==='बथुआ'&&i.sale===110&&i.active)"), "बथुआ बिक्री में (80 + 35% → 110)"
+        await pg.screenshot(path=os.path.join(SHOTS, "buygap.png"))
+        # 🔄 ऐप अपडेट करें बटन (सेटिंग में)
+        await pg.evaluate("S.tab='set';showTab()"); await pg.wait_for_timeout(200)
+        assert await pg.locator("#p-set [data-updnow]").count() == 1 and await pg.evaluate("typeof SE.updateNow") == "function"
         await b.close()
     assert not errs, errs
     print("✅ पूरा टेस्ट पास (गल्ला गिनती)")

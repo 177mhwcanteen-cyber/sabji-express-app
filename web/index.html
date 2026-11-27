@@ -390,7 +390,7 @@ main{padding-block:10px 120px}
 .big-in{font-size:22px!important;font-weight:800;text-align:center}
 .pbarbtn{background:#6d28d9;color:#fff}
 /* v24 */
-.qstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 12px}.gc-own{margin:8px 0 4px;padding:8px;border-radius:12px;background:var(--chip-bg)}.ns-need{margin:8px 0 0;padding:8px;border-radius:12px;background:var(--chili-bg);color:var(--ink)}.ns-need b{display:block;color:var(--chili);font-size:14px;margin-bottom:6px}.ns-need div{display:flex;flex-wrap:wrap;gap:6px}.ns-need button{border:1.5px solid var(--chili);background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 11px;font-weight:800;font-size:14px}.ns-w{margin-top:6px}.ns-w>span:first-child{font-size:13px;font-weight:800;white-space:nowrap}
+.qstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 12px}.updbox{margin:10px 0}.updbox .big.upd{background:linear-gradient(120deg,var(--leaf),#4f46e5);color:#fff;font-weight:800}.updbox .big.upd:disabled{opacity:.6}.updbar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:8px}.updbar i{display:block;height:100%;width:0;background:var(--leaf);transition:width .25s}.gc-own{margin:8px 0 4px;padding:8px;border-radius:12px;background:var(--chip-bg)}.ns-need{margin:8px 0 0;padding:8px;border-radius:12px;background:var(--chili-bg);color:var(--ink)}.ns-need b{display:block;color:var(--chili);font-size:14px;margin-bottom:6px}.ns-need div{display:flex;flex-wrap:wrap;gap:6px}.ns-need button{border:1.5px solid var(--chili);background:var(--surface);color:var(--ink);border-radius:99px;padding:6px 11px;font-weight:800;font-size:14px}.ns-w{margin-top:6px}.ns-w>span:first-child{font-size:13px;font-weight:800;white-space:nowrap}
 .qstrip button{display:grid;justify-items:center;gap:2px;border:0;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);padding:10px 4px;font-size:22px;color:var(--ink)}
 .qstrip button span{font-size:12.5px;font-weight:800}
 .card .mg{display:block;font-size:11px;font-weight:800;padding:0 9px 7px;color:#15803d}.card .mg.mid{color:#b45309}.card .mg.bad{color:var(--chili)}
@@ -1517,7 +1517,7 @@ function renderReport(){
     ...(window.SFM&&SFM.html?[R("firms","long","🏢","सभी फर्म · 177 MH का महीना","",()=>SFM.html())]:[])];
   const G={day:"📅 आज का हिसाब",item:"🥬 सब्ज़ी और माल",party:"👥 ग्राहक और पार्टी",long:"🗓️ लंबा समय और औज़ार"};
   let fav=[];try{fav=JSON.parse(lsGet("rep_fav")||(window.SFM?'["full","items","firms"]':'["full","items","galla"]'))}catch(e){}
-  const alerts=(window.SF?SF.cancelReqsHTML():"")+(window.SF&&SF.hiRateHTML?SF.hiRateHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+(window.SX&&SX.ownAlertsHTML?SX.ownAlertsHTML():"")+guardHTML();
+  const alerts=(window.SF?SF.cancelReqsHTML():"")+(window.SF&&SF.hiRateHTML?SF.hiRateHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+(window.SX&&SX.ownAlertsHTML?SX.ownAlertsHTML():"")+(window.SF&&SF.buyGapHTML?SF.buyGapHTML():"")+guardHTML();
   const GO={daybook:"bills",kharch:"day",stock:"day",ledger:"udhar",route:"route"};REP.forEach(r=>{if(GO[r.id])r.tab=GO[r.id]});
   const sel=REP.find(r=>r.id===S.repSel&&!r.tab);
   const row=r=>`<div class="rp-r${r.warn?" warn":""}"><button type="button" class="rp-go" ${r.tab?`data-rtab="${r.tab}"`:`data-rsel="${r.id}"`}><i>${r.ic}</i><b>${r.t}</b>${r.hint?`<small>${esc(r.hint)}</small>`:""}<em>${r.tab?"↗":"›"}</em></button><button type="button" class="rp-st${fav.includes(r.id)?" on":""}" data-rfav="${r.id}" aria-label="पसंदीदा">${fav.includes(r.id)?"★":"☆"}</button></div>`;
@@ -1558,8 +1558,8 @@ $("#p-report").addEventListener("click",e=>{const rt=e.target.closest("[data-rta
 function renderSettings(){
   const s=S.settings;
   $("#p-set").innerHTML=`<h2 class="sec">रेट व सेटिंग</h2>
-  <p class="note" style="margin-top:-6px">यहाँ बदला रेट तुरंत सब कर्मचारियों के फोन पर लागू होगा। कर्मचारी ये पेज नहीं देख सकता।</p>
-  <div class="list" style="padding:12px 14px;display:grid;gap:10px">
+  <p class="note" style="margin-top:-6px">यहाँ बदला रेट तुरंत सब कर्मचारियों के फोन पर और ऑनलाइन ऑर्डर-पेज पर लागू होगा। कर्मचारी ये पेज नहीं देख सकता।</p>
+  ${updBoxHTML()}<div class="list" style="padding:12px 14px;display:grid;gap:10px">
     <div class="lock">🔒<div><span class="note">UPI पक्की लगी है (कोई नहीं बदल सकता)</span><b>${esc(UPI_FIXED.upi)}</b><span class="note">${esc(UPI_FIXED.payee)} · Google Pay · बदलनी हो तो विक्रम जी Claude से बदलवाएँ</span></div></div>
     <label class="fld">आपका WhatsApp नंबर (बिल रद्द की अर्ज़ी इसी पर आएगी)<input class="inp" id="s-ownerPh" data-sf="ownerPh" inputmode="tel" value="${esc(s.ownerPh||"")}" placeholder="10 अंक"></label>
     <label class="fld">दुकान/गाड़ी का ऑर्डर नंबर (बिल पर छपेगा)<input class="inp" id="s-shopPh" data-sf="shopPh" inputmode="tel" value="${esc(s.shopPh||"")}" placeholder="10 अंक"></label>
@@ -1684,7 +1684,14 @@ function openBiller(next){
   <button class="big" data-ok>सेव करें</button></div></div>`;
   $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}if(e.target.closest("[data-ok]")){const v=$("#bName").value.trim();if(!v){toast("नाम लिखें");return}S.staff=v;lsSet("se_staff",v);closeSheet();renderTabs();next&&next()}};
 }
-$("#who").onclick=()=>{if(!S.demo){$("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिलर"><div class="grab"></div><div class="sh-head"><h3>👤 ${esc(biller())}</h3><button class="x" data-close aria-label="बंद करें">✕</button></div><p class="note">इस फोन पर अभी आपके नाम से बिल बन रहे हैं${S.isOwner?" (मालिक)":""}।</p><button class="big ghost" data-logout>लॉग-आउट — दूसरा व्यक्ति</button><p class="verline">ऐप संस्करण ${esc(SE.version)}${SE.isNative?" · Android":" · वेब"}</p></div></div>`;$("#sheet").onclick=e=>{if(e.target.matches("[data-close]")||e.target.closest("[data-close].x")){closeSheet();return}if(e.target.closest("[data-logout]")){closeSheet();logoutStaff()}};return}openBiller()};
+$("#who").onclick=()=>{if(!S.demo){$("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="बिलर"><div class="grab"></div><div class="sh-head"><h3>👤 ${esc(biller())}</h3><button class="x" data-close aria-label="बंद करें">✕</button></div><p class="note">इस फोन पर अभी आपके नाम से बिल बन रहे हैं${S.isOwner?" (मालिक)":""}।</p>${updBoxHTML()}<button class="big ghost" data-logout>लॉग-आउट — दूसरा व्यक्ति</button><p class="verline">ऐप संस्करण ${esc(SE.version)}${SE.isNative?" · Android":" · वेब"}</p></div></div>`;$("#sheet").onclick=e=>{if(e.target.matches("[data-close]")||e.target.closest("[data-close].x")){closeSheet();return}if(e.target.closest("[data-logout]")){closeSheet();logoutStaff()}};return}openBiller()};
+/* 🔄 ऐप अपडेट करें (177 MH जैसा) — 👤 खिड़की और सेटिंग में; अपने-आप भी हर 30 मिनट/वापस आते ही (SE.autoUpdateLoop) */
+function updBoxHTML(){return `<div class="updbox"><button class="big upd" data-updnow>🔄 ऐप अपडेट करें</button><div class="updbar" hidden><i></i></div><p class="note updmsg" style="margin:6px 0 0;text-align:center">अभी: ${esc(SE.version)} · नया संस्करण GitHub से आता है, आपका कोई डेटा नहीं मिटता</p></div>`}
+async function runUpdate(){const B=[...document.querySelectorAll("[data-updnow]")];if(B.some(b=>b.disabled))return;
+  if(S.saving){toast("बिल सेव हो रहा है — एक पल रुकें");return}
+  const say=(m,k,pc)=>{document.querySelectorAll(".updbox").forEach(x=>{const ms=x.querySelector(".updmsg"),bar=x.querySelector(".updbar"),bt=x.querySelector("[data-updnow]");if(ms){ms.textContent=m;ms.style.color=k==="bad"?"var(--chili)":k==="ok"?"var(--leaf)":""}if(bar){bar.hidden=pc==null;if(pc!=null)bar.firstElementChild.style.width=pc+"%"}if(bt)bt.disabled=!(k==="bad"||k==="ok")})};
+  if(SE.updateNow)await SE.updateNow(say);else say("इस संस्करण में बटन नहीं — ऐप बंद करके खोलें","bad")}
+document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("[data-updnow]"))runUpdate()});
 
 /* ---------- data ---------- */
 function subBills(){
@@ -1722,7 +1729,7 @@ async function boot(){
   if(S.isOwner)db.collection("staff").onSnapshot(s=>{S.staffDocs=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="set"&&!$("#p-set").contains(document.activeElement))renderSettings()},()=>{});
   setTimeout(()=>SE.checkUpdate(toast),4000);if(SE.autoUpdateLoop)SE.autoUpdateLoop(toast);
   const sortItems=a=>a.sort((x,y)=>(x.order??999)-(y.order??999)||x.name.localeCompare(y.name,"hi"));
-  db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(window.SR)SR.addVirtual();if(S.isOwner&&window.SF&&S.items.some(i=>!i.plu))SF.ensurePLU();S.cart.forEach(l=>{const it=item(l.id);if(it&&!l.changed&&!l.free){l.board=priceOf(it);l.rate=l.board;l.cost=+it.cost||0;l.amt=r2(l.qty*l.rate)}});renderPane();renderCart()},()=>toast("सब्ज़ी लिस्ट लोड नहीं हुई"));
+  db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(window.SX&&SX.ratesSoon)SX.ratesSoon();if(window.SR)SR.addVirtual();if(S.isOwner&&window.SF&&S.items.some(i=>!i.plu))SF.ensurePLU();S.cart.forEach(l=>{const it=item(l.id);if(it&&!l.changed&&!l.free){l.board=priceOf(it);l.rate=l.board;l.cost=+it.cost||0;l.amt=r2(l.qty*l.rate)}});renderPane();renderCart()},()=>toast("सब्ज़ी लिस्ट लोड नहीं हुई"));
   db.doc("settings/main").onSnapshot(s=>{S.settings=s.exists?s.data():{};checkLock();if(S.tab!=="set")renderPane()});
   if(S.isOwner)db.collection("presence").onSnapshot(s=>{S.presence=s.docs.map(d=>d.data());if(S.tab==="bills")renderBills()},()=>{});
   setTimeout(()=>{flushOutbox();beat();netbar()},1500);

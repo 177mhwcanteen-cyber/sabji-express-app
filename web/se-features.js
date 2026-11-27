@@ -1450,6 +1450,30 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-nag]");if(
   if(k==="none"){const d={by:S.uid||"",byName:biller(),ts:Date.now()};SF.nobuy=d;if(!S.demo&&S.db)S.db.doc("days/"+today()+"/meta/nobuy").set(d).catch(()=>{});toast("ठीक है — आज खरीद की याद नहीं आएगी")}});
 setTimeout(()=>{try{SF.buyNag()}catch(e){}},15*60000);setInterval(()=>{try{SF.buyNag()}catch(e){}},5*60000);
 
+/* 🛒 खरीदा, पर बिक्री में नहीं (विक्रम जी 27-11): पिछले 20 दिन की खरीद में (क) जो सामान बंद है/भाव नहीं — जैसे सर्दी का बथुआ,
+   (ख) जो नाम लिखकर खरीदा पर ऐप में सामान ही नहीं — मालिक एक टैप में भाव डालकर चालू करें / नया सामान बनाएँ। WhatsApp-चैट वाली पुरानी खरीद (src chat) नहीं गिनी। */
+SF.buyGap=function(){if(!S.isOwner)return {off:[],nw:[]};const P=[...(S.purchHist||[]),...(S.purch||[])].filter(p=>p&&!p.cancelled&&p.src!=="chat");const seen=new Set(),off={},nw={};
+  const norm=x=>String(x||"").toLowerCase().replace(/[\s().\-]+/g,"");const byName=n=>S.items.find(i=>norm(i.name)===norm(n)||String(i.alias||"").split(/[,\s]+/).some(a=>a&&norm(a)===norm(n)));
+  P.forEach(p=>{if(seen.has(p.id))return;seen.add(p.id);(p.lines||[]).forEach(l=>{const it=l.id?item(l.id):byName(l.name);const nm=String(l.name||"").trim();
+    if(it){if(it.virtual||it.track||(it.active!==false&&num(it.sale)>0))return;const o=off[it.id]||(off[it.id]={it,q:0,last:0,rate:0});o.q+=num(l.qty);if((p.ts||0)>=o.last){o.last=p.ts||0;o.rate=num(l.rate)}return}
+    if(!nm||l.id)return;const k=norm(nm),o=nw[k]||(nw[k]={name:nm,unit:l.unit||"kg",q:0,last:0,rate:0});o.q+=num(l.qty);if((p.ts||0)>=o.last){o.last=p.ts||0;o.rate=num(l.rate)}})});
+  return {off:Object.values(off).sort((a,b)=>b.last-a.last),nw:Object.values(nw).filter(o=>!(SF._bgDone||{})[o.name]).sort((a,b)=>b.last-a.last)}};
+SF.buyGapHTML=function(){if(!S.isOwner)return "";const G=SF.buyGap();if(!G.off.length&&!G.nw.length)return "";
+  const sug=r=>r>0?Math.ceil(r*1.35/5)*5:"";
+  return `<div class="card2" style="border:2px solid #f59e0b"><h3>🛒 खरीदा, पर बिक्री में नहीं (${G.off.length+G.nw.length})</h3><p class="note" style="margin:0 0 6px">ये माल पिछले दिनों खरीदा गया, पर ऐप में बिक नहीं सकता (बंद है / भाव नहीं / सामान ही नहीं) — बिक्री भाव लिखकर चालू करें। सुझाया भाव = खरीद + 35%।</p>
+  ${G.off.map(o=>`<div class="creq-row"><div><b>${esc(o.it.name)}</b><span class="note">${o.it.active===false?"बंद है":"भाव नहीं"} · खरीदा ${fq(o.q,o.it.unit)} · आख़िरी खरीद ₹${o.rate}/${UNITS[o.it.unit]||o.it.unit}</span></div>
+    <div class="row3" style="margin:0"><input class="inp" data-bgr="${esc(o.it.id)}" inputmode="decimal" value="${num(o.it.sale)||sug(o.rate)}" aria-label="${esc(o.it.name)} का बिक्री भाव"><button class="big" data-bgon="${esc(o.it.id)}">▶ चालू</button><span></span></div></div>`).join("")}
+  ${G.nw.map((o,i)=>`<div class="creq-row"><div><b>${esc(o.name)} <span class="pill blue">ऐप में नहीं</span></b><span class="note">खरीदा ${fq(o.q,o.unit)} · आख़िरी खरीद ₹${o.rate}/${UNITS[o.unit]||o.unit}</span></div>
+    <div class="row3" style="margin:0"><input class="inp" data-bgnr="${i}" inputmode="decimal" value="${sug(o.rate)}" aria-label="${esc(o.name)} का बिक्री भाव"><button class="big" data-bgnew="${i}">➕ बनाएँ</button><button class="big ghost" data-bgskip="${i}">छोड़ें</button></div></div>`).join("")}</div>`};
+document.addEventListener("click",async e=>{const t=e.target;if(!t.closest||!S.isOwner)return;
+  const on=t.closest("[data-bgon]");if(on){const id=on.dataset.bgon,it=item(id),v=num((document.querySelector(`[data-bgr="${id}"]`)||{}).value);if(!(v>0)){toast("बिक्री भाव लिखें");return}
+    const old=num(it&&it.sale);await saveItem(id,{active:true,sale:v});if(it){it.active=true;it.sale=v}logPrice(id,"sale",old,v);toast("▶ "+(it?it.name:id)+" चालू · ₹"+v);try{renderReport()}catch(x){}return}
+  const nw=t.closest("[data-bgnew]"),sk=t.closest("[data-bgskip]");if(nw||sk){const G=SF.buyGap(),o=G.nw[+(nw||sk).dataset[nw?"bgnew":"bgskip"]];if(!o)return;
+    if(sk){(SF._bgDone||(SF._bgDone={}))[o.name]=1;try{renderReport()}catch(x){}return}
+    const v=num((document.querySelector(`[data-bgnr="${nw.dataset.bgnew}"]`)||{}).value);if(!(v>0)){toast("बिक्री भाव लिखें");return}
+    const id="n"+uid(),doc={name:o.name,unit:o.unit,cat:"sabzi",emoji:"🥬",hue:110,sale:v,cost:o.rate,active:true,order:900,ts:Date.now(),addedByName:biller()};
+    try{if(S.demo)S.items.push({id,...doc});else await S.db.collection("items").doc(id).set(doc);(SF._bgDone||(SF._bgDone={}))[o.name]=1;toast("➕ "+o.name+" बिक्री में जुड़ा · ₹"+v+" — फोटो सेटिंग में लगाएँ");try{renderReport()}catch(x){}}catch(x){toast("नहीं बना: "+(x.code||""))}}});
+
 /* ⏱️ हर घंटे गल्ला गिनती (विक्रम जी 27-11-2026): दिन में कई बार गिनती — हर गिनती अलग लाइन में रहती है (पुरानी कभी नहीं मिटती),
    उस पल का "होना चाहिए" उसी समय पक्का; कर्मचारी को सिर्फ़ "गिनें" — होना चाहिए/फर्क कभी नहीं। मालिक तय करे: हर 1/2/3 घंटे या बंद (settings/main.gcEvery)。
    ⏳ भुगतान बाकी वाले बिल पहले सेटल — वरना उनका पैसा गल्ले में "ज़्यादा" दिखता है (या जेब में चला जाता है)। */
