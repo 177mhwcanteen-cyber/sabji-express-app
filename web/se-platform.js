@@ -332,7 +332,8 @@ SE.receiptCanvas=function(b,o,widthPx){
 const r2=n=>Math.round((+n||0)*100)/100;
 function canvasToEscPos(cv){
   const W=cv.width,H=cv.height,bw=W>>3;const d=cv.getContext("2d").getImageData(0,0,W,H).data;
-  const parts=[[0x1b,0x40]];
+  /* ESC @ + FS . (चीनी अक्षर-मोड बंद) + ESC t 0 — मैनेजर ऐप जैसा; वरना कई Xprinter चित्र की जगह चीनी अक्षर छापते */
+  const parts=[[0x1b,0x40,0x1c,0x2e,0x1b,0x74,0x00]];
   for(let y0=0;y0<H;y0+=24){
     const h=Math.min(24,H-y0);const blk=new Uint8Array(8+bw*h);
     blk.set([0x1d,0x76,0x30,0x00,bw&255,bw>>8,h&255,h>>8]);
@@ -363,9 +364,13 @@ SE.printReceipt=async function(b,o){
     if(!SE.printer.addr)throw {code:"noprinter",msg:"पहले \"रेट व सेटिंग\" में प्रिंटर चुनें"};
     const data=SE.printer.type==="tspl"?SE.tspl(cv,{gap:0}):canvasToEscPos(cv);
     /* पक्का जुड़ना: पहली बार न जुड़े (प्रिंटर अभी जागा/दूर) तो 0.8 सेकंड बाद एक बार और */
-    try{await N.BtPrinter.print({address:SE.printer.addr,data})}catch(e1){await new Promise(r=>setTimeout(r,800));
-      try{await N.BtPrinter.print({address:SE.printer.addr,data})}catch(e2){throw {code:"bt",msg:"🖨️ प्रिंटर से नहीं जुड़ा — प्रिंटर चालू है? पास है? कागज़ है? फिर 🖨️ दबाएँ"}}}
-    return "bt"}
+    const why=e=>String((e&&(e.message||e.msg))||e||"");
+    if(!N.BtPrinter||!N.BtPrinter.print)throw {code:"oldapk",msg:"🖨️ इस फोन के ऐप (APK) में प्रिंटर का हिस्सा नहीं — नया APK डालें (👤 → ऐप अपडेट करें के नीचे वाला लिंक)"};
+    try{await N.BtPrinter.print({address:SE.printer.addr,data})}catch(e1){if(/not implemented|UNIMPLEMENTED/i.test(why(e1)))throw {code:"oldapk",msg:"🖨️ नया APK डालें — पुराने ऐप में यह प्रिंटर नहीं चलता"};
+      if(/अनुमति|permission/i.test(why(e1)))throw {code:"perm",msg:"🖨️ Bluetooth की अनुमति दें — फोन सेटिंग → ऐप → सब्ज़ी एक्सप्रेस → अनुमति → आस-पास के डिवाइस"};
+      await new Promise(r=>setTimeout(r,1200));
+      try{await N.BtPrinter.print({address:SE.printer.addr,data})}catch(e2){SE._prnErr=why(e2);throw {code:"bt",msg:why(e2)||"🖨️ प्रिंटर से नहीं जुड़ा"}}}
+    SE._prnErr="";return "bt"}
   const url=cv.toDataURL("image/png");
   printHTMLWeb(`<!doctype html><html><head><meta charset="utf-8"><style>@page{size:${SE.printer.mm}mm auto;margin:0}body{margin:0}img{width:100%;display:block}</style></head><body><img src="${url}"></body></html>`);
   return "web";

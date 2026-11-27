@@ -119,25 +119,32 @@ public class BtPrinterPlugin extends Plugin {
                 a.cancelDiscovery();
                 BluetoothDevice dev = a.getRemoteDevice(address);
                 byte[] bytes = Base64.decode(data, Base64.DEFAULT);
-                try {
-                    s = dev.createRfcommSocketToServiceRecord(SPP);
-                    s.connect();
-                } catch (Exception first) {
-                    try { if (s != null) s.close(); } catch (Exception ignore) {}
-                    s = dev.createInsecureRfcommSocketToServiceRecord(SPP);
-                    s.connect();
+                /* 27-11: VBE मैनेजर ऐप वाला पक्का तरीका (वहाँ यही Xprinter XP-P502A ठीक छपता है) —
+                   सुरक्षित → बिना-सुरक्षा → सीधा चैनल 1 (कई सस्ते प्रिंटर में "read failed, socket might closed" का इलाज) */
+                Exception last = null;
+                for (int k = 0; k < 3 && s == null; k++) {
+                    BluetoothSocket t = null;
+                    try {
+                        if (k == 0) t = dev.createRfcommSocketToServiceRecord(SPP);
+                        else if (k == 1) t = dev.createInsecureRfcommSocketToServiceRecord(SPP);
+                        else t = (BluetoothSocket) dev.getClass().getMethod("createRfcommSocket", int.class).invoke(dev, 1);
+                        t.connect(); s = t;
+                    } catch (Exception ex) { last = ex; try { if (t != null) t.close(); } catch (Exception ignore) {} Thread.sleep(300); }
                 }
+                if (s == null) throw (last != null ? last : new Exception("जुड़ा नहीं"));
                 OutputStream out = s.getOutputStream();
-                int chunk = 512;
+                /* छोटे प्रिंटर का बफ़र छोटा — 128 बाइट, बीच में 25 ms (तेज़ भेजने पर बाइट छूटते/चीनी अक्षर छपते) */
+                int chunk = 128;
                 for (int i = 0; i < bytes.length; i += chunk) {
                     out.write(bytes, i, Math.min(chunk, bytes.length - i));
                     out.flush();
-                    Thread.sleep(12);
+                    Thread.sleep(25);
                 }
-                Thread.sleep(400);
+                Thread.sleep(1500);
                 call.resolve();
             } catch (Exception e) {
-                call.reject("प्रिंटर से जुड़ नहीं पाए — प्रिंटर चालू है? " + e.getMessage());
+                String m = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                call.reject("प्रिंटर से नहीं जुड़ा — चालू है? पास है? किसी दूसरे ऐप से तो नहीं जुड़ा? (" + (m.length() > 60 ? m.substring(0, 60) : m) + ")");
             } finally {
                 try { if (s != null) s.close(); } catch (Exception ignore) {}
             }
