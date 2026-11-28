@@ -88,10 +88,14 @@ async def main():
           CRM.d='';crmWatch();await new Promise(r=>setTimeout(r,120));
           const P=crmPend(),tabs=tabsList().find(t=>t[0]==='report')[1],chip=crmChipHTML(),card=cartRmHTML();
           const ph=P.find(x=>x._waste)?.ph||'';
+          /* नई हटाई चीज़ आए तो आवाज़/पॉप-अप नहीं; ऐप खुलने पर एक सूचना */
+          window.__bp=0;const ob=beep;beep=()=>{__bp++};document.querySelector('#toast').textContent='';
+          CRM.days[d].log.push({id:'gajar',n:'गाजर',q:1,u:'kg',a:70,by:'कमल भाई',uid:'s1',ts:now-1000,w:'ट्रे ✕'});CRM.t0=0;crmChanged();
+          const silent=__bp===0&&document.querySelector('#toast').textContent==='';ownerOpenNote();const note=document.querySelector('#toast').textContent;beep=ob;
           await crmDecide([P[0]],'no');const left=crmPend().length;await crmDecide(crmPend(),'ok');
-          const out=[P.length,tabs.includes('🔴2'),chip.includes('2 हटाए'),card.includes('पूरा बिल ✕✕'),ph,left,crmPend().length,__W.length,JSON.stringify(__W[0][1]).includes('"s":"no"')];
+          const out=[P.length,tabs.includes('🔴2'),chip.includes('2 हटाए'),card.includes('पूरा बिल ✕✕'),ph,left,crmPend().length,__W.length,JSON.stringify(__W[0][1]).includes('"s":"no"'),silent,note.includes('3 हटाए')];
           S.demo=true;S.isOwner=false;S.db=null;CRM.d='';return out})()""")
-        assert r == [2, True, True, True, "days/" + await pg.evaluate("today()") + "/meta/ph_w_abc", 1, 0, 2, True], ("removal approval", r)
+        assert r == [2, True, True, True, "days/" + await pg.evaluate("today()") + "/meta/ph_w_abc", 2, 0, 2, True, True, True], ("removal approval", r)
 
         assert not errs, errs
         print("✅ पूरा टेस्ट पास (50 कमियों के सुधार)")

@@ -126,7 +126,7 @@ SX.orders=[];SX._oUn=null;
 SX.watchOrders=function(){if(S.demo||!S.db||SX._oUn)return;try{SX._oUn=S.db.collection("orders").where("status","in",["new","billing"]).onSnapshot(s=>{SX.orders=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>num(b.ts)-num(a.ts));SX.orderPill()},()=>{})}catch(e){}};
 SX.orderPill=function(){let el=document.getElementById("sxOrd");const n=SX.orders.filter(o=>o.status==="new").length,m=SX.orders.length;
   if(!m){if(el)el.remove();return}if(!el){el=document.createElement("button");el.id="sxOrd";el.className="sx-ord";el.type="button";el.setAttribute("data-sxorders","1");document.body.appendChild(el)}
-  el.innerHTML=`📥 ऑर्डर <b>${m}</b>${n?'<i></i>':""}`;if(n&&!SX._beeped){SX._beeped=1;try{beep(true)}catch(e){}}};
+  el.innerHTML=`📥 ऑर्डर <b>${m}</b>${n?'<i></i>':""}`;if(n&&!SX._beeped&&!S.isOwner){SX._beeped=1;try{beep(true)}catch(e){}}/* 28-11: मालिक के फोन पर आवाज़ नहीं */};
 SX.ordersSheet=function(){const L=SX.orders;$("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" role="dialog" aria-label="ऑर्डर"><div class="grab"></div>
   <div class="sh-head"><div><h3>📥 ग्राहकों के ऑर्डर (${L.length})</h3><span class="note">ऑर्डर-लिंक: ${esc(pubBase()+"o.html")}</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>
   ${L.length?L.map(o=>`<div class="card2 sx-o"><div class="rr-h"><b>${esc(o.name||"ग्राहक")} · ${esc(o.phone||"")}</b><small class="note">${ftime(o.ts)}${o.status==="billing"?" · 🧾 बिल बन रहा":""}</small></div>

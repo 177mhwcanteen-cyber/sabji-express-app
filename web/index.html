@@ -673,7 +673,7 @@ function ftime(ts){const d=new Date(ts);return d.toLocaleTimeString("hi-IN",{hou
 function fdate(s){const [y,m,d]=s.split("-");return d+"-"+m+"-"+y}
 function lsGet(k){try{return localStorage.getItem(k)||""}catch(e){return ""}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2200)}
+function toast(m,ms){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,ms||2200)}
 function insts(){return (S.settings.insts&&S.settings.insts.length)?S.settings.insts:["मारवाड़ रसोई (होटल)","177 MH कैंटीन","रामविनायक डोसा पॉइंट","15 भैरव कैंटीन (जसाई)"]}
 function item(id){return S.items.find(i=>i.id===id)}
 function priceOf(it){return +it.sale||0} /* संस्था: चुनते समय बिक्री भाव, सेव होते ही खरीद भाव (SB.instReprice) */
@@ -938,7 +938,8 @@ function crmAll(){const out=[];[today(),dayPlus(today(),-1)].forEach(k=>{const v
   (CRM.st[k]||[]).forEach(w=>{const key=crmKey(w,1),it=item(w.id),a=r2((+w.qty||0)*(it?+it.sale||0:0));out.push({id:w.id,n:w.name,q:+w.qty||0,u:w.unit,a,by:w.byName||"",uid:w.by||"",ts:w.ts,w:"🥀 खराब: "+(w.reason||""),ph:w.ph?"days/"+k+"/meta/ph_w_"+w.wid:"",_d:k,_k:key,_s:dec[key]?dec[key].s:(w.ts<=ok?"ok":""),_waste:1})})});
   return out.sort((a,b)=>a.ts-b.ts)}
 function crmPend(){return crmAll().filter(x=>!x._s)}
-function crmChanged(){const P=crmPend(),n=P.length;if(CRM.n>=0&&n>CRM.n&&Date.now()-(CRM.t0||0)>5000){const x=P[P.length-1];toast("🗑️ "+(x.by||"साथी")+" ने "+x.n+" "+fqg(x.q,x.u)+" "+rs(x.a)+(x._waste?" खराब लिखा":" बिल से हटाया")+" — मंज़ूरी दें");try{beep(false)}catch(e){}try{navigator.vibrate&&navigator.vibrate([80,60,80])}catch(e){}}
+/* 28-11 (विक्रम जी: "बार-बार बीप से परेशान — ऐप खोलूँ तभी सूचना"): यहाँ कोई आवाज़/झटका/पॉप-अप नहीं — सिर्फ़ चिप/🔴 चुपचाप बदलते हैं; सूचना ownerOpenNote() में, ऐप खुलते/सामने आते ही एक बार */
+function crmChanged(){const n=crmPend().length;
   CRM.n=n;try{renderTabs()}catch(e){}if(S.tab==="report"&&!$("#sheet .scrim"))try{renderReport()}catch(e){}if(S.tab==="bill"&&!$("#p-bill").contains(document.activeElement))try{renderBill()}catch(e){}if($("#crmSh"))crmSheet()}
 async function crmDecide(list,s){const now=Date.now(),by={};list.forEach(x=>{(by[x._d]=by[x._d]||{})[x._k]={s,at:now}});
   for(const [d,m] of Object.entries(by)){const v=CRM.days[d]||(CRM.days[d]={});v.dec={...(v.dec||{}),...m};if(!S.demo&&S.db)try{await S.db.doc("days/"+d+"/meta/cartrm").set({dec:m},{merge:true})}catch(e){toast("सेव नहीं हुआ — नेट देखें")}}
@@ -1408,7 +1409,11 @@ function gref(n){return S.db.collection("data/users/"+G.id).doc(n)}
 async function gget(n){if(S.demo)return G.mem[n]?JSON.parse(JSON.stringify(G.mem[n])):null;const x=await gref(n).get();return x.exists?x.data():null}
 async function gset(n,d){if(S.demo){G.mem[n]=JSON.parse(JSON.stringify(d));return}await gref(n).set(d)}
 function guardOpen(){return G.alarms.filter(a=>!a.seen).length}
-async function guardAlarm(a){G.alarms.unshift({...a,at:Date.now(),seen:false});G.alarms=G.alarms.slice(0,200);await gset("g_alarms",{list:G.alarms});renderTabs();if(S.tab==="report")renderReport();beep(false);toast("🚨 पहरेदार: "+a.msg)}
+async function guardAlarm(a){G.alarms.unshift({...a,at:Date.now(),seen:false});G.alarms=G.alarms.slice(0,200);await gset("g_alarms",{list:G.alarms});renderTabs();if(S.tab==="report")renderReport()/* 28-11: बीप/पॉप-अप नहीं — ऐप खुलते ही ownerOpenNote में */}
+/* 🔔 28-11: मालिक को सूचना सिर्फ़ ऐप खुलते/सामने आते समय — एक बार, बिना आवाज़ (मंज़ूरी बाकी, रद्द की अर्ज़ी, पहरेदार) */
+function ownerOpenNote(){try{if(!S.isOwner||S.demo||!S.db)return;const a=typeof crmPend==="function"?crmPend().length:0,b=(S.cancelReqs||[]).length,c=guardOpen();if(!a&&!b&&!c)return;
+  toast("🔔 विक्रम जी, मंज़ूरी बाकी: "+[a?"🗑️ "+a+" हटाए/खराब सामान":"",b?"🚫 "+b+" बिल रद्द की अर्ज़ी":"",c?"🚨 "+c+" पहरेदार चेतावनी":""].filter(Boolean).join(" · ")+" — रिपोर्ट में देखें",6500)}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.isOwner)setTimeout(ownerOpenNote,1800)});
 async function guardInit(){
   if(!S.isOwner||G.ready)return;
   try{G.id=S.demo?"demo":(S.user&&S.user.id?await S.user.id():S.uid);if(!G.id)return;
@@ -1873,7 +1878,7 @@ async function boot(){
   if(S.isOwner)db.collection("presence").onSnapshot(s=>{S.presence=s.docs.map(d=>d.data());if(S.tab==="bills")renderBills()},()=>{});
   setTimeout(()=>{flushOutbox();beat();netbar()},1500);
   if(S.isOwner)setTimeout(()=>guardQ(guardInit),2500);
-  if(S.isOwner)setTimeout(crmWatch,3000);
+  if(S.isOwner){setTimeout(crmWatch,3000);setTimeout(ownerOpenNote,7500)}
   db.collection("parties").onSnapshot(s=>{const all=s.docs.map(d=>({id:d.id,...d.data()}));S.parties=all.filter(p=>!p.deleted);S.partiesDel=all.filter(p=>p.deleted);if(window.SR&&SR.watchDel)SR.watchDel(S.partiesDel);renderPane()});
   db.collection("ledger").onSnapshot(s=>{S.ledger=s.docs.map(d=>({id:d.id,...d.data()}));renderPane();if(S.isOwner)guardQ(guardLedger)});
   db.collection("pstock").onSnapshot(s=>{S.pstock={};s.docs.forEach(d=>S.pstock[d.id]=d.data());if(S.tab==="bill"&&!$("#p-bill").contains(document.activeElement))renderBill();if(S.tab==="day"&&!$("#p-day").contains(document.activeElement))renderDay()},()=>{});

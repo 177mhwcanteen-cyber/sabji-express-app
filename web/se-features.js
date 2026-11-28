@@ -1173,7 +1173,7 @@ SF.drawCheckout=function(){
 S.cancelReqs=[];
 SF.watchCancelReqs=function(db){
   db.collection("cancelReq").where("status","==","pending").onSnapshot(s=>{S.cancelReqs=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.ts-a.ts);
-    if(S.isOwner){renderTabs();if(S.tab==="report")renderReport();const n=S.cancelReqs.length;if(n>(SF._crN||0)){toast("🚫 "+n+" बिल रद्द करने की अर्ज़ी आई है — रिपोर्ट में सबसे ऊपर");try{beep(false)}catch(e){}}SF._crN=n}
+    if(S.isOwner){renderTabs();if(S.tab==="report")renderReport();SF._crN=S.cancelReqs.length/* 28-11: बीप/पॉप-अप नहीं (विक्रम जी) — ऐप खुलते ही ownerOpenNote बताता है, टैब पर 🔴 */}
     else{try{renderPane(true)}catch(e){}}},()=>{});
 };
 /* 🚫 27-11 (विक्रम जी, 177 MH जैसा): साथी की अर्ज़ी जाते ही बिल उसकी सूची/भुगतान-बाकी से हट जाता है; रद्द सिर्फ़ मालिक की मंज़ूरी पर।
@@ -1454,7 +1454,7 @@ document.addEventListener("change",e=>{if(e.target.id!=="gpFile")return;const f=
 SF.watchClose=function(d){if(SF._unC)try{SF._unC()}catch(e){}SF._ct=undefined;if(!S.isOwner||S.demo||!S.db||d!==today())return;
   SF._unC=S.db.doc("days/"+d+"/meta/close").onSnapshot(x=>{const v=x.exists?x.data():null;const k=v&&v.counted!=null&&v.counted!==""?String(v.counted)+"|"+(v.ts||""):"";
     if(SF._ct!==undefined&&k&&k!==SF._ct&&v.by!==S.uid)setTimeout(()=>{S.close=v;const c=cashCalc(d);const bad=c.diff!=null&&c.diff<-5;
-      toast((bad?"🚨 ":"💵 ")+(v.byName||"कर्मचारी")+" ने ₹"+c.counted+" गिना · होना चाहिए ₹"+c.expected+" → "+(c.diff===0?"ठीक":(c.diff>0?"+₹"+c.diff+" ज़्यादा":"₹"+Math.abs(c.diff)+" कम")));if(bad)try{beep(false)}catch(e){}},900);
+      toast((bad?"🚨 ":"💵 ")+(v.byName||"कर्मचारी")+" ने ₹"+c.counted+" गिना · होना चाहिए ₹"+c.expected+" → "+(c.diff===0?"ठीक":(c.diff>0?"+₹"+c.diff+" ज़्यादा":"₹"+Math.abs(c.diff)+" कम")));/* 28-11: आवाज़ नहीं (पहले गड़बड़ पर बीप बजती थी) */},900);
     SF._ct=k},()=>{})};
 SF.gallaTileHTML=function(){if(!S.isOwner)return "";const c=cashCalc(S.billsDate);
   return `<div><span>💵 गल्ला गिनती</span><b>${c.counted==null?"— अभी नहीं":rs(c.counted)}</b><small>होना चाहिए ${rs(c.expected)}${c.diff!=null?" · "+(c.diff===0?"✅ ठीक":c.diff>0?"+"+rs(c.diff):"🚨 "+rs(Math.abs(c.diff))+" कम"):""}${S.close&&S.close.byName&&c.counted!=null?" · "+esc(S.close.byName):""}${(()=>{const n=SF.glLog().filter(g=>!g.ok).length;return n?" · 🔔 "+n+" एंट्री देखनी है":""})()}</small></div>`};

@@ -1370,7 +1370,7 @@ SR.watchDel=function(L){if(!S.isOwner)return;let seen={};try{seen=JSON.parse(loc
   const first=!seen;seen=seen||{};let ch=false;
   (L||[]).forEach(p=>{const t=num(p.deletedTs);if(!t||seen[p.id]===t)return;seen[p.id]=t;ch=true;if(first||p.deletedDev===devId())return;
     const msg=`उधार खाता "${p.name}" हटाया गया — आपकी (मालिक) ID से, ${ftime(t)} पर, फ़ोन: ${p.deletedDevTxt||"पता नहीं"}${num(p.oldBal)?" · बाकी था "+rs(p.oldBal):""}`;
-    try{if(typeof guardAlarm==="function"&&G.ready)guardAlarm({kind:"pdel",no:p.id,msg});else{toast("🚨 "+msg);beep(false)}}catch(e){toast("🚨 "+msg)}});
+    try{if(typeof guardAlarm==="function"&&G.ready)guardAlarm({kind:"pdel",no:p.id,msg});else{toast("🚨 "+msg)/* 28-11: आवाज़ नहीं */}}catch(e){toast("🚨 "+msg)}});
   if(ch)try{localStorage.setItem("se_pdel",JSON.stringify(seen))}catch(e){}};
 document.addEventListener("change",async e=>{if(e.target.id!=="pName"||!S.isOwner)return;const p=(S.parties||[]).find(x=>x.id===e.target.dataset.pid);const v=e.target.value.trim();if(!p||!v||v===p.name)return;
   if(SR.instOf(v)){toast("🏢 यह अपनी संस्था का नाम है — उधार खाता इस नाम से नहीं रखें");e.target.value=p.name;return}
