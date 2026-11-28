@@ -244,15 +244,16 @@ function wrapLines(ctx,text,maxW){const words=String(text).split(" ");const out=
 /* 🧾 छोटी पर्ची (विक्रम जी 27-11, docs/PARCHI-PROMPT): नाम · बिल नं+समय · सामान · कुल · बड़ा QR (रकम भरी) · धन्यवाद — बस */
 SE.slimCanvas=function(b,o,widthPx){
   /* 28-11 (विक्रम जी): अंग्रेज़ी, सब बीच में (SBI रोल के किनारों पर नीला लोगो — दोनों ओर ~7% खाली), बड़े अक्षर, QR छोटा और बीच में */
-  const W=widthPx||SE.printer.width,k=W/384,fs=n=>Math.round(n*k),P=Math.round(W*0.075),CW=W-2*P;
+  /* 28-11 (2): SBI रोल पर दाईं ओर लोगो ज़्यादा अंदर आता है → दाएँ 13% खाली, बाएँ 7.5% */
+  const W=widthPx||SE.printer.width,k=W/384,fs=n=>Math.round(n*k),P=Math.round(W*0.075),PR=Math.round(W*0.13),CW=W-P-PR,MID=P+CW/2;
   const F='"Mukta","Noto Sans","Noto Sans Devanagari",sans-serif',FB='"Baloo 2","Mukta","Noto Sans",sans-serif';
   const c=document.createElement("canvas");c.width=W;c.height=4000;const x=c.getContext("2d");
   x.fillStyle="#fff";x.fillRect(0,0,W,c.height);x.fillStyle="#000";x.textBaseline="top";let y=fs(6);
   const font=(sz,w)=>{x.font=`${w||600} ${sz}px ${F}`};
-  const C=(t,sz,w,fam)=>{x.font=`${w||600} ${sz}px ${fam||F}`;for(const ln of wrapLines(x,t,CW)){const tw=x.measureText(ln).width;x.fillText(ln,(W-tw)/2,y);y+=Math.round(sz*1.22)}};
-  const LR=(l,r,sz,w)=>{font(sz,w);const rw=x.measureText(r).width;x.fillText(l,P,y);x.fillText(r,W-P-rw,y);y+=Math.round(sz*1.3)};
+  const C=(t,sz,w,fam)=>{x.font=`${w||600} ${sz}px ${fam||F}`;for(const ln of wrapLines(x,t,CW)){const tw=x.measureText(ln).width;x.fillText(ln,MID-tw/2,y);y+=Math.round(sz*1.22)}};
+  const LR=(l,r,sz,w)=>{font(sz,w);const rw=x.measureText(r).width;x.fillText(l,P,y);x.fillText(r,W-PR-rw,y);y+=Math.round(sz*1.3)};
   const fit=(t,max)=>{if(x.measureText(t).width<=max)return t;while(t.length>1&&x.measureText(t+"…").width>max)t=t.slice(0,-1);return t+"…"};
-  const DASH=()=>{y+=fs(3);for(let i=P;i<W-P;i+=fs(9))x.fillRect(i,y,fs(5),Math.max(2,fs(2)));y+=fs(8)};
+  const DASH=()=>{y+=fs(3);for(let i=P;i<W-PR;i+=fs(9))x.fillRect(i,y,fs(5),Math.max(2,fs(2)));y+=fs(8)};
   const LINE=()=>{y+=fs(2);x.fillRect(P,y,CW,Math.max(2,fs(3)));y+=fs(8)};
   C("SABJI EXPRESS",fs(36),800,FB);y-=fs(4);
   C("Fresh Vegetables & Fruits",fs(15),600);y+=fs(4);
@@ -262,18 +263,24 @@ SE.slimCanvas=function(b,o,widthPx){
   /* सामान: नाम (अंग्रेज़ी) | मात्रा × भाव | रकम */
   const en=l=>{try{const it=l.id&&typeof item==="function"?item(l.id):null;return (window.SN&&SN.en&&(SN.en(it||l.name)))||l.name||""}catch(e){return l.name||""}};
   const unit=u=>u==="kg"?"kg":u==="g"?"g":u==="pc"||u==="nag"?"pc":u==="dozen"?"dz":(u||"");
-  const sz=fs(20),c2=P+Math.round(CW*0.50),c3=W-P;
-  font(fs(14),800);x.fillText("ITEM",P,y);{const t="QTY × RATE";x.fillText(t,c2-x.measureText(t).width/2,y)}{const t="AMT";x.fillText(t,c3-x.measureText(t).width,y)}y+=fs(20);
-  (b.lines||[]).forEach(l=>{const am="₹"+r2(l.amt),q=(+l.qty%1?(+l.qty).toFixed(2).replace(/0$/,""):l.qty)+unit(l.unit)+(l.free?" free":" × "+r2(l.rate));
+  /* सामान (विक्रम जी 28-11): नाम = अंग्रेज़ी + हिंदी ("Banana केला"), मात्रा × भाव ठीक रकम के पास, बीच की खाली जगह नाम को */
+  const sz=fs(19),c3=W-PR;font(sz,800);const amW=Math.max(x.measureText("₹0000").width,...(b.lines||[]).map(l=>x.measureText("₹"+r2(l.amt)).width));
+  const c2=c3-amW-fs(10);/* मात्रा-भाव का दायाँ किनारा */
+  font(fs(13),800);x.fillText("ITEM",P,y);{const t="QTY × RATE";x.fillText(t,c2-x.measureText(t).width,y)}{const t="AMT";x.fillText(t,c3-x.measureText(t).width,y)}y+=fs(19);
+  (b.lines||[]).forEach(l=>{const am="₹"+r2(l.amt),q=(+l.qty%1?(+l.qty).toFixed(2).replace(/0$/,""):l.qty)+unit(l.unit)+(l.free?" free":"×"+r2(l.rate));
     font(sz,800);const aw=x.measureText(am).width;x.fillText(am,c3-aw,y);
-    font(fs(17),600);const qw=x.measureText(q).width;x.fillText(q,c2-qw/2,y+fs(2));
-    font(sz,700);x.fillText(fit(en(l),c2-qw/2-P-fs(8)),P,y);y+=Math.round(sz*1.35)});
+    font(fs(16),600);const qw=x.measureText(q).width;x.fillText(q,c2-qw,y+fs(2));
+    const e=en(l),hi=String(l.name||"").replace(/\s*\(.*\)/,"").trim(),room=c2-qw-P-fs(8);
+    font(sz,700);const ew=x.measureText(e).width;
+    if(e&&hi&&e!==hi&&ew<room){x.fillText(e,P,y);font(fs(17),600);x.fillText(fit(hi,room-ew-fs(6)),P+ew+fs(6),y+fs(1))}
+    else{font(sz,700);x.fillText(fit(e||hi,room),P,y)}
+    y+=Math.round(sz*1.38)});
   DASH();
   {font(fs(16),700);x.fillText((b.lines||[]).length+" item"+((b.lines||[]).length>1?"s":""),P,y+fs(12));
-   x.font=`800 ${fs(36)}px ${FB}`;const t="TOTAL ₹"+r2(b.total),tw=x.measureText(t).width;x.fillText(t,W-P-tw,y);y+=fs(44)}
+   x.font=`800 ${fs(34)}px ${FB}`;const t="TOTAL ₹"+r2(b.total),tw=x.measureText(t).width;x.fillText(t,W-PR-tw,y);y+=fs(42)}
   const p=b.pay;if(p&&o.paid!==false){const parts=[p.upi?"UPI ₹"+p.upi:"",p.cash?"Cash ₹"+p.cash:"",p.udhar?"Credit ₹"+p.udhar:""].filter(Boolean);if(parts.length)C((p.udhar&&!p.upi&&!p.cash?"":"✔ PAID · ")+parts.join(" · "),fs(17),800)}
   if(o.qr){LINE();C(o.qrLabel||"SCAN & PAY",fs(20),800);y+=fs(8);
-    const s=Math.round(W*0.56);x.imageSmoothingEnabled=false;x.drawImage(o.qr,Math.round((W-s)/2),y,s,s);y+=s+fs(8);
+    const s=Math.round(W*0.56);x.imageSmoothingEnabled=false;x.drawImage(o.qr,Math.round(MID-s/2),y,s,s);y+=s+fs(8);
     if(o.upi)C("UPI: "+o.upi,fs(14),600)}
   else LINE();
   y+=fs(2);C("Thank you! Visit again",fs(17),700);
