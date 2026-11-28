@@ -38,27 +38,43 @@ SCL.send=async function(loud){
     o.ts=Date.now();o.d=d;o.ver=(window.SE&&SE.version)||"";
     await S.db.doc("pub/cx_"+d).set(o);
     await S.db.doc("pub/cx_idx").set({d:{[d]:o.ts},ts:o.ts},{merge:true});
-    LS("se_cxh_"+d,h);if(loud)toast("✓ "+fdate(d)+" का हिसाब Claude को भेज दिया — Claude इसी चैट में जाँच करेगा");return true}
-  catch(e){if(loud)toast("भेज नहीं पाए: "+(e.message||e));return false}
+    LS("se_cxh_"+d,h);SCL.st.sent=o.ts;SCL.st.sentD=d;SCL.st.serr="";LS("se_cxst",JSON.stringify(SCL.st));if(loud)setTimeout(SCL.pull,1500);if(loud)toast("✓ "+fdate(d)+" का हिसाब Claude को भेज दिया — Claude इसी चैट में जाँच करेगा");return true}
+  catch(e){SCL.st.serr=String(e.message||e).slice(0,80);LS("se_cxst",JSON.stringify(SCL.st));if(loud)toast("भेज नहीं पाए: "+(e.message||e)+" — नेट आते ही ऐप फिर भेजेगा");return false}
 };
 /* Claude का जवाब लाओ */
 SCL.out={};
+SCL.st={};
+const API="https://api.github.com/repos/177mhwcanteen-cyber/sabji-express-app/contents/claude/out/";
+async function getJ(name,v){
+  try{const r=await fetch(SCL.RAW+name+"?t="+(v||Date.now()),{cache:"no-store"});if(r.ok)return await r.json()}catch(e){}
+  /* raw न खुले तो GitHub API (शाखा claude-data) */
+  const r=await fetch(API+name+"?ref=claude-data&t="+Date.now(),{cache:"no-store",headers:{Accept:"application/vnd.github.raw+json"}});
+  if(!r.ok)throw new Error("GitHub "+r.status);return await r.json()}
 SCL.pull=async function(){
-  if(!SCL.ok())return;
-  try{const r=await fetch(SCL.RAW+"index.json?t="+Date.now(),{cache:"no-store"});if(!r.ok)return;const ix=await r.json();
-    const ds=Object.keys(ix.d||{}).sort().slice(-7);
+  if(!SCL.ok()||SCL._pulling)return;SCL._pulling=1;
+  try{const ix=await getJ("index.json");let bad=0;
+    const ds=Object.keys(ix.d||{}).sort().slice(-10);
     for(const d of ds){if(SCL.out[d]&&SCL.out[d]._ts===ix.d[d])continue;
-      try{const f=await (await fetch(SCL.RAW+d+".json?t="+ix.d[d],{cache:"no-store"})).json();const o=JSON.parse(await SCL.open(f));o._ts=ix.d[d];SCL.out[d]=o}catch(e){/* दूसरी चाबी (पुराना फोन) */}}
-    if(typeof renderReport==="function"&&S.tab==="report")renderReport()}catch(e){}
-};
+      try{const o=JSON.parse(await SCL.open(await getJ(d+".json",ix.d[d])));o._ts=ix.d[d];SCL.out[d]=o;LS("se_cxo_"+d,JSON.stringify(o))}catch(e){bad++}}
+    SCL.st.pull=Date.now();SCL.st.err=bad?bad+" जवाब इस फोन की चाबी से नहीं खुले (दूसरे फोन/पुरानी चाबी के)":"";
+  }catch(e){SCL.st.err="जवाब नहीं ला पाए: "+(e.message||e)+" — नेट देखें"}
+  SCL._pulling=0;try{LS("se_cxst",JSON.stringify(SCL.st))}catch(e){}
+  if(typeof renderReport==="function"&&S.tab==="report"&&!document.querySelector(".sheet.open,.sheet.show"))renderReport()};
+/* पिछले जवाब फोन में रखे — नेट न हो तब भी दिखें */
+(function(){try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith("se_cxo_")){const o=JSON.parse(localStorage.getItem(k));if(o&&o._ts)SCL.out[k.slice(7)]=o}}
+  SCL.st=JSON.parse(LS("se_cxst")||"{}")||{}}catch(e){}})();
 SCL.unseen=()=>Object.keys(SCL.out).filter(d=>LS("se_cxs_"+d)!==String(SCL.out[d]._ts));
 const lv=l=>l==="पक्का"?"#c0392b":l==="शक"?"#e67e22":"#7f8c8d";
 SCL.cardHTML=function(){
   if(typeof S==="undefined"||!S.isOwner)return "";
+  if(SCL.ok()&&Date.now()-((SCL.st&&SCL.st.pull)||0)>60000)setTimeout(SCL.pull,300);
   const ds=Object.keys(SCL.out).sort().reverse();
   const head=`<div class="card2" id="sclCard" style="border-left:4px solid #f39c12"><h3>🧑‍💼 Claude का ऑडिट</h3>`;
-  const btn=`<div class="row2" style="margin:8px 0 0"><button class="big" data-sclsend>📤 ${fdate(S.billsDate)} का हिसाब Claude को भेजें</button></div>
-  <p class="note" style="margin:6px 0 0">ऐप हर 30 मिनट अपने-आप भेजता है। कॉपी के पन्नों की फोटो Claude की चैट में दें — जवाब यहीं आएगा।</p>`;
+  const tm=t=>t?new Date(t).toLocaleTimeString("hi-IN",{hour:"2-digit",minute:"2-digit"})+(new Date(t).toDateString()===new Date().toDateString()?"":" ("+new Date(t).toLocaleDateString("hi-IN",{day:"2-digit",month:"2-digit"})+")"):"—";
+  const st=SCL.st||{};
+  const stat=`<p class="note" style="margin:6px 0 0">📤 भेजा: <b>${tm(st.sent)}</b> · 📥 जाँचा: <b>${tm(st.pull)}</b>${st.serr?` · <span style="color:#c0392b">भेजने में दिक्कत: ${esc(st.serr)}</span>`:""}${st.err?` · <span style="color:#c0392b">${esc(st.err)}</span>`:""}</p>`;
+  const btn=stat+`<div class="row2" style="margin:8px 0 0"><button class="big" data-sclsend>📤 ${fdate(S.billsDate)} का हिसाब भेजें</button><button class="big ghost" data-sclpull>🔄 जवाब देखें</button></div>
+  <p class="note" style="margin:6px 0 0">ऐप हर 15 मिनट अपने-आप भेजता है, हर 5 मिनट जवाब देखता है। कॉपी के पन्नों की फोटो Claude की चैट में दें — जवाब यहीं आएगा।</p>`;
   if(!ds.length)return head+`<p class="note" style="margin:0">अभी कोई जवाब नहीं।</p>`+btn+"</div>";
   const one=d=>{const o=SCL.out[d],nw=LS("se_cxs_"+d)!==String(o._ts);
     return `<details ${d===ds[0]?"open":""} style="margin:6px 0"><summary><b>${esc(fdate(d))}</b> ${nw?"🔴 नया":""} — ${esc(o.verdict||"")}</summary>
@@ -70,11 +86,13 @@ SCL.cardHTML=function(){
   return head+ds.map(one).join("")+btn+"</div>";
 };
 document.addEventListener("click",e=>{const a=e.target.closest("[data-sclsend]");if(a){SCL.send(true);return}
+  if(e.target.closest("[data-sclpull]")){toast("🔄 Claude का जवाब देख रहे हैं…");SCL.pull().then(()=>toast(SCL.st.err||"✓ ताज़ा"));return}
   const b=e.target.closest("[data-sclseen]");if(b){const d=b.dataset.sclseen;LS("se_cxs_"+d,String(SCL.out[d]._ts));if(typeof renderReport==="function")renderReport()}});
 SCL.note=()=>{const n=SCL.unseen().length;return n?"🧑‍💼 Claude का "+n+" नया ऑडिट":""};
 SCL.start=function(){if(SCL._st||!SCL.ok())return;SCL._st=1;
   setTimeout(()=>{SCL.pull();if(S.billsDate===today())SCL.send(false)},20000);
-  setInterval(()=>{if(document.hidden)return;SCL.pull();if(S.billsDate===today())SCL.send(false)},30*60000);
+  setInterval(()=>{if(document.hidden)return;if(S.billsDate===today())SCL.send(false)},15*60000);
+  setInterval(()=>{if(!document.hidden)SCL.pull()},5*60000);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)SCL.pull()})};
 setTimeout(function w(){if(typeof S!=="undefined"&&S.isOwner&&S.db)SCL.start();else setTimeout(w,5000)},4000);
 })();

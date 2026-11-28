@@ -1,8 +1,8 @@
-# 🧑‍💼 ऐप → Claude (28-11-2026): मालिक का फोन pub/cx_<दिन> में ताले वाला ऑडिट-पैक रखता है; यह हर 30 मिनट उसे
+# 🧑‍💼 ऐप → Claude (28-11-2026): मालिक का फोन pub/cx_<दिन> में ताले वाला ऑडिट-पैक रखता है; यह हर 15 मिनट उसे
 # शाखा claude-data के claude/in/<दिन>.json में ले आता है। खोलने की चाबी सिर्फ़ Claude के पास (repo सार्वजनिक है — सब ताले में)।
 name: claude-in
 on:
-  schedule: [{ cron: "7,37 * * * *" }]
+  schedule: [{ cron: "7,22,37,52 * * * *" }]
   workflow_dispatch: {}
 permissions: { contents: write }
 concurrency: { group: claude-data, cancel-in-progress: false }
