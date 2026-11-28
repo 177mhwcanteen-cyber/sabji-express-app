@@ -149,7 +149,7 @@ SX.orderSet=async function(id,status,extra){try{if(!S.demo)await S.db.collection
    ऑर्डर-पेज सब्ज़ी के ऑर्डर की हालत यहीं से पढ़ता है: मिला (acc) → पैक (pack) → रास्ते में (out) → पहुँचा (done) / रद्द */
 SX.mid=o=>{const m=String((o&&o.note)||"").match(/🆔([A-Za-z0-9]+)/);return m?m[1]:""};
 SX.pubOt=async function(id,st,extra){const o=SX.orders.find(x=>x.id===id)||(SX._oall||{})[id],mid=SX.mid(o);if(!mid||!st||S.demo||!S.db)return;
-  try{await S.db.collection("pub").doc("ot_"+mid).set({st,ts:Date.now(),by:biller()||"",msg:st==="out"?"🛵 Sabji Express van is coming":st==="pack"?"Weighing fresh vegetables for you":"",...(extra&&extra.billNo?{billNo:extra.billNo}:{})},{merge:true})}catch(e){}};
+  try{await S.db.collection("pub").doc("ot_"+mid).set({st,ts:Date.now(),by:biller()||"",msg:st==="out"?"🛵 Sabji Express van is coming":st==="pack"?"Weighing fresh vegetables for you":st==="cancel"&&extra&&extra.why?"❌ "+({"सब्ज़ी खत्म हो गई":"Sold out today","ग्राहक ने मना किया":"Cancelled as you asked","पता/नंबर नहीं मिला":"Could not reach your address/phone","आज गाड़ी नहीं पहुँचेगी":"Van cannot reach today"}[extra.why]||extra.why):"",...(extra&&extra.billNo?{billNo:extra.billNo}:{})},{merge:true})}catch(e){}};
 /* ⚠ मालिक: पिछले 3 दिन में "पूरा" हुए ऑनलाइन ऑर्डर जिनका बिल नहीं बना (माल गया, हिसाब नहीं) */
 SX.noBill=[];
 SX.loadNoBill=async function(){if(!S.isOwner||S.demo||!S.db)return;try{const q=await S.db.collection("orders").where("status","==","done").get();const t0=Date.now()-3*864e5;
@@ -161,8 +161,10 @@ document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest
 /* बिल सेव हुआ तो उसी ग्राहक का ऑर्डर अपने-आप पूरा */
 SX.checkOrderDone=function(){const o=S.sxOrder;if(!o)return;const b=(S.dayBills||[]).find(x=>!x.cancelled&&x.ts>o.ts&&(!o.phone||x.custPhone===o.phone));if(b){S.sxOrder=null;SX.orderSet(o.id,"done",{billNo:b.no});toast("✓ ऑर्डर पूरा — बिल "+b.no)}};
 SX.pubRates=async function(force){if(S.demo||!S.db||!(S.isOwner||S.uid))return;/* साथी के फोन से भी भाव जाएँ — तीन-दुकान ऑर्डर-पेज इन्हीं से चलता है */const k="sx_pubr";const last=LS.get(k)||0;
-  const L=S.items.filter(i=>i.active!==false&&!i.virtual&&!i.pending&&num(i.sale)>0&&i.id!=="xyz"&&!i.track).map(i=>{const ps=SE.photoSrc(i);return {id:i.id,n:i.name,e:window.SN&&SN.en?SN.en(i):"",u:i.unit,s:num(i.sale),c:i.cat||"",p:ps&&!/^data:/.test(ps)?ps:"",h:num(i.hue)}});
-  const h=JSON.stringify(L.map(i=>[i.id,i.s,i.p,i.n]));if(!force&&LS.get("sx_pubh")===h&&Date.now()-last<6*3600e3)return;if(!L.length)return;
+  /* 28-11: आज गाड़ी में जो सब्ज़ी है ही नहीं (आज खरीदी नहीं + कल रात कुछ नहीं बचा) — ऑर्डर-पेज पर "Sold out" (o:1)। दिन शुरू (आज की खरीद चढ़ी) तभी — सुबह सब बंद न दिखे */
+  let avail=null;try{if(S.billsDate===today()&&window.SF&&SF.dayRows&&SF.livePurch&&SF.livePurch().length&&SF._pvOk){avail={};SF.dayRows().forEach(r=>avail[r.it.id]=r.avail)}}catch(e){avail=null}
+  const L=S.items.filter(i=>i.active!==false&&!i.virtual&&!i.pending&&num(i.sale)>0&&i.id!=="xyz"&&!i.track).map(i=>{const ps=SE.photoSrc(i);return {id:i.id,n:i.name,e:window.SN&&SN.en?SN.en(i):"",u:i.unit,s:num(i.sale),c:i.cat||"",p:ps&&!/^data:/.test(ps)?ps:"",h:num(i.hue),...(avail&&avail[i.id]!=null&&!(avail[i.id]>0)?{o:1}:{})}});
+  const h=JSON.stringify(L.map(i=>[i.id,i.s,i.p,i.n,i.o||0]));if(!force&&LS.get("sx_pubh")===h&&Date.now()-last<6*3600e3)return;if(!L.length)return;
   try{await S.db.collection("pub").doc("rates").set({type:"rates",items:L,ts:Date.now(),phone:String(S.settings.ownerPh||"").replace(/\D/g,"").slice(-10)});LS.set(k,Date.now());LS.set("sx_pubh",h)}catch(e){}};
 
 /* ======================= 8) रोज़ का भाव-पोस्टर ======================= */
@@ -314,7 +316,10 @@ document.addEventListener("click",async e=>{const t=e.target;
   const od=t.closest("[data-sxodone]");if(od){/* बिना बिल "पूरा" — पक्का पूछो और मालिक की रिपोर्ट में दिखे */if(!od.dataset.sure){od.dataset.sure="1";od.textContent="⚠ बिना बिल पूरा? (मालिक को दिखेगा)";return}SX.orderSet(od.dataset.sxodone,"done",{noBill:true});closeSheet();toast("✓ ऑर्डर पूरा — बिल नहीं बना, मालिक को दिखेगा");return}
   const oo=t.closest("[data-sxoout]");if(oo){const id=oo.dataset.sxoout;SX.pubOt(id,"out");try{if(!S.demo)S.db.collection("orders").doc(id).update({out:Date.now()})}catch(x){}const o=SX.orders.find(x=>x.id===id);if(o)o.out=Date.now();oo.textContent="✓ रास्ते में";toast("🛵 ग्राहक को दिख गया — गाड़ी रास्ते में");return}
   const oa=t.closest("[data-sxoacc]");if(oa){SX.pubOt(oa.dataset.sxoacc,"acc")}
-  const on=t.closest("[data-sxono]");if(on){if(!on.dataset.sure){on.dataset.sure="1";on.textContent="पक्का रद्द?";return}SX.orderSet(on.dataset.sxono,"cancel");closeSheet();return}
+  /* 28-11: रद्द करते समय वजह (ग्राहक के ट्रैकिंग-पेज पर वही दिखे) — पहले सिर्फ़ "रद्द" */
+  const on=t.closest("[data-sxono]");if(on){const id=on.dataset.sxono,box=document.createElement("div");box.className="seg";box.style.margin="0";
+    box.innerHTML=`<span class="note" style="width:100%">रद्द क्यों? (ग्राहक को यही दिखेगा)</span>`+["सब्ज़ी खत्म हो गई","ग्राहक ने मना किया","पता/नंबर नहीं मिला","आज गाड़ी नहीं पहुँचेगी"].map(w=>`<button class="chip" data-sxwhy="${esc(w)}" data-oid="${esc(id)}">${esc(w)}</button>`).join("");on.replaceWith(box);return}
+  const wy=t.closest("[data-sxwhy]");if(wy){SX.orderSet(wy.dataset.oid,"cancel",{why:wy.dataset.sxwhy});closeSheet();toast("✕ ऑर्डर रद्द — ग्राहक को वजह दिखेगी");return}
   if(t.closest("[data-sxqr]")){SX.qrCard();return}
   if(t.closest("[data-sxolink]")){window.open(waLink("🥬 सब्ज़ी एक्सप्रेस — अब घर बैठे ऑर्डर करें! सब्ज़ी चुनें, भेजें, गाड़ी आपकी गली में 🚐\n"+pubBase()+"o.html",""),"_blank");return}
   if(t.closest("[data-sxposter]")){SX.poster();return}

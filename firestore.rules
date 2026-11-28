@@ -75,7 +75,13 @@ service cloud.firestore {
     match /customers/{id} { allow read, create, update: if active(); allow delete: if false; }
     // हर ग्राहक की पूरी खरीद का इतिहास — कभी नहीं मिटता
     match /customers/{id}/hist/{h} { allow read, create, update: if active(); allow delete: if false; }
-    match /pstock/{id}    { allow read, create, update: if active(); allow delete: if false; }
+    // 28-11: पैकेट वाले सामान का स्टॉक — हर बदलाव पर लिखने वाले का नाम पक्का (by = खुद), सिर्फ़ गिनती वाले खाने; मिटाना कभी नहीं
+    match /pstock/{id}    {
+      allow read: if active();
+      allow create: if isOwner() || (active() && request.resource.data.by == request.auth.uid);
+      allow update: if isOwner() || (active() && request.resource.data.by == request.auth.uid && onlyKeys(['qty', 'ts', 'by', 'byName', 'last']));
+      allow delete: if false;
+    }
     match /stockLog/{id}  { allow read, create: if active(); }
     match /inward/{id}    { allow read, create: if active(); }
     match /presence/{id}  { allow read, write: if active(); }

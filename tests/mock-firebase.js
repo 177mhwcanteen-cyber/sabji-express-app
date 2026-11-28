@@ -4,7 +4,7 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 function coll(p){D[p]=D[p]||{};return D[p]}
 let quiet=0;const notify=()=>{if(!quiet)setTimeout(()=>subs.forEach(s=>s()),0)};
 function snapDoc(p,id){const c=D[p]||{};const ex=id in c;return {exists:ex,id,ref:docRef(p+"/"+id),data:()=>ex?clone(c[id]):undefined}}
-function applyInc(old,d){const o={...(old||{})};for(const [k,v] of Object.entries(d)){if(v&&v.__inc!=null)o[k]=(+o[k]||0)+v.__inc;else if(v&&v.__union)o[k]=(o[k]||[]).concat(v.__union);else o[k]=v}return o}
+function applyInc(old,d){const o={...(old||{})};for(const [k,v] of Object.entries(d)){if(v&&v.__inc!=null)o[k]=(+o[k]||0)+v.__inc;else if(v&&v.__union){const cur=o[k]||[];o[k]=cur.concat(v.__union.filter(x=>!cur.some(y=>JSON.stringify(y)===JSON.stringify(x))))}/* असली Firestore जैसा: जो पहले से है वह दोबारा नहीं */else o[k]=v}return o}
 function docRef(full){const p=full.split("/");const id=p.pop();const cp=p.join("/");return {id,
  get:async()=>snapDoc(cp,id),
  set:async(d,opt)=>{const c=coll(cp);c[id]=clone(applyInc(opt&&opt.merge?c[id]:{},d));notify()},

@@ -79,6 +79,20 @@ async def main():
         assert r == ["static", True], r
         await pg.screenshot(path=f"{SHOTS}/k1-bills-360.png")
 
+        # 10) 🗑️ साथी का हटाया सामान + खराबी → मालिक की मंज़ूरी (✓/✗), रिपोर्ट टैब पर 🔴, बिलिंग में चिप
+        r = await pg.evaluate("""(async()=>{const d=today(),now=Date.now();window.__W=[];
+          const D={['days/'+d+'/meta/cartrm']:{log:[{id:'tamatar',n:'टमाटर',q:2,u:'kg',a:60,by:'कमल भाई',uid:'s1',ts:now-9000,w:'पूरा बिल बंद'}]},
+                   ['days/'+d+'/meta/stock']:{wlog:[{id:'aloo',name:'आलू',unit:'kg',qty:5,reason:'सड़ गया',ts:now-8000,by:'s1',byName:'कमल भाई',wid:'abc',ph:1}]}};
+          S.demo=false;S.isOwner=true;S.uid='own';
+          S.db={doc:p=>({onSnapshot:fn=>{setTimeout(()=>fn({exists:!!D[p],data:()=>D[p]}),5);return ()=>{}},set:async(x,o)=>{__W.push([p,x])},get:async()=>({exists:!!D[p],data:()=>D[p]})})};
+          CRM.d='';crmWatch();await new Promise(r=>setTimeout(r,120));
+          const P=crmPend(),tabs=tabsList().find(t=>t[0]==='report')[1],chip=crmChipHTML(),card=cartRmHTML();
+          const ph=P.find(x=>x._waste)?.ph||'';
+          await crmDecide([P[0]],'no');const left=crmPend().length;await crmDecide(crmPend(),'ok');
+          const out=[P.length,tabs.includes('🔴2'),chip.includes('2 हटाए'),card.includes('पूरा बिल ✕✕'),ph,left,crmPend().length,__W.length,JSON.stringify(__W[0][1]).includes('"s":"no"')];
+          S.demo=true;S.isOwner=false;S.db=null;CRM.d='';return out})()""")
+        assert r == [2, True, True, True, "days/" + await pg.evaluate("today()") + "/meta/ph_w_abc", 1, 0, 2, True], ("removal approval", r)
+
         assert not errs, errs
         print("✅ पूरा टेस्ट पास (50 कमियों के सुधार)")
         await b.close()

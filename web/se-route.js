@@ -758,9 +758,13 @@ SR.wasteSheet=function(id){
     const w=e.target.closest("[data-wr]");if(w){why=w.dataset.wr;document.querySelectorAll("[data-wr]").forEach(x=>x.setAttribute("aria-pressed",x===w));return}
     if(!e.target.closest("[data-wsave]"))return;
     const q=r2(parseFloat(String($("#wQ").value).replace(",","."))*1000||0)/1000;if(!(q>0)){toast("कितना खराब हुआ — लिखें");return}
-    const items=S.stock.items||(S.stock.items={});const o=items[it.id]||(items[it.id]={});o.waste=r2((+o.waste||0)+q);
-    (S.stock.wlog||(S.stock.wlog=[])).push({id:it.id,name:it.name,unit:it.unit,qty:q,reason:why,ts:Date.now(),by:S.uid||"",byName:biller()});
-    await saveStock();closeSheet();toast("🗑️ "+it.name+" "+fq(q,it.unit)+" खराबी दर्ज ("+why+")");try{renderPane()}catch(err){}
+    const wid=Date.now().toString(36)+Math.random().toString(36).slice(2,4),val=r2(q*(+it.sale||0));
+    const save=async ph=>{const items=S.stock.items||(S.stock.items={});const o=items[it.id]||(items[it.id]={});o.waste=r2((+o.waste||0)+q);
+      (S.stock.wlog||(S.stock.wlog=[])).push({id:it.id,name:it.name,unit:it.unit,qty:q,reason:why,ts:Date.now(),by:S.uid||"",byName:biller(),wid,...(ph?{ph:1}:{})});
+      await saveStock();closeSheet();toast("🗑️ "+it.name+" "+fq(q,it.unit)+" खराबी दर्ज ("+why+")");try{renderPane()}catch(err){}};
+    /* 28-11: ₹100 या ज़्यादा की खराबी पर फोटो ज़रूरी (रात की कमी "खराब" लिखकर न छिपे) — फोटो मालिक की मंज़ूरी-सूची में */
+    if(!S.isOwner&&!S.demo&&val>=100&&window.SF&&SF.takePhoto){toast("📷 "+rs(val)+" की खराबी — खराब माल की फोटो लें");SF.takePhoto({kind:"waste",k:"w_"+wid,date:today(),name:today()+"_खराब_"+it.name+".jpg"},()=>save(true));return}
+    await save(false);
   };
   setTimeout(()=>{const x=$("#wQ");if(x)x.focus()},60);
 };

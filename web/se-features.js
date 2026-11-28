@@ -79,7 +79,7 @@ SF.flushPhotos=async function(){
     const list=await IDB.all();
     for(const ph of list){
       try{
-        const url=SF.scriptUrl();let got;
+        const url=ph.kind==="waste"?"":SF.scriptUrl();let got;/* खराबी की फोटो हमेशा Firestore में (मालिक की मंज़ूरी-सूची में सीधे दिखे) */
         if(url){const tok=await firebase.auth().currentUser.getIdToken();
           const r=await fetch(url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
             body:JSON.stringify({idToken:tok,apiKey:CFG.firebase.apiKey,pid:ph.pid,date:ph.date,name:ph.name,mime:"image/jpeg",b64:await b64(ph.blob)})});
@@ -87,6 +87,7 @@ SF.flushPhotos=async function(){
         else got=await photoToFs(ph);
         const F=firebase.firestore.FieldValue;
         if(ph.kind==="bill")await S.db.doc("days/"+ph.date+"/meta/billPhotos").set({[ph.no]:F.arrayUnion({...got,ts:Date.now(),by:ph.by||""})},{merge:true});
+        else if(ph.kind==="waste"){/* रास्ता पक्का: days/<d>/meta/ph_w_<wid> */}
         else await S.db.doc("purchases/"+ph.pid).update({photos:F.arrayUnion({...got,ts:Date.now()}),photoPending:F.increment(-1)});
         await IDB.del(ph.k);
       }catch(e){break}
@@ -319,7 +320,7 @@ async function savePurchase(){
     const n=pNo(doc,S.purch.filter(p=>p.date===doc.date).length+(S.purch.find(p=>p.id===id)?0:1));
     P=blankP();draftPhotos=[];saveDraft();S.saving=false;closeSheet();SF.renderKharid(1);beep(true);
     toast("✓ खरीद "+n+" सेव · "+rs(net)+(disc>0?" (छूट "+rs(disc)+")":"")+" · माल स्टॉक में जुड़ा");
-    setTimeout(SF.flushPhotos,1500);
+    setTimeout(SF.flushPhotos,1500);if(window.SX&&SX.ratesSoon)SX.ratesSoon();
   }catch(e){S.saving=false;toast("सेव नहीं हुई: "+(e.message||e.code||""))}
 }
 function viewPurchase(p){
@@ -340,6 +341,8 @@ function viewPurchase(p){
   $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}
     if(e.target.closest("[data-paddphoto]")){pickPhoto(async blob=>{const k=p.id+"_x"+Date.now();await IDB.put({k,pid:p.id,date:p.date,name:`${p.date}_${p.supName}_x.jpg`,blob,ts:Date.now()});S.db.doc("purchases/"+p.id).update({photoPending:firebase.firestore.FieldValue.increment(1)}).catch(()=>{});toast("फोटो जुड़ी — नेट मिलते ही Drive पर जाएगी");closeSheet();SF.flushPhotos()})}};
 }
+/* 📷 कोई भी फोटो कतार में (खराबी आदि) — m = {kind,k,date,name}; फोटो ली तो cb(true) */
+SF.takePhoto=function(m,cb){pickPhoto(async blob=>{try{await IDB.put({k:m.k,kind:m.kind||"x",pid:m.pid||"",no:m.no||"",date:m.date||today(),by:biller(),name:m.name||"",blob,ts:Date.now()});SF.flushPhotos();if(cb)cb(true)}catch(e){toast("फोटो सेव नहीं हुई")}})};
 SF.addBillPhoto=function(b,done){pickPhoto(async blob=>{try{const k="b_"+b.no+"_"+Date.now();
   await IDB.put({k,kind:"bill",no:b.no,pid:b.no,date:b.date||today(),by:biller(),name:`${b.date||today()}_बिल_${b.no}_${(b.photoN||0)+1}.jpg`,blob,ts:Date.now()});
   b.photoN=(b.photoN||0)+1;toast("📷 फोटो बिल "+b.no+" के साथ जुड़ी");SF.flushPhotos();if(done)done()}catch(e){toast("फोटो सेव नहीं हुई")}})};
@@ -1192,7 +1195,12 @@ SF.doCancel=async function(b,why){
   try{await SB.patchBill(b,ch)}catch(e){Object.assign(b,before);throw e}
   if(b.pay&&num(b.pay.udhar)>0){try{G.okdel.add(b.no)}catch(x){}try{if(!S.demo&&S.db)await S.db.doc("ledger/"+b.no).delete()}catch(x){}S.ledger=(S.ledger||[]).filter(l=>l.id!==b.no)}
   try{await adjStock(trackedPairs(b.lines||[],1),"रद्द बिल "+b.no)}catch(x){}
+  custAdj(b,-1);
 };
+/* 28-11: बिल रद्द/वापस हो तो ग्राहक-रजिस्टर की "कुल खरीद" और "कितनी बार" भी (पहले रद्द बिल भी गिने रहते थे) */
+function custAdj(b,sign){try{const ph=String((b&&b.custPhone)||"");if(ph.length!==10||S.demo||!S.db)return;const F=firebase.firestore.FieldValue;
+  S.db.collection("customers").doc(ph).set({spent:F.increment(r2(sign*num(b.total))),visits:F.increment(sign)},{merge:true}).catch(()=>{});
+  S.db.doc("customers/"+ph+"/hist/"+b.no).set({cancelled:sign<0},{merge:true}).catch(()=>{})}catch(e){}}
 SF.sendCancelReq=async function(b){
   const why=($("#crWhy")?.value||"").trim();if(why.length<3){toast("पहले रद्द करने की वजह लिखें");return}
   /* साथी खुद रद्द नहीं करता — सिर्फ़ अर्ज़ी (मालिक ✓ करें तब स्टॉक/उधार वापस) */
@@ -1218,11 +1226,11 @@ SF.decideCancel=async function(id,ok){
     if(ok){const ref=S.db.doc("days/"+r.date+"/bills/"+r.no);const g=await ref.get();if(!g.exists){toast("बिल नहीं मिला");return}const b=g.data();
       if(!b.cancelled){await ref.update({cancelled:true,cancelledBy:S.uid||"",cancelReason:"अर्ज़ी: "+r.reason+" ("+r.byName+")",cancelTs:Date.now()});
         if(b.pay&&b.pay.udhar>0){try{await S.db.doc("ledger/"+b.no).delete()}catch(e){}}
-        await adjStock(trackedPairs(b.lines||[],1),"रद्द बिल "+b.no)}}
+        await adjStock(trackedPairs(b.lines||[],1),"रद्द बिल "+b.no);custAdj(b,-1)}}
     if(!ok){const ref=S.db.doc("days/"+r.date+"/bills/"+r.no);const g=await ref.get();const b=g.exists?g.data():null;
       if(b&&b.cancelled){await ref.update({cancelled:false,restoredTs:Date.now(),restoredBy:S.uid||"",cancelNote:"रद्द वापस — "+(b.cancelReason||"")});
         if(b.pay&&b.pay.udhar>0&&b.partyId)await S.db.collection("ledger").doc(b.no).set({ts:b.ts,date:b.date,partyId:b.partyId,partyName:b.partyName||"",type:"udhar",amt:b.pay.udhar,billNo:b.no,by:b.by||"",byName:b.byName||"",restored:true});
-        await adjStock(trackedPairs(b.lines||[],-1),"रद्द वापस "+b.no)}}
+        await adjStock(trackedPairs(b.lines||[],-1),"रद्द वापस "+b.no);custAdj(b,1)}}
     await S.db.doc("cancelReq/"+id).update({status:ok?"approved":"rejected",decidedTs:Date.now()});
     S.cancelReqs=S.cancelReqs.filter(x=>x.id!==id);renderTabs();renderReport();toast(ok?"✓ ठीक — बिल रद्द रहेगा":"↩ बिल वापस चालू — पहले जैसा रहेगा");
   }catch(e){toast("नहीं हुआ: "+(e.code||e.message||""))}
@@ -1246,7 +1254,7 @@ SF.roff=function(b){if(!b||b.mode==="inst")return 0;const sub=b.sub!=null?num(b.
 SF.roffTxt=r=>"राउंड ऑफ "+(r>0?"+":"−")+"₹"+Math.abs(r).toFixed(2);
 SF.billProfit=function(b){
   if(!b||b.cancelled)return null;if(b.mode==="inst")return {p:0,pct:0,inst:true,miss:0};
-  let p=0,miss=0;(b.lines||[]).forEach(l=>{if(l.id==="xyz"){p+=num(l.amt);return}const c=SF.lineCost(l,b.date);if(!(c>0))miss++;p+=(l.free?0:num(l.amt))-num(l.qty)*c});
+  let p=0,miss=0;(b.lines||[]).forEach(l=>{if(l.id==="xyz")return;/* 28-11: XYZ (थैली/पुराना हिसाब…) की लागत पता नहीं — बिल की cost में पूरी रकम लागत है, इसलिए यहाँ भी फायदा 0 (पहले यहाँ पूरा फायदा गिना जाता था) */const c=SF.lineCost(l,b.date);if(!(c>0))miss++;p+=(l.free?0:num(l.amt))-num(l.qty)*c});
   p=r2(p-num(b.disc)+SF.roff(b));return {p,pct:num(b.total)>0?Math.round(p/num(b.total)*100):0,miss}};
 SF.billProfitTag=function(b){const x=SF.billProfit(b);if(!x)return "";if(x.inst)return '<small class="pf z">खरीद भाव</small>';
   return `<small class="pf ${x.p<0?"neg":x.pct<20?"low":""}">${x.p<0?"घाटा":"फायदा"} ₹${Math.abs(Math.round(x.p))} · ${x.pct}%${x.miss?" *":""}</small>`};

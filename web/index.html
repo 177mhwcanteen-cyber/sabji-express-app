@@ -601,6 +601,7 @@ html .cartbtn:active{transform:scale(.985)}
 .snav button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:5px 10px;font-size:12.5px;font-weight:700;white-space:nowrap}
 .toast{pointer-events:none}
 /* 28-11: 📷 Firestore फोटो की परत · छोटे फोन (≤400px) पर बिल-सूची की फ़िल्टर पट्टी चिपकी न रहे (ऊपर के आँकड़े ढक जाते थे) और तारीखें नीचे की लाइन में */.fsph{position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.86);display:grid;place-items:center;padding:10px}.fsph-in{display:grid;gap:6px;justify-items:center;color:#fff;max-width:100%;max-height:100%}.fsph-in img{max-width:100%;max-height:86vh;border-radius:10px;background:#fff}.fsph-in small{color:#ddd;text-align:center}@media (max-width:400px){.bfbar{position:static}.bf-r{flex-wrap:wrap}.bf-d input{max-width:120px}#ctray .cth span{white-space:normal}}
+/* 🎨 28-11 ग्राफिक्स (विक्रम जी: हरा पसंद नहीं — iPhone Pro जैसा नेवी + केसरिया; बड़े बटन; टैब किनारे पर कटे नहीं, धीरे से धुँधले) */.tabs{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 16px,#000 calc(100% - 16px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 16px,#000 calc(100% - 16px),transparent 100%);scroll-snap-type:x proximity;padding:0 10px}.tabs button{scroll-snap-align:center;white-space:nowrap}#bfab{background:linear-gradient(145deg,#ff9a4d,#e04a00 70%)!important;box-shadow:0 8px 20px rgba(224,74,0,.35),0 2px 6px rgba(0,0,0,.16)!important;width:60px!important;height:60px!important}#ctray .cth{background:linear-gradient(90deg,#eef2ff,#fff7ed);color:#0d1a33}#ctray .cth button{color:#1b3566}#ctray .cth button.nb{background:linear-gradient(135deg,#1b3566,#0d1a33);color:#fff}.ctr .cti{background:#f2f2f7}.ctr .ctw{border-color:#1b3566;background:#eef2ff;color:#0d1a33}.ctr .ctq{border-color:#1b3566}.ctr .ctq button{background:#eef2ff;color:#1b3566}@keyframes ctrhl{0%{background:#ffedd5}100%{background:transparent}}.upd{background:linear-gradient(120deg,#1b3566,#4f46e5)!important}.spcard{border-color:#1b3566;background:linear-gradient(135deg,rgba(27,53,102,.08),var(--surface))}html body .pfk{background:linear-gradient(135deg,#f5f7ff,#fffaf2);border-color:#1b3566}html body .pfk span{color:#0d1a33}html body .pfk b{color:#0d1a33}html body .pfk>small,html body .pfk span small{color:#475569}html body .cats .chip{padding:7px 14px;font-size:13.5px;min-height:34px}.crm-chip{display:block;width:100%;border:0;border-radius:14px;padding:10px 12px;margin:0 0 8px;background:linear-gradient(135deg,#fee2e2,#fff1f2);color:#991b1b;font:inherit;font-weight:800;font-size:14px;text-align:left;box-shadow:0 2px 8px rgba(153,27,27,.12)}.crm-card{border:2px solid #f97316}.crm-card h3{color:#c2410c;margin:0 0 6px}.crm-r{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}.crm-r>div:first-child{display:grid;gap:2px;min-width:0}.crm-r .chip{justify-self:start;margin-top:2px}.crm-r.no b{color:#b91c1c}.crm-b{display:flex;gap:6px}.crm-b .big{margin:0;padding:8px 12px;width:auto;font-size:14px}.crm-bad{margin-top:8px;font-size:13px}.crm-bad summary{cursor:pointer;font-weight:800;color:#b91c1c}
 </style>
 
 <header class="px">
@@ -727,7 +728,7 @@ $("#btabs").onclick=e=>{
 };
 
 /* ---------- tabs ---------- */
-function tabsList(){const t=[["bill","बिलिंग"],["kharid","खरीद"],["udhar","उधार खाता"],["bills","आज के बिल"],["day","दिन का हिसाब"]];t.push(["label","लेबल"]);if(S.isOwner)t.push(["route","रूट"]);const _cr=(S.cancelReqs||[]).length;if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()+_cr?" 🔴"+(guardOpen()+_cr):"")],["set","रेट व सेटिंग"]);return t}
+function tabsList(){const t=[["bill","बिलिंग"],["kharid","खरीद"],["udhar","उधार खाता"],["bills","आज के बिल"],["day","दिन का हिसाब"]];t.push(["label","लेबल"]);if(S.isOwner)t.push(["route","रूट"]);const _cr=(S.cancelReqs||[]).length+(S.isOwner&&typeof crmPend==="function"?crmPend().length:0);if(S.isOwner)t.push(["report","रिपोर्ट"+(guardOpen()+_cr?" 🔴"+(guardOpen()+_cr):"")],["set","रेट व सेटिंग"]);return t}
 /* 🧾 दाएँ तैरता "बिलिंग" बटन (177 MH से, 13-11-2026): किसी भी टैब से एक टैप में बिलिंग */
 function billFab(){let b=$("#bfab");if(!b){b=document.createElement("button");b.id="bfab";b.type="button";b.setAttribute("aria-label","बिलिंग शुरू करें");
     b.innerHTML=`<svg viewBox="0 0 48 48" width="30" height="30" aria-hidden="true"><path d="M12 5h24a2 2 0 0 1 2 2v35l-4.7-3-4.6 3-4.7-3-4.7 3-4.6-3L10 42V7a2 2 0 0 1 2-2z" fill="#fff"/><path d="M16 13h16M16 19h16M16 25h9" stroke="#16a34a" stroke-width="2.6" stroke-linecap="round"/><circle cx="31" cy="29" r="6.5" fill="#f97316"/><path d="M28 29.2l2.2 2.2 3.9-4.2" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>बिलिंग</span>`;
@@ -735,7 +736,8 @@ function billFab(){let b=$("#bfab");if(!b){b=document.createElement("button");b.
   b.hidden=S.tab==="bill"}
 function renderTabs(){
   billFab();
-  const TI={bill:"🧾",kharid:"🛒",udhar:"📒",bills:"📋",day:"🌙",label:"🏷️",route:"📍",report:"📈",set:"⚙️"};$("#tabs").innerHTML=tabsList().map(([k,v])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}"><span class="ti">${TI[k]||""}</span> ${v}</button>`).join("");{const a=$("#tabs [aria-selected=\"true\"]");if(a&&a.scrollIntoView)try{a.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}}
+  const TI={bill:"🧾",kharid:"🛒",udhar:"📒",bills:"📋",day:"🌙",label:"🏷️",route:"📍",report:"📈",set:"⚙️"};const SHT={"उधार खाता":"उधार","आज के बिल":"बिल-सूची","दिन का हिसाब":"हिसाब","रेट व सेटिंग":"सेटिंग"};/* 28-11: छोटे नाम — ज़्यादा टैब एक साथ दिखें, बीच से कटे शब्द नहीं */
+  $("#tabs").innerHTML=tabsList().map(([k,v])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}" aria-label="${esc(v)}"><span class="ti">${TI[k]||""}</span> ${SHT[v]||v}</button>`).join("");{const a=$("#tabs [aria-selected=\"true\"]");if(a&&a.scrollIntoView)try{a.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}}
   $("#who").textContent="👤 "+(biller()||"नाम डालें");
 }
 $("#tabs").onclick=e=>{const b=e.target.closest("[data-tab]");if(!b)return;S.tab=b.dataset.tab;showTab()};
@@ -783,7 +785,7 @@ function renderBill(){
   if(S.mode==="walk"&&S.cust.phone.length===10){const c=S.cust;const known=c.phone.length===10?S.customers.find(x=>x.id===c.phone):null;
     cb=`${known?`<p class="custinfo">⭐ पुराने ग्राहक${known.name?" "+esc(known.name):""} · ${known.visits||0} बार आए · कुल ${rs(known.spent||0)}${known.lastItems?" · पिछली बार: "+esc(known.lastItems):""} ${known.lastCart&&known.lastCart.length?'<button class="lnk" data-repeat>पिछला सामान दोबारा जोड़ें</button>':""}</p>`:""}`}
   else if(S.mode==="udhar"&&S.partyId){const p=S.parties.find(x=>x.id===S.partyId);if(p&&p.lastCart&&p.lastCart.length)cb+=`<p class="note" style="margin:-4px 0 10px"><button class="lnk" data-repeat>${esc(p.name)} का पिछला सामान दोबारा जोड़ें</button></p>`}
-  $("#custbox").innerHTML=(window.SB?SB.pendingHTML():"")+cb;
+  $("#custbox").innerHTML=crmChipHTML()+(window.SB?SB.pendingHTML():"")+cb;
   const bl=billList(),searching=!!bl.raw;
   ["#modes","#custbox","#cats"].forEach(x=>$(x).hidden=searching);if(S.demo)$("#demo").hidden=searching||!S.demo;
   const tip=$("#qtip");tip.hidden=!searching;S.qq=bl.qq;
@@ -923,16 +925,39 @@ function ctray(show){let t=$("#ctray");
 /* 28-11 (50 कमियाँ #1-2): पूरा बिल-टैब ✕✕ से बंद करना और मात्रा-खिड़की का "बिल से हटाएँ" भी यहीं दर्ज (पहले सिर्फ़ ट्रे का ✕) — w = कैसे हटाया */
 function rmLog(l,w){try{if(!l)return;S.cartRmLocal=(S.cartRmLocal||0)+1;if(S.isOwner||S.demo||!S.db)return;
   const F=firebase.firestore.FieldValue;S.db.doc("days/"+today()+"/meta/cartrm").set({log:F.arrayUnion({id:l.id||"",n:l.name||"",q:+l.qty||0,u:l.unit||"",a:r2(+l.amt||0),by:biller()||"",uid:S.uid||"",ts:Date.now(),...(w?{w}:{})})},{merge:true}).catch(()=>{})}catch(e){}}
-/* 28-11: पहले दिन में एक ही बार पढ़ता था (बाद के हटाए दिखते नहीं थे) और "देख लिया" सिर्फ़ इसी फोन में — अब हर मिनट ताज़ा, आज + कल, ✓ सर्वर पर (okTs) */
-function cartRmHTML(){if(!S.isOwner||S.demo||!S.db)return "";const d=today(),y=dayPlus(d,-1);
-  if(S._crmD!==d||!S._crmT||Date.now()-S._crmT>60000){S._crmD=d;S._crmT=Date.now();
-    Promise.all([d,y].map(k=>S.db.doc("days/"+k+"/meta/cartrm").get().then(x=>{const v=(x.exists&&x.data())||{};const ok=Math.max(+v.okTs||0,+lsGet("se_crmok_"+k)||0);return (v.log||[]).filter(e=>e&&e.ts>ok).map(e=>({...e,_d:k}))}).catch(()=>[])))
-      .then(R=>{const n=R.flat(),sig=a=>a.map(x=>x.ts+"|"+x.n).join(",");const ch=sig(n)!==sig(S.cartRm||[]);S.cartRm=n;if(ch&&S.tab==="report")renderReport()})}
-  const nw=(S.cartRm||[]).slice().sort((a,b)=>a.ts-b.ts);if(!nw.length)return "";const tot=r2(nw.reduce((a,x)=>a+(+x.a||0),0)),whole=nw.filter(x=>x.w==="पूरा बिल बंद").length;
-  return `<div class="card2" style="border:2px solid #f97316"><h3 style="color:#c2410c">✕ ${nw.length} सामान बिल बनने से पहले हटाए गए · ${rs(tot)}</h3><p class="note" style="margin:0 0 6px">साथी ने जोड़कर हटाया — ज़्यादातर गलती से जुड़ा होता है; बार-बार हो तो पूछें।${whole?` <b style="color:#c2410c">${whole} सामान पूरा बिल ✕ से बंद करके हटे — माल गया हो तो पैसा कहाँ?</b>`:""}</p>
-  ${nw.slice(-15).reverse().map(x=>`<div class="stkmeta"><span>${esc(x.n)} · ${esc(fqg(x.q,x.u))}${x.w?` · <b style="color:#c2410c">${esc(x.w)}</b>`:""}<br><small class="note">${x._d!==d?"कल ":""}${ftime(x.ts)} · ${esc(x.by||"")}</small></span><b>${rs(x.a)}</b></div>`).join("")}
-  <button class="lnk" data-crmok>✓ देख लिया</button></div>`}
-document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("[data-crmok]")){const now=Date.now();[today(),dayPlus(today(),-1)].forEach(k=>{lsSet("se_crmok_"+k,String(now));if(!S.demo&&S.db)S.db.doc("days/"+k+"/meta/cartrm").set({okTs:now},{merge:true}).catch(()=>{})});S.cartRm=[];try{renderReport()}catch(x){}return}
+/* 🗑️ 28-11 (विक्रम जी: "जो भी बिल से हटाएँ, वह मेरे पास मंज़ूरी को आए"): साथी का हर हटाना (ट्रे ✕/−, मात्रा-खिड़की, पूरा बिल ✕✕) और खराबी —
+   मालिक के फोन पर तुरंत सूचना + बीप, बिलिंग में लाल चिप, रिपोर्ट में सूची: हर एक पर ✓ ठीक / ✗ गलत (days/<d>/meta/cartrm.dec)। साथी को कुछ नहीं दिखता।
+   पुराना "देख लिया" (okTs) = उससे पहले के सब ठीक माने जाते हैं। */
+const CRM={un:[],d:"",days:{},st:{},n:-1};
+const crmKey=(x,w)=>(w?"w_":"")+x.ts+"_"+(x.uid||x.by||"");
+function crmWatch(){if(!S.isOwner||S.demo||!S.db)return;const d=today();if(CRM.d===d)return;CRM.d=d;CRM.t0=Date.now();CRM.n=-1;CRM.un.forEach(f=>{try{f()}catch(e){}});CRM.un=[];CRM.days={};CRM.st={};
+  [d,dayPlus(d,-1)].forEach(k=>{CRM.un.push(S.db.doc("days/"+k+"/meta/cartrm").onSnapshot(x=>{CRM.days[k]=(x.exists&&x.data())||{};crmChanged()},()=>{}));
+    CRM.un.push(S.db.doc("days/"+k+"/meta/stock").onSnapshot(x=>{CRM.st[k]=((x.exists&&x.data().wlog)||[]).filter(w=>w&&w.by!==S.uid);crmChanged()},()=>{}))})}
+function crmAll(){const out=[];[today(),dayPlus(today(),-1)].forEach(k=>{const v=CRM.days[k]||{},dec=v.dec||{},ok=Math.max(+v.okTs||0,+lsGet("se_crmok_"+k)||0);
+  (v.log||[]).forEach(x=>{if(!x)return;const key=crmKey(x);out.push({...x,_d:k,_k:key,_s:dec[key]?dec[key].s:(x.ts<=ok?"ok":"")})});
+  (CRM.st[k]||[]).forEach(w=>{const key=crmKey(w,1),it=item(w.id),a=r2((+w.qty||0)*(it?+it.sale||0:0));out.push({id:w.id,n:w.name,q:+w.qty||0,u:w.unit,a,by:w.byName||"",uid:w.by||"",ts:w.ts,w:"🥀 खराब: "+(w.reason||""),ph:w.ph?"days/"+k+"/meta/ph_w_"+w.wid:"",_d:k,_k:key,_s:dec[key]?dec[key].s:(w.ts<=ok?"ok":""),_waste:1})})});
+  return out.sort((a,b)=>a.ts-b.ts)}
+function crmPend(){return crmAll().filter(x=>!x._s)}
+function crmChanged(){const P=crmPend(),n=P.length;if(CRM.n>=0&&n>CRM.n&&Date.now()-(CRM.t0||0)>5000){const x=P[P.length-1];toast("🗑️ "+(x.by||"साथी")+" ने "+x.n+" "+fqg(x.q,x.u)+" "+rs(x.a)+(x._waste?" खराब लिखा":" बिल से हटाया")+" — मंज़ूरी दें");try{beep(false)}catch(e){}try{navigator.vibrate&&navigator.vibrate([80,60,80])}catch(e){}}
+  CRM.n=n;try{renderTabs()}catch(e){}if(S.tab==="report"&&!$("#sheet .scrim"))try{renderReport()}catch(e){}if(S.tab==="bill"&&!$("#p-bill").contains(document.activeElement))try{renderBill()}catch(e){}if($("#crmSh"))crmSheet()}
+async function crmDecide(list,s){const now=Date.now(),by={};list.forEach(x=>{(by[x._d]=by[x._d]||{})[x._k]={s,at:now}});
+  for(const [d,m] of Object.entries(by)){const v=CRM.days[d]||(CRM.days[d]={});v.dec={...(v.dec||{}),...m};if(!S.demo&&S.db)try{await S.db.doc("days/"+d+"/meta/cartrm").set({dec:m},{merge:true})}catch(e){toast("सेव नहीं हुआ — नेट देखें")}}
+  crmChanged()}
+function crmRow(x,i){return `<div class="crm-r${x._s==="no"?" no":""}"><div><b>${i+1}. ${esc(x.n||x.id||"")} · ${esc(fqg(x.q,x.u))} · ${rs(x.a)}</b><span class="note">${x._d!==today()?"कल ":""}${ftime(x.ts)} · ${esc(x.by||"")}${x.w?` · <b style="color:#c2410c">${esc(x.w)}</b>`:""}</span>${x.ph?`<button class="chip" data-fsph="${esc(x.ph)}">📷 फोटो</button>`:""}</div>
+  ${x._s?`<span class="pill ${x._s==="ok"?"green":"red"}">${x._s==="ok"?"✓ ठीक":"✗ गलत"}</span>`:`<div class="crm-b"><button class="big" data-crmd="ok" data-k="${esc(x._k)}">✓ ठीक</button><button class="big ghost" data-crmd="no" data-k="${esc(x._k)}">✗ गलत</button></div>`}</div>`}
+function crmBodyHTML(){const A=crmAll(),P=A.filter(x=>!x._s),bad=A.filter(x=>x._s==="no"),tot=r2(P.reduce((a,x)=>a+(+x.a||0),0)),whole=P.filter(x=>x.w==="पूरा बिल बंद").length;
+  return `${P.length?`<p class="note" style="margin:0 0 6px">साथी ने बिल बनने से पहले हटाया या खराब लिखा — ठीक लगे तो ✓, शक हो तो ✗ (साथी को कुछ नहीं दिखता, आप फोन करके पूछ सकते हैं)।${whole?` <b style="color:#c2410c">${whole} सामान पूरा बिल ✕✕ से बंद करके हटे — माल गया हो तो पैसा कहाँ?</b>`:""}</p>
+  ${P.map(crmRow).join("")}<button class="big" data-crmall style="margin-top:8px">✓ सब ठीक है (${P.length} · ${rs(tot)})</button>`:'<p class="note" style="margin:0">✓ कोई मंज़ूरी बाकी नहीं</p>'}
+  ${bad.length?`<details class="crm-bad"><summary>✗ गलत माने (${bad.length} · ${rs(r2(bad.reduce((a,x)=>a+(+x.a||0),0)))})</summary>${bad.map(crmRow).join("")}</details>`:""}`}
+function cartRmHTML(){if(!S.isOwner||S.demo||!S.db)return "";crmWatch();const P=crmPend();if(!P.length)return "";
+  return `<div class="card2 crm-card"><h3>🗑️ ${P.length} हटाए/खराब सामान — आपकी मंज़ूरी बाकी · ${rs(r2(P.reduce((a,x)=>a+(+x.a||0),0)))}</h3>${crmBodyHTML()}</div>`}
+function crmChipHTML(){if(!S.isOwner||S.demo||!S.db)return "";crmWatch();const n=crmPend().length;return n?`<button type="button" class="crm-chip" data-crmopen>🗑️ ${n} हटाए/खराब सामान — मंज़ूरी दें ›</button>`:""}
+function crmSheet(){$("#sheet").innerHTML=`<div class="scrim" data-close><div class="sheet px" id="crmSh" role="dialog" aria-label="हटाए सामान की मंज़ूरी"><div class="grab"></div>
+  <div class="sh-head"><div><h3>🗑️ हटाए / खराब सामान</h3><span class="note">आज + कल · साथी का हर हटाना</span></div><button class="x" data-close aria-label="बंद करें">✕</button></div>${crmBodyHTML()}</div></div>`;
+  $("#sheet").onclick=e=>{if(e.target.matches("[data-close]"))closeSheet()}}
+document.addEventListener("click",e=>{if(!e.target.closest)return;if(e.target.closest("[data-crmopen]")){crmSheet();return}
+  const cd=e.target.closest("[data-crmd]");if(cd&&S.isOwner){const x=crmAll().find(y=>y._k===cd.dataset.k);if(x)crmDecide([x],cd.dataset.crmd);return}
+  if(e.target.closest("[data-crmall]")&&S.isOwner){crmDecide(crmPend(),"ok");toast("✓ सब ठीक माने");return}
   const t=e.target.closest&&e.target.closest("#ctray");if(!t)return;
   if(e.target.closest("[data-ctmin]")){t.classList.toggle("min");lsSet("se_ctmin",t.classList.contains("min")?"1":"0");renderCart();return}
   if(e.target.closest("[data-ctnew]")){newTab();return}
@@ -1323,8 +1348,16 @@ function liveHTML(){
 }
 
 /* ---------- offline outbox ---------- */
-function outbox(){try{return JSON.parse(lsGet("se_outbox")||"[]")}catch(e){return []}}
-function saveOutbox(o){lsSet("se_outbox",JSON.stringify(o))}
+/* 🗄️ 28-11 (177 MH का 24-11 वाला सुधार): बिना-नेट बिलों की कतार IndexedDB में भी — फोन localStorage साफ़ कर दे या भर जाए तो भी बिल नहीं खोते */
+const OBX={v:null,db:null,
+  open(){if(this.db)return this.db;this.db=new Promise((res,rej)=>{try{const r=indexedDB.open("se-sabji",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}});return this.db},
+  async put(o){try{const d=await this.open();await new Promise((res,rej)=>{const t=d.transaction("kv","readwrite");t.objectStore("kv").put(JSON.stringify(o),"outbox");t.oncomplete=res;t.onerror=()=>rej(t.error)})}catch(e){}},
+  async get(){try{const d=await this.open();return await new Promise(res=>{const q=d.transaction("kv").objectStore("kv").get("outbox");q.onsuccess=()=>{try{res(JSON.parse(q.result||"[]"))}catch(e){res([])}};q.onerror=()=>res([])})}catch(e){return []}}};
+function outbox(){let L=null;try{const t=lsGet("se_outbox");L=t?JSON.parse(t):[]}catch(e){L=null}if(OBX.v&&(!L||OBX.v.length>L.length&&lsGet("se_outbox_full")==="1"))return OBX.v.slice();return L||[]}
+function saveOutbox(o){const j=JSON.stringify(o);lsSet("se_outbox",j);const ok=lsGet("se_outbox")===j;lsSet("se_outbox_full",ok?"":"1");OBX.v=ok?null:o.slice();OBX.put(o)}
+/* खुलते समय: localStorage की कतार गायब पर IndexedDB में बिल बचे हों → वापस कतार में (7 दिन तक के) */
+setTimeout(async()=>{try{if(lsGet("se_outbox"))return;const I=await OBX.get();if(!I.length)return;const L=outbox(),k=x=>x&&x.bill&&x.bill.no,have=new Set(L.map(k));
+  const add=I.filter(x=>k(x)&&!have.has(k(x))&&Date.now()-(+x.bill.ts||Date.now())<7*864e5);if(add.length){saveOutbox(L.concat(add));toast("🗄️ "+add.length+" बिल बचाए गए — नेट आते ही सेव होंगे");try{flushOutbox()}catch(e){}}}catch(e){}},900);
 function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej({code:"timeout"}),ms))])}
 async function commitBill(item){
   const bill=item.bill,date=bill.date,f=item.done||(item.done={});
@@ -1336,7 +1369,7 @@ async function commitBill(item){
   if(!f.c){const lastCart=bill.lines.filter(l=>!l.free).map(l=>({id:l.id,qty:l.qty})),lastItems=bill.lines.map(l=>l.name).slice(0,5).join(", ");
     try{if((bill.custPhone||"").length===10){const ref=S.db.collection("customers").doc(bill.custPhone);const g=await ref.get();const o=g.exists?g.data():{};await ref.set({...(bill.loc?{lastLoc:bill.loc}:{}),name:bill.custName||o.name||"",phone:bill.custPhone,visits:(o.visits||0)+1,spent:r2((o.spent||0)+bill.total),firstTs:o.firstTs||bill.ts,lastTs:bill.ts,lastItems,lastCart},{merge:true})/* 28-11: merge — पहले हर बिल पर बाकी खाने (lastLoc आदि) मिट जाते थे */}
       else if(bill.mode==="udhar"&&bill.partyId)await S.db.collection("parties").doc(bill.partyId).update({lastCart,lastTs:bill.ts})}catch(e){}f.c=1}
-  if(!f.s){if(!item.localStock)await adjStock(trackedPairs(bill.lines,-1),"बिल "+bill.no);else{for(const [id,d] of trackedPairs(bill.lines,-1)){try{await S.db.collection("pstock").doc(id).set({qty:SE.inc(r2(d)),ts:Date.now(),byName:bill.byName,last:"बिल "+bill.no},{merge:true})}catch(e){}}}f.s=1}
+  if(!f.s){if(!item.localStock)await adjStock(trackedPairs(bill.lines,-1),"बिल "+bill.no);else{for(const [id,d] of trackedPairs(bill.lines,-1)){try{await S.db.collection("pstock").doc(id).set({qty:SE.inc(r2(d)),ts:Date.now(),by:S.uid||"",byName:bill.byName,last:"बिल "+bill.no},{merge:true})}catch(e){}}}f.s=1}
 }
 let flushing=false;
 async function flushOutbox(){
@@ -1485,13 +1518,15 @@ function renderDay(){
 let kMode="cash";
 async function saveStock(){
   if(S.demo)return;
-  try{await S.db.doc("days/"+S.billsDate+"/meta/stock").set({items:S.stock.items||{},wlog:S.stock.wlog||[],nightBy:S.stock.nightBy||"",nightTs:S.stock.nightTs||0,nightVal:S.stock.nightVal||0,nightN:S.stock.nightN||0,ts:Date.now(),by:S.uid||"",byName:biller()})}catch(e){toast("माल का हिसाब सेव नहीं हुआ")}
+  /* 28-11: पहले पूरा doc दोबारा लिखा जाता (दो फोन एक साथ = एक की गिनती/खराबी गायब) — अब merge, खराबी-सूची arrayUnion (कभी नहीं घटती), रात का नाम/समय तभी जब इस फोन को पता हो */
+  const st=S.stock||{},wl=st.wlog||[],F=firebase.firestore.FieldValue;
+  try{await S.db.doc("days/"+S.billsDate+"/meta/stock").set({items:st.items||{},...(wl.length?{wlog:F.arrayUnion(...wl)}:{}),...(st.nightTs?{nightBy:st.nightBy||"",nightTs:st.nightTs,nightVal:st.nightVal||0,nightN:st.nightN||0}:{}),ts:Date.now(),by:S.uid||"",byName:biller()},{merge:true})}catch(e){toast("माल का हिसाब सेव नहीं हुआ")}
 }
 $("#p-day").addEventListener("change",async e=>{
   const t=e.target;
   if(t.dataset.ps){const id=t.dataset.ps,v=t.value.trim();if(v==="")return;const nv=parseFloat(v)||0,cur=+(S.pstock[id]?.qty)||0;await adjStock([[id,r2(nv-cur)]],"गिनती सुधारी");toast(item(id)?.name+" का स्टॉक "+nv+" किया");renderDay();return}
   if(t.dataset.sk){const id=t.closest("[data-sid]").dataset.sid;const items=S.stock.items||(S.stock.items={});const o=items[id]||(items[id]={});
-    const v=t.value.trim();if(v==="")delete o[t.dataset.sk];else o[t.dataset.sk]=parseFloat(v)||0;await saveStock();renderDay();return}
+    const v=t.value.trim();if(v==="")o[t.dataset.sk]="";else o[t.dataset.sk]=parseFloat(v)||0;await saveStock();/* खाली = "" (merge में delete नहीं चलता) */renderDay();return}
 });
 $("#p-day").addEventListener("click",async e=>{
   if(e.target.closest("[data-scanin]")){S.scanIn=!S.scanIn;renderDay();toast(S.scanIn?"अब हर स्कैन स्टॉक में जुड़ेगा":"माल चढ़ाना बंद — अब स्कैन बिल में जाएगा");return}
@@ -1805,7 +1840,7 @@ function subBills(){
    पहले तारीख नहीं बदलती थी → नए बिल दिखते नहीं, खर्चा/गल्ला कल की तारीख में चढ़ता। जो पुरानी तारीख खुद चुनकर देख रहा है, उसे नहीं छेड़ते। */
 let _dayNow=today();
 function dayRoll(){const t=today();if(t===_dayNow)return;const was=_dayNow;_dayNow=t;if(!S.db&&!S.demo)return;if(S.billsDate!==was)return;
-  S.billsDate=t;S.repDate=t;try{subBills()}catch(e){}try{renderTabs();renderPane(true)}catch(e){}}
+  S.billsDate=t;S.repDate=t;try{subBills()}catch(e){}try{crmWatch()}catch(e){}try{renderTabs();renderPane(true)}catch(e){}}
 setInterval(dayRoll,60000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)dayRoll()});
 function loadDemo(){
   S.demo=true;S.isOwner=true;
@@ -1838,6 +1873,7 @@ async function boot(){
   if(S.isOwner)db.collection("presence").onSnapshot(s=>{S.presence=s.docs.map(d=>d.data());if(S.tab==="bills")renderBills()},()=>{});
   setTimeout(()=>{flushOutbox();beat();netbar()},1500);
   if(S.isOwner)setTimeout(()=>guardQ(guardInit),2500);
+  if(S.isOwner)setTimeout(crmWatch,3000);
   db.collection("parties").onSnapshot(s=>{const all=s.docs.map(d=>({id:d.id,...d.data()}));S.parties=all.filter(p=>!p.deleted);S.partiesDel=all.filter(p=>p.deleted);if(window.SR&&SR.watchDel)SR.watchDel(S.partiesDel);renderPane()});
   db.collection("ledger").onSnapshot(s=>{S.ledger=s.docs.map(d=>({id:d.id,...d.data()}));renderPane();if(S.isOwner)guardQ(guardLedger)});
   db.collection("pstock").onSnapshot(s=>{S.pstock={};s.docs.forEach(d=>S.pstock[d.id]=d.data());if(S.tab==="bill"&&!$("#p-bill").contains(document.activeElement))renderBill();if(S.tab==="day"&&!$("#p-day").contains(document.activeElement))renderDay()},()=>{});
@@ -1849,7 +1885,8 @@ async function boot(){
 }
 async function loadTop7(){
   if(lsGet("se_top7d")===today()&&Object.keys(S.top7||{}).length)return;
-  try{const ds=[];for(let i=0;i<=14;i++){const x=new Date();x.setDate(x.getDate()-i);ds.push(today(x))}
+  /* 28-11: 15 की जगह 7 दिन — हर फोन रोज़ आधे बिल ही पढ़े (टॉप सेलिंग के लिए इतना काफ़ी) */
+  try{const ds=[];for(let i=0;i<=6;i++){const x=new Date();x.setDate(x.getDate()-i);ds.push(today(x))}
     const all=await Promise.all(ds.map(d=>S.db.collection("days/"+d+"/bills").get().then(q=>q.docs.map(x=>x.data())).catch(()=>[])));
     const sc={};all.flat().forEach(b=>{if(b.cancelled)return;const seen=new Set();(b.lines||[]).forEach(l=>{if(!seen.has(l.id)){seen.add(l.id);sc[l.id]=(sc[l.id]||0)+1}})});
     if(Object.keys(sc).length){S.top7=sc;lsSet("se_top7",JSON.stringify(sc));lsSet("se_top7d",today());if(S.tab==="bill"&&!$("#p-bill").contains(document.activeElement))renderBill()}
