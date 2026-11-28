@@ -1001,7 +1001,7 @@ SF.reserveBillNo=async function(){
 /* =============== 🧾 कागज़ जैसी रसीद + सेटल + शेयर =============== */
 SF.qrCanvas=function(amount,no,px){
   if(!window.QRCode||!upiId())return null;const box=document.createElement("div");
-  const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${amount>0?"&am="+(+amount).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`;
+  const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.pn||"SABJI EXPRESS")}${amount>0?"&am="+(+amount).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express Bill "+no)}`;
   try{new QRCode(box,{text:upi,width:px||240,height:px||240,correctLevel:QRCode.CorrectLevel.M})}catch(e){return null}
   return box.querySelector("canvas");
 };
@@ -1100,7 +1100,7 @@ SF.paperHTML=function(b,o){
   </div>`;
 };
 function drawQR(id,amt,no,size){const el=document.getElementById(id);if(!el||!window.QRCode||!upiId())return;el.innerHTML="";
-  try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}${+amt>0?"&am="+(+amt).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+no)}`,width:size||190,height:size||190,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+  try{new QRCode(el,{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.pn||"SABJI EXPRESS")}${+amt>0?"&am="+(+amt).toFixed(2):""}&cu=INR&tn=${encodeURIComponent("Sabji Express Bill "+no)}`,width:size||190,height:size||190,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
 SF.drawQR=drawQR;
 SF.drawPaperQR=function(b,id,size){const q=SF.qrFor(b);if(q)drawQR(id||"ppqr",q.amt,b.no,size||150)};
 function draftBill(){

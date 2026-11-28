@@ -1200,7 +1200,9 @@ const CHIKU1={date:"2026-11-27",flag:"cheeku1",src:"विक्रम जी 27
 const COPY3={date:"2026-11-27",flag:"copy3",src:"कमल भाई की कॉपी 27-11 (विक्रम जी की भेजी फोटो)",
   night:{date:"2026-11-27",by:"कॉपी से (Claude) · विक्रम जी",
     items:{aloo:32.5,pyaj:21,tamatar:5.6,cheeku:10,seb:5,anar:1.5,amrood:4,papita:2,kiwi:8,matar:3.5,makka:4,phoolgobhi:0.7,gwarfali:1,lauki:1.5,shimla:1,amla:1.5,motamirch:0.4,mushroom:2,adrak:1.5,kheera:3,bhindi:3,beans:1,karela:2,semfali:0.4,lahsun:0.4},waste:{}}};
-const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1,BOARD3,SUPPLY1,CHAT1,CHIKU1,COPY3];
+/* 28-11: 🥒 टिंडा ₹80/kg नया सामान, फोटो के साथ (विक्रम जी) */
+const TINDA1={date:"2026-11-28",flag:"tinda1",src:"विक्रम जी 28-11-2026 (फोटो + भाव)",add:[{id:"tinda",name:"टिंडा",unit:"kg",cat:"sabzi",emoji:"🥒",hue:100,sale:80,photo:"b"}]};
+const PACKS=[BOARD,BOARD2,COST1,PHOTO1,COPY1,COPY2,WINTER1,BOARD3,SUPPLY1,CHAT1,CHIKU1,COPY3,TINDA1];
 SR.BOARD=BOARD;SR.PACKS=PACKS;
 SR.applyBoard=async function(db){
   if(!S.isOwner||S.demo||!db||SR._board)return;SR._board=1;
@@ -1263,7 +1265,7 @@ SR.applyBoard=async function(db){
             note:"WhatsApp: कमल भाई की पर्ची + "+(md==="galla"?"नकद (आपका भुगतान नहीं)":"आपका भुगतान "+t)+(note&&md!=="galla"?" · "+note:"")+" · फोटो "+f,photos:[],photoPending:0,cancelled:false,src:"chat"});ncb++}}
       let ord=Math.max(0,...items.map(i=>+i.order||0));
       for(const a of (P.add||[])){if(items.some(x=>x.id===a.id||String(x.name||"").replace(/\s*\(.*\)/,"").trim()===a.name.replace(/\s*\(.*\)/,"").trim()))continue;
-        const d={active:a.active!==false,...(a.season?{season:a.season,seasonMon:a.seasonMon||"",seasonTip:a.seasonTip||"",offNote:"मौसम का माल — खरीदें तब चालू करें"}:{}),name:a.name,unit:a.unit,cat:a.cat,emoji:a.emoji,hue:a.hue,sale:a.sale,cost:a.cost||0,order:++ord,photo:"",buyHist:a.cost?[{date:P.date,rate:a.cost,src:"कमल भाई की कॉपी (अक्टूबर)"}]:[],saleSet:{date:P.date,src:a.sale?src:"भाव बाकी — विक्रम जी बताएँगे"}};
+        const d={active:a.active!==false,...(a.season?{season:a.season,seasonMon:a.seasonMon||"",seasonTip:a.seasonTip||"",offNote:"मौसम का माल — खरीदें तब चालू करें"}:{}),name:a.name,unit:a.unit,cat:a.cat,emoji:a.emoji,hue:a.hue,sale:a.sale,cost:a.cost||0,order:++ord,photo:a.photo||"",buyHist:a.cost?[{date:P.date,rate:a.cost,src:"कमल भाई की कॉपी (अक्टूबर)"}]:[],saleSet:{date:P.date,src:a.sale?src:"भाव बाकी — विक्रम जी बताएँगे"}};
         await put(db.collection("items").doc(a.id),d);add++}
       await put(fr,{[P.flag]:now,[P.flag+"Changed"]:ch,[P.flag+"Added"]:add,...(P.sup?{[P.flag+"Sup"]:nsup}:{}),...(P.chatBuy?{[P.flag+"Buy"]:ncb}:{})},{merge:true});
       if(W)await W.commit();

@@ -628,7 +628,8 @@ const DEMO_ITEMS=[
  ["kela","केला","🍌","fal","kg",60,36,50],["anar","अनार","🍎","fal","kg",250,175,350],["nariyal","नारियल","🥥","fal","pc",70,0,30],
  ["doodh","दूध पैकेट ½ ली. (डेमो)","🥛","packed","pc",34,32,200,"8901000000011"],["bread","ब्रेड (डेमो)","🍞","packed","pc",45,40,40,"8901000000028"],["namak","नमक 1 किलो (डेमो)","🧂","packed","pc",28,22,0,"8901000000035"]
 ];
-const UPI_FIXED={upi:"9460409552@okbizaxis",payee:"VIKRAM CHARAN"};
+/* pn = QR स्कैन पर दिखने वाला नाम (विक्रम जी 28-11: "विक्रम चारण की जगह सब्ज़ी एक्सप्रेस", नोट में बिल नंबर) */
+const UPI_FIXED={upi:"9460409552@okbizaxis",payee:"VIKRAM CHARAN",pn:"SABJI EXPRESS"};
 function upiId(){return UPI_FIXED.upi}
 const CATS=[["all","सब"],["sabzi","सब्ज़ी"],["patta","पत्तेदार"],["fal","फल"],["packed","पैक्ड सामान"]];
 const UNITS={kg:"कि.ग्रा",pc:"पीस",dz:"दर्जन",gd:"गड्डी"};
@@ -912,7 +913,7 @@ function drawCheckout(){if(window.SF&&SF.drawCheckout)return SF.drawCheckout();
     <button class="big ghost" data-hold style="margin-bottom:8px">+ दूसरा ग्राहक (यह बिल ऊपर टैब में खुला रहेगा)</button>
     <button class="big ${c.pay==="upi"?"haldi":""}" data-save ${c.udPick||S.saving||(c.pay==="upi"&&!upiId())||tot<=0&&S.mode!=="inst"?"disabled":""}>${S.saving?"सेव हो रहा है…":c.pay==="upi"?"✓ पैसा आ गया · बिल सेव करें":"✓ बिल सेव करें"}</button>
   </div></div>`;
-  if(c.pay==="upi"&&upiId()&&window.QRCode){const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${tot.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express | Bill No "+c.no)}`;try{new QRCode($("#qr"),{text:upi,width:208,height:208,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
+  if(c.pay==="upi"&&upiId()&&window.QRCode){const upi=`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.pn||"SABJI EXPRESS")}&am=${tot.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Sabji Express Bill "+c.no)}`;try{new QRCode($("#qr"),{text:upi,width:208,height:208,correctLevel:QRCode.CorrectLevel.M})}catch(e){}}
   const sh=$("#sheet");
   sh.oninput=e=>{if(e.target.id==="udQ"){c.udQ=e.target.value;const l=$("#udList");if(l)l.innerHTML=udListHTML(c.udQ)}};
   sh.onclick=async e=>{
@@ -1083,7 +1084,7 @@ function openParty(pid){
     </div></div>`;
   };
   draw();
-  const jq=()=>{const box=$("#jqr");if(!box)return;const a=parseFloat($("#jAmt").value)||0;box.innerHTML="";if(st.mode!=="upi"||a<=0||!window.QRCode)return;box.innerHTML=`<div class="qrbox"><div class="qr" id="jqrc"></div><b>${rs(a)}</b><span class="note">${esc(UPI_FIXED.payee)} · ${esc(upiId())}</span></div>`;try{new QRCode($("#jqrc"),{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.payee)}&am=${a.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Udhar "+p.name)}`,width:200,height:200,correctLevel:QRCode.CorrectLevel.M})}catch(e){}};
+  const jq=()=>{const box=$("#jqr");if(!box)return;const a=parseFloat($("#jAmt").value)||0;box.innerHTML="";if(st.mode!=="upi"||a<=0||!window.QRCode)return;box.innerHTML=`<div class="qrbox"><div class="qr" id="jqrc"></div><b>${rs(a)}</b><span class="note">${esc(UPI_FIXED.payee)} · ${esc(upiId())}</span></div>`;try{new QRCode($("#jqrc"),{text:`upi://pay?pa=${encodeURIComponent(upiId())}&pn=${encodeURIComponent(UPI_FIXED.pn||"SABJI EXPRESS")}&am=${a.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Udhar "+p.name)}`,width:200,height:200,correctLevel:QRCode.CorrectLevel.M})}catch(e){}};
   $("#sheet").oninput=e=>{if(e.target.id==="jAmt")jq()};
   $("#sheet").onchange=async e=>{if(e.target.id==="pLimit"){try{await S.db.collection("parties").doc(pid).update({limit:parseFloat(e.target.value)||0});toast("सीमा सेव हुई")}catch(err){toast("सीमा सेव नहीं हुई")}}};
   $("#sheet").onclick=async e=>{

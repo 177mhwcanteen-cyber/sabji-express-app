@@ -134,7 +134,7 @@ async def main():
 
         # ---------- 1) मालिक ----------
         users = {"sabziexpress3600@gmail.com": {"uid": "own", "pw": "secret123"}}
-        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1, "winter1": 1, "board3": 1, "supply1": 1, "chat1": 1, "cheeku1": 1, "copy3": 1}}}, users)
+        pg = await page(b, {"ownerCfg": {"flags": {"board1": 1, "board2": 1, "cost1": 1, "photo1": 1, "copy1": 1, "copy2": 1, "winter1": 1, "board3": 1, "supply1": 1, "chat1": 1, "cheeku1": 1, "copy3": 1, "tinda1": 1}}}, users)
         await pg.wait_for_selector("#lock:not([hidden])")
         await pg.screenshot(path=f"{SHOTS}/1-login-staff.png")
         await pg.click('[data-lg="to-owner"]')
@@ -787,7 +787,7 @@ async def main():
         assert ed and ed[0]["amt"] == 450 and ed[0]["prevAmt"] == 460, ed
         print("opening edit ok")
         # 🪧 बोर्ड के भाव: एक बार अपने-आप
-        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;delete window.__MOCK__.ownerCfg.flags.winter1;delete window.__MOCK__.ownerCfg.flags.board3;delete window.__MOCK__.ownerCfg.flags.supply1;delete window.__MOCK__.ownerCfg.flags.chat1;delete window.__MOCK__.ownerCfg.flags.cheeku1;delete window.__MOCK__.ownerCfg.flags.copy3;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
+        await pg.evaluate("(async()=>{delete window.__MOCK__.ownerCfg.flags.board1;delete window.__MOCK__.ownerCfg.flags.board2;delete window.__MOCK__.ownerCfg.flags.cost1;delete window.__MOCK__.ownerCfg.flags.photo1;delete window.__MOCK__.ownerCfg.flags.copy1;delete window.__MOCK__.ownerCfg.flags.copy2;delete window.__MOCK__.ownerCfg.flags.winter1;delete window.__MOCK__.ownerCfg.flags.board3;delete window.__MOCK__.ownerCfg.flags.supply1;delete window.__MOCK__.ownerCfg.flags.chat1;delete window.__MOCK__.ownerCfg.flags.cheeku1;delete window.__MOCK__.ownerCfg.flags.copy3;delete window.__MOCK__.ownerCfg.flags.tinda1;SR._board=0;await SR.applyBoard(S.db)})()"); await pg.wait_for_timeout(800)
         bd = await pg.evaluate("[window.__MOCK__.items.tamatar.sale,window.__MOCK__.items.nimbu.sale,!!window.__MOCK__.items.parwal,window.__MOCK__.items.parwal&&window.__MOCK__.items.parwal.sale,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.note&&x.note.includes('बोर्ड')).length,window.__MOCK__.ownerCfg.flags.board1>0]")
         assert bd[0] == 30 and bd[1] == 200 and bd[2] and bd[3] == 90 and bd[4] >= 10 and bd[5], bd
         b2 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.board2>0,window.__MOCK__.items.harapyaj&&window.__MOCK__.items.harapyaj.sale,window.__MOCK__.items.kachchakela&&window.__MOCK__.items.kachchakela.sale,!window.__MOCK__.items.safalmatar,window.__MOCK__.items.methi.sale]")
@@ -797,7 +797,8 @@ async def main():
         ck = await pg.evaluate("(()=>{const I=window.__MOCK__.items.cheeku||{},B=window.__MOCK__.items.bathua||{};return [window.__MOCK__.ownerCfg.flags.cheeku1>0,I.active,I.sale,I.photo,B.active,B.sale,B.photo]})()")
         assert ck == [True, True, 100, "b", True, 160, "b"], ck
         n27 = await pg.evaluate("(()=>{const D=(window.__MOCK__['days/2026-11-27/meta']||{}).stock||window.__MOCK__['days/2026-11-27/meta/stock']||{};const I=D.items||{};return [window.__MOCK__.ownerCfg.flags.copy3>0,(I.aloo||{}).close,(I.cheeku||{}).close,(I.phoolgobhi||{}).close,(I.mushroom||{}).close]})()")
-        assert n27[0] and n27[2:] == [10, 0.7, 2], n27  # आलू साथी पहले भर चुका (टेस्ट में) — पहले भरा कभी नहीं बदलता  # 🌙 27-11 की कॉपी से रात का माल  # 🍈 चीकू चालू ₹100 + फोटो (27-11)
+        assert n27[0] and n27[2:] == [10, 0.7, 2], n27
+        td = await pg.evaluate("(()=>{const I=window.__MOCK__.items.tinda||{};return [I.name,I.sale,I.photo,I.active]})()"); assert td == ["टिंडा", 80, "b", True], td  # आलू साथी पहले भर चुका (टेस्ट में) — पहले भरा कभी नहीं बदलता  # 🌙 27-11 की कॉपी से रात का माल  # 🍈 चीकू चालू ₹100 + फोटो (27-11)
         c1 = await pg.evaluate("[window.__MOCK__.ownerCfg.flags.cost1>0,window.__MOCK__.items.tamatar.cost,window.__MOCK__.items.aloo.cost,(window.__MOCK__.items.aloo.lastBuy||{}).rate,Object.values(window.__MOCK__.priceLog||{}).filter(x=>x.field==='cost').length]")
         assert c1[0] and c1[1] == 8 and c1[2] == 13 and c1[3] == 13 and c1[4] >= 20, c1
         p1 = await pg.evaluate("""(()=>{const M=window.__MOCK__,I=M.items,st=(M['days/2026-11-01/meta']||{}).stock||{};return [M.ownerCfg.flags.photo1>0,I.moongfali&&I.moongfali.active,I.sitafal.active,I.parwal.photo,I.dragonfruit.photo,(st.items||{}).seb&&st.items.seb.close,(st.items||{}).shimla&&st.items.shimla.close,Object.keys(st.items||{}).length,SE.bundled.has('lalaloo')]})()""")
