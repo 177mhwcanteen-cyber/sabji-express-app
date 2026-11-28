@@ -367,7 +367,8 @@ SE.printReceipt=async function(b,o){
     const why=e=>String((e&&(e.message||e.msg))||e||"");
     if(!N.BtPrinter||!N.BtPrinter.print)throw {code:"oldapk",msg:"🖨️ इस फोन के ऐप (APK) में प्रिंटर का हिस्सा नहीं — नया APK डालें (👤 → ऐप अपडेट करें के नीचे वाला लिंक)"};
     try{await N.BtPrinter.print({address:SE.printer.addr,data})}catch(e1){if(/not implemented|UNIMPLEMENTED/i.test(why(e1)))throw {code:"oldapk",msg:"🖨️ नया APK डालें — पुराने ऐप में यह प्रिंटर नहीं चलता"};
-      if(/अनुमति|permission/i.test(why(e1)))throw {code:"perm",msg:"🖨️ Bluetooth की अनुमति दें — फोन सेटिंग → ऐप → सब्ज़ी एक्सप्रेस → अनुमति → आस-पास के डिवाइस"};
+      if(/अनुमति नहीं मिली/.test(why(e1)))throw {code:"perm",msg:"🖨️ Bluetooth की अनुमति दें — फोन सेटिंग → ऐप → सब्ज़ी एक्सप्रेस → अनुमति → आस-पास के डिवाइस"};
+      if(/BLUETOOTH_SCAN|SecurityException/i.test(why(e1)))throw {code:"oldapk",msg:"🖨️ नया APK डालें (28-11 वाला) — पुराने ऐप में छपाई यहीं अटकती है"};
       await new Promise(r=>setTimeout(r,1200));
       try{await N.BtPrinter.print({address:SE.printer.addr,data})}catch(e2){SE._prnErr=why(e2);throw {code:"bt",msg:why(e2)||"🖨️ प्रिंटर से नहीं जुड़ा"}}}
     SE._prnErr="";return "bt"}

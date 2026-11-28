@@ -116,7 +116,8 @@ public class BtPrinterPlugin extends Plugin {
             try {
                 BluetoothAdapter a = adapter();
                 if (a == null || !a.isEnabled()) throw new Exception("फोन का Bluetooth चालू करें");
-                a.cancelDiscovery();
+                /* 28-11: Android 12+ में cancelDiscovery को BLUETOOTH_SCAN चाहिए — न हो तो SecurityException से छपाई ही रुक जाती थी (मैनेजर ऐप इसे runCatching में रखता है) */
+                try { a.cancelDiscovery(); } catch (Exception ignore) {}
                 BluetoothDevice dev = a.getRemoteDevice(address);
                 byte[] bytes = Base64.decode(data, Base64.DEFAULT);
                 /* 27-11: VBE मैनेजर ऐप वाला पक्का तरीका (वहाँ यही Xprinter XP-P502A ठीक छपता है) —
