@@ -95,6 +95,31 @@ async def main():
         await pg.evaluate("closeSheet();localStorage.removeItem('se_autoprn');S._fakePrn=null;prnSheet()"); await pg.wait_for_timeout(150)
         assert "छोटी पर्ची" in await pg.inner_text("#sheet")
         await pg.evaluate("closeSheet()")
+        # 🧾 चालू बिल की ट्रे: फोटो/नाम, ₹ से ग्राम, ✕, ➕ दूसरा ग्राहक
+        await pg.evaluate("closeSheet();S.tab='bill';showTab();S.cart=[];refreshAfterCart()")
+        await pg.evaluate("openQty(item('dhaniya'))"); await pg.wait_for_timeout(120)
+        await pg.click('#sheet [data-qa="20"]'); await pg.wait_for_timeout(150)
+        c = await pg.evaluate("S.cart.map(l=>[l.id,l.amt,l.qty])"); assert c == [["dhaniya", 20, 0.1]], c
+        assert await pg.locator("#ctray .ctr").count() == 1
+        tx = await pg.inner_text("#ctray"); assert "ग्रा" in tx and "₹20" in tx, tx
+        await pg.click('#ctray [data-ctamt="0"]'); await pg.wait_for_timeout(150)
+        assert await pg.evaluate("document.activeElement.id") == "aIn"
+        await pg.fill("#aIn", "10"); assert "= ₹10" in await pg.inner_text("#sheet [data-add]")
+        await pg.click("#sheet [data-add]"); await pg.wait_for_timeout(150)
+        assert await pg.evaluate("[S.cart.length,S.cart[0].amt,S.cart[0].qty]") == [1, 10, 0.05]
+        await pg.evaluate("openQty(item('kela'))"); await pg.wait_for_timeout(100); await pg.fill("#qIn", "0.38"); await pg.click("#sheet [data-add]"); await pg.wait_for_timeout(150)
+        assert "380 ग्रा" in await pg.inner_text("#ctray")
+        await pg.evaluate("openQty(item('nariyal'))"); await pg.wait_for_timeout(100); await pg.fill("#qIn", "1"); await pg.click("#sheet [data-add]"); await pg.wait_for_timeout(150)
+        await pg.click('#ctray [data-ctinc="2"]'); await pg.wait_for_timeout(100)
+        assert await pg.evaluate("[S.cart[2].qty,S.cart[2].amt]") == [2, 140]
+        await pg.screenshot(path=os.path.join(SHOTS, "tray.png"))
+        await pg.click('#ctray [data-ctdel="1"]'); await pg.wait_for_timeout(100)
+        assert await pg.evaluate("S.cart.map(l=>l.id)") == ["dhaniya", "nariyal"]
+        await pg.click("#ctray [data-ctnew]"); await pg.wait_for_timeout(150)
+        assert await pg.evaluate("[S.bt.length,S.cart.length,!!document.getElementById('ctray')]") == [2, 0, False]
+        await pg.evaluate("switchTab(0)"); await pg.wait_for_timeout(150)
+        assert await pg.locator("#ctray .ctr").count() == 2
+        await pg.evaluate("S.cart=[];syncTab();S.bt=[blankTab()];loadTab(0);refreshAfterCart()")
         # 🔄 ऐप अपडेट करें बटन (सेटिंग में)
         await pg.evaluate("S.tab='set';showTab()"); await pg.wait_for_timeout(200)
         assert await pg.locator("#p-set [data-updnow]").count() == 1 and await pg.evaluate("typeof SE.updateNow") == "function"
