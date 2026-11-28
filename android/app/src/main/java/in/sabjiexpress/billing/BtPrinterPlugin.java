@@ -53,6 +53,8 @@ import java.util.UUID;
 )
 public class BtPrinterPlugin extends Plugin {
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    /* 28-11: एक समय में एक ही छपाई — दो पर्चियाँ साथ गईं तो बाइट आपस में मिलकर "जापानी/चीनी अक्षर" छपते थे */
+    private static final Object PRINT_LOCK = new Object();
     private WebView printView; // प्रिंट पूरा होने तक रखना ज़रूरी
 
     private boolean needPerm() {
@@ -111,8 +113,9 @@ public class BtPrinterPlugin extends Plugin {
         final String address = call.getString("address");
         final String data = call.getString("data");
         if (address == null || data == null) { call.reject("प्रिंटर या डेटा नहीं"); return; }
-        new Thread(() -> {
+        new Thread(() -> { synchronized (PRINT_LOCK) {
             BluetoothSocket s = null;
+            boolean sending = false;
             try {
                 BluetoothAdapter a = adapter();
                 if (a == null || !a.isEnabled()) throw new Exception("फोन का Bluetooth चालू करें");
@@ -134,6 +137,7 @@ public class BtPrinterPlugin extends Plugin {
                 }
                 if (s == null) throw (last != null ? last : new Exception("जुड़ा नहीं"));
                 OutputStream out = s.getOutputStream();
+                sending = true;
                 /* छोटे प्रिंटर का बफ़र छोटा — 128 बाइट, बीच में 25 ms (तेज़ भेजने पर बाइट छूटते/चीनी अक्षर छपते) */
                 int chunk = 128;
                 for (int i = 0; i < bytes.length; i += chunk) {
@@ -145,11 +149,12 @@ public class BtPrinterPlugin extends Plugin {
                 call.resolve();
             } catch (Exception e) {
                 String m = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-                call.reject("प्रिंटर से नहीं जुड़ा — चालू है? पास है? किसी दूसरे ऐप से तो नहीं जुड़ा? (" + (m.length() > 60 ? m.substring(0, 60) : m) + ")");
+                /* भेजते-भेजते टूटा तो WRITE — JS दोबारा नहीं भेजता (आधी पर्ची के ऊपर पूरी फिर जाती तो कचरा छपता) */
+                call.reject((sending ? "पर्ची भेजते समय प्रिंटर छूट गया — पास रखकर 🖨️ फिर दबाएँ (" : "प्रिंटर से नहीं जुड़ा — चालू है? पास है? किसी दूसरे ऐप से तो नहीं जुड़ा? (") + (m.length() > 60 ? m.substring(0, 60) : m) + ")", sending ? "WRITE" : "CONNECT");
             } finally {
                 try { if (s != null) s.close(); } catch (Exception ignore) {}
             }
-        }).start();
+        } }).start();
     }
 
     @PluginMethod

@@ -1651,7 +1651,7 @@ async function printBill(b,auto){
   try{
     const o=window.SF?SF.rcptOpts(b,!b.pay||(b.pay.udhar>0)):{shop:"सब्ज़ी एक्सप्रेस",date:fdate(b.date)+" "+ftime(b.ts),fq};
     const how=await SE.printReceipt(b,o);
-    toast(how==="bt"?"🖨️ रसीद छप रही है":"प्रिंट खुल गया");
+    toast(how==="bt"?"🖨️ पर्ची छप गई ✓":how==="dup"?"🖨️ यही पर्ची अभी छप रही है — रुकिए":"प्रिंट खुल गया");
   }catch(err){toast(err.msg||("प्रिंट नहीं हुआ: "+(err.message||err.code||"")))}
 }
 function reportA4(date){
