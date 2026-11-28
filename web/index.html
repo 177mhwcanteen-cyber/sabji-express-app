@@ -1411,8 +1411,9 @@ async function gset(n,d){if(S.demo){G.mem[n]=JSON.parse(JSON.stringify(d));retur
 function guardOpen(){return G.alarms.filter(a=>!a.seen).length}
 async function guardAlarm(a){G.alarms.unshift({...a,at:Date.now(),seen:false});G.alarms=G.alarms.slice(0,200);await gset("g_alarms",{list:G.alarms});renderTabs();if(S.tab==="report")renderReport()/* 28-11: बीप/पॉप-अप नहीं — ऐप खुलते ही ownerOpenNote में */}
 /* 🔔 28-11: मालिक को सूचना सिर्फ़ ऐप खुलते/सामने आते समय — एक बार, बिना आवाज़ (मंज़ूरी बाकी, रद्द की अर्ज़ी, पहरेदार) */
-function ownerOpenNote(){try{if(!S.isOwner||S.demo||!S.db)return;const a=typeof crmPend==="function"?crmPend().length:0,b=(S.cancelReqs||[]).length,c=guardOpen();if(!a&&!b&&!c)return;
-  toast("🔔 विक्रम जी, मंज़ूरी बाकी: "+[a?"🗑️ "+a+" हटाए/खराब सामान":"",b?"🚫 "+b+" बिल रद्द की अर्ज़ी":"",c?"🚨 "+c+" पहरेदार चेतावनी":""].filter(Boolean).join(" · ")+" — रिपोर्ट में देखें",6500)}catch(e){}}
+function ownerOpenNote(){try{if(!S.isOwner||S.demo||!S.db)return;const a=typeof crmPend==="function"?crmPend().length:0,b=(S.cancelReqs||[]).length,c=guardOpen(),cl=window.SCL?SCL.note():"";if(!a&&!b&&!c&&!cl)return;
+  if(!a&&!b&&!c){toast("🔔 विक्रम जी, "+cl+" — रिपोर्ट में देखें",6500);return}
+  toast("🔔 विक्रम जी, मंज़ूरी बाकी: "+[a?"🗑️ "+a+" हटाए/खराब सामान":"",b?"🚫 "+b+" बिल रद्द की अर्ज़ी":"",c?"🚨 "+c+" पहरेदार चेतावनी":"",cl].filter(Boolean).join(" · ")+" — रिपोर्ट में देखें",6500)}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.isOwner)setTimeout(ownerOpenNote,1800)});
 async function guardInit(){
   if(!S.isOwner||G.ready)return;
@@ -1635,7 +1636,7 @@ function renderReport(){
     ...(window.SFM&&SFM.html?[R("firms","long","🏢","सभी फर्म · 177 MH का महीना","",()=>SFM.html())]:[])];
   const G={day:"📅 आज का हिसाब",item:"🥬 सब्ज़ी और माल",party:"👥 ग्राहक और पार्टी",long:"🗓️ लंबा समय और औज़ार"};
   let fav=[];try{fav=JSON.parse(lsGet("rep_fav")||(window.SFM?'["full","items","firms"]':'["full","items","galla"]'))}catch(e){}
-  const alerts=(window.SF?SF.cancelReqsHTML():"")+(window.SF&&SF.hiRateHTML?SF.hiRateHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+(window.SX&&SX.ownAlertsHTML?SX.ownAlertsHTML():"")+(window.SF&&SF.buyGapHTML?SF.buyGapHTML():"")+cartRmHTML()+guardHTML();
+  const alerts=(window.SCL?SCL.cardHTML():"")+(window.SF?SF.cancelReqsHTML():"")+(window.SF&&SF.hiRateHTML?SF.hiRateHTML():"")+(window.SB?SB.editsHTML():"")+(window.SR?SR.pendingItemsHTML():"")+(window.SX&&SX.ownAlertsHTML?SX.ownAlertsHTML():"")+(window.SF&&SF.buyGapHTML?SF.buyGapHTML():"")+cartRmHTML()+guardHTML();
   const GO={daybook:"bills",kharch:"day",stock:"day",ledger:"udhar",route:"route"};REP.forEach(r=>{if(GO[r.id])r.tab=GO[r.id]});
   const sel=REP.find(r=>r.id===S.repSel&&!r.tab);
   const row=r=>`<div class="rp-r${r.warn?" warn":""}"><button type="button" class="rp-go" ${r.tab?`data-rtab="${r.tab}"`:`data-rsel="${r.id}"`}><i>${r.ic}</i><b>${r.t}</b>${r.hint?`<small>${esc(r.hint)}</small>`:""}<em>${r.tab?"↗":"›"}</em></button><button type="button" class="rp-st${fav.includes(r.id)?" on":""}" data-rfav="${r.id}" aria-label="पसंदीदा">${fav.includes(r.id)?"★":"☆"}</button></div>`;
@@ -1905,5 +1906,6 @@ boot();
 <script src="se-bill.js"></script>
 <script src="se-plus.js"></script>
 <script src="se-watch.js"></script>
+<script src="se-claude.js"></script>
 
 </body></html>

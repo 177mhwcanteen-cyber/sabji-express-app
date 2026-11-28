@@ -1,0 +1,21 @@
+# 🧑‍💼 ऐप → Claude (28-11-2026): मालिक का फोन pub/cx_<दिन> में ताले वाला ऑडिट-पैक रखता है; यह हर 30 मिनट उसे
+# शाखा claude-data के claude/in/<दिन>.json में ले आता है। खोलने की चाबी सिर्फ़ Claude के पास (repo सार्वजनिक है — सब ताले में)।
+name: claude-in
+on:
+  schedule: [{ cron: "7,37 * * * *" }]
+  workflow_dispatch: {}
+permissions: { contents: write }
+concurrency: { group: claude-data, cancel-in-progress: false }
+jobs:
+  get:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { ref: main, path: m }
+      - run: |
+          set -e
+          git clone -q --depth 1 --branch claude-data "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" d || {
+            mkdir d && cd d && git init -q -b claude-data && git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" && cd ..; }
+          python3 m/scripts/claude_box.py fetch d
+          cd d && git config user.name "claude-in" && git config user.email "claude-in@users.noreply.github.com"
+          git add -A && git commit -qm "ऐप से नया हिसाब" && git push -q origin claude-data || echo "कोई नया नहीं"
