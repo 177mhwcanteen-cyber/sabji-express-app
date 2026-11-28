@@ -50,7 +50,7 @@
 2a. 🧑‍💼 **Claude से सीधी बात (28-11 बना — Gemini नहीं, विक्रम जी: "हर काम Claude से, इसी चैट में")**:
    मालिक का फोन हर 30 मिनट (और रिपोर्ट के कार्ड का 📤 बटन) उस दिन का पूरा ऑडिट-पैक ताले में `pub/cx_<दिन>` → Action `claude-in.yml` (हर :07/:37) → शाखा `claude-data/claude/in/`।
    Claude: `python3 scripts/claude_box.py inbox` → `/tmp/sabji-in/<दिन>.md` (ऐप का पूरा हिसाब) + कॉपी के पन्ने → रजिस्टर में पंक्ति → `audit.json` → `python3 scripts/claude_box.py send <दिन> audit.json` → ऐप की रिपोर्ट में "🧑‍💼 Claude का ऑडिट" कार्ड (ऐप खुलने पर एक बार सूचना, कोई आवाज़ नहीं)।
-   निजी चाबी `/home/claude/vbe-block-timer/keys/sabji-claude.pem` — ⚠ अभी सिर्फ़ इस सत्र में; पक्की जगह (निजी repo) पर रखने की विक्रम जी की अनुमति बाकी। चाबी खो जाए तो नई जोड़ी बनाकर `web/se-claude.js` का `SCL.PUB` बदलें।
+   🔑 **हर नई चैट सबसे पहले `python3 scripts/claude_box.py newkey`** — निजी चाबी सिर्फ़ सत्र में (`/tmp/sabji-claude/key.pem`), GitHub पर कभी नहीं (सिस्टम रोकता है); सार्वजनिक चाबी `claude-data/claude/pub.json` → फोन ऐप खुलते/30 मिनट में नई चाबी से फिर भेजता है। पुरानी चाबी के पैक नहीं खुलते — कोई बात नहीं, रजिस्टर में सब लिखा है।
 3. KAMIYAN के बाकी 3 (#42, #45, #49)।
 4. टीम ऐप अपनाए तब: ऐप की खरीद / रात का स्टॉक बनाम कॉपी — रोज़ `milan.py`।
 5. बड़े काम का पूरा क्रम: `docs/NAKSHA-2026-11-13.md` और `docs/SUDHAR-KHAKA-2026-11-27.md`।

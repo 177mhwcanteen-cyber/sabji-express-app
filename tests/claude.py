@@ -2,7 +2,7 @@
 उपयोग: python3 tests/claude.py <www> [निजी चाबी PEM]  (चाबी न हो तो सिर्फ़ ऐप-तरफ़ की जाँच)"""
 import asyncio, base64, json, os, sys, threading, http.server, functools
 from playwright.async_api import async_playwright
-WWW = os.path.abspath(sys.argv[1]); PEM = sys.argv[2] if len(sys.argv) > 2 else "/home/claude/vbe-block-timer/keys/sabji-claude.pem"
+WWW = os.path.abspath(sys.argv[1]); PEM = sys.argv[2] if len(sys.argv) > 2 else "/tmp/sabji-claude/key.pem"
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 8771), functools.partial(http.server.SimpleHTTPRequestHandler, directory=WWW))
 srv.RequestHandlerClass.log_message = lambda *a: None
 threading.Thread(target=srv.serve_forever, daemon=True).start()

@@ -7,6 +7,10 @@
 const SCL=window.SCL={};
 SCL.PUB="MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA33kYWtxB83/pIAJZHjav35Uz4eX0+68mWj7VLtV8WWYjxda2FAArCEW01DCSo1V0s2kzyYYXX86qo5mntff55pZD8V5AhrMvDEaielwNCfwtJBJYEp9+3Jwu/8AfiIAflrmrcPfXWJlXQ88lPonBRJe42dSb/29zHmQA3OUdRDgWCTCNIPNfG24jc4OkrAcR7GxMokMXYqznhUKCqJhmyK+tZsTBGBOMAem6zBsS0n3WK/rwCmSwENvRhrW8ft5St1z4eZYtW/SrKdxcNP71rNAKBk0EORrigPuW4ZxDK9fERjMDrRWtJYET5aEdidGEti/gKoKYidB9PxayaiVKCQIDAQAB";
 SCL.RAW="https://raw.githubusercontent.com/177mhwcanteen-cyber/sabji-express-app/claude-data/claude/out/";
+/* Claude की सार्वजनिक चाबी हर नई चैट बदल सकती है (निजी चाबी कहीं सहेजी नहीं जाती) → claude-data/claude/pub.json से ताज़ा */
+SCL.getPub=async function(){try{const r=await fetch(SCL.RAW.replace("/out/","/")+"pub.json?t="+Date.now(),{cache:"no-store"});
+  if(r.ok){const j=await r.json();if(j&&j.pub){LS("se_cpub",JSON.stringify(j));return j}}}catch(e){}
+  try{const j=JSON.parse(LS("se_cpub")||"null");if(j&&j.pub)return j}catch(e){}return {kid:"k0",pub:SCL.PUB}};
 const b64=u=>{let s="";const a=new Uint8Array(u);for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode.apply(null,a.subarray(i,i+8192));return btoa(s)};
 const unb=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const LS=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
@@ -16,12 +20,12 @@ SCL.key=async function(){
   return {raw:unb(r),k:await cs().importKey("raw",unb(r),"AES-GCM",false,["encrypt","decrypt"])};
 };
 /* टेक्स्ट को ताले में: {wk, iv, ct} */
-SCL.pack=async function(text){
-  const K=await SCL.key(),iv=crypto.getRandomValues(new Uint8Array(12));
+SCL.pack=async function(text,P){
+  P=P||{kid:"k0",pub:SCL.PUB};const K=await SCL.key(),iv=crypto.getRandomValues(new Uint8Array(12));
   const ct=await cs().encrypt({name:"AES-GCM",iv},K.k,new TextEncoder().encode(text));
-  const pk=await cs().importKey("spki",unb(SCL.PUB),{name:"RSA-OAEP",hash:"SHA-256"},false,["encrypt"]);
+  const pk=await cs().importKey("spki",unb(P.pub),{name:"RSA-OAEP",hash:"SHA-256"},false,["encrypt"]);
   const wk=await cs().encrypt({name:"RSA-OAEP"},pk,K.raw);
-  return {v:1,wk:b64(wk),iv:b64(iv),ct:b64(ct)};
+  return {v:1,kid:P.kid,wk:b64(wk),iv:b64(iv),ct:b64(ct)};
 };
 SCL.open=async function(o){const K=await SCL.key();
   const pt=await cs().decrypt({name:"AES-GCM",iv:unb(o.iv)},K.k,unb(o.ct));return new TextDecoder().decode(pt)};
@@ -29,11 +33,11 @@ SCL.ok=()=>typeof S!=="undefined"&&S.isOwner&&!S.demo&&S.db&&cs();
 /* भेजो: अभी चुने दिन (S.billsDate) का पूरा पैक */
 SCL.send=async function(loud){
   if(!SCL.ok()||!window.SF||!SF.auditPack)return false;
-  try{const d=S.billsDate,t=await SF.auditPack(),o=await SCL.pack(t);
-    const h=t.length+"|"+t.slice(-400);if(!loud&&LS("se_cxh_"+d)===h)return true;
+  try{const d=S.billsDate,t=await SF.auditPack(),P=await SCL.getPub(),o=await SCL.pack(t,P);
+    const h=P.kid+"|"+t.length+"|"+t.slice(-400);if(!loud&&LS("se_cxh_"+d)===h)return true;
     o.ts=Date.now();o.d=d;o.ver=(window.SE&&SE.version)||"";
     await S.db.doc("pub/cx_"+d).set(o);
-    const p={};p["d."+d]=o.ts;await S.db.doc("pub/cx_idx").set({d:{[d]:o.ts},ts:o.ts},{merge:true});
+    await S.db.doc("pub/cx_idx").set({d:{[d]:o.ts},ts:o.ts},{merge:true});
     LS("se_cxh_"+d,h);if(loud)toast("✓ "+fdate(d)+" का हिसाब Claude को भेज दिया — Claude इसी चैट में जाँच करेगा");return true}
   catch(e){if(loud)toast("भेज नहीं पाए: "+(e.message||e));return false}
 };

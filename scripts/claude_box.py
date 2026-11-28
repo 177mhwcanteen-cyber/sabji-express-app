@@ -2,16 +2,18 @@
 """🧑‍💼 सब्ज़ी एक्सप्रेस ↔ Claude का ताले वाला डिब्बा (28-11-2026) — web/se-claude.js का दूसरा सिरा।
   fetch <dir>                 (GitHub Action) pub/cx_idx + pub/cx_<दिन> → <dir>/claude/in/<दिन>.json  (ताले में ही)
   inbox [--key PEM]           (Claude) शाखा claude-data खींचो, खोलो → /tmp/sabji-in/<दिन>.md + key.txt (फोन की चाबी)
+  newkey                      (Claude, हर नई चैट में पहले) नई चाबी-जोड़ी → निजी /tmp/sabji-claude/key.pem (कहीं सहेजी नहीं जाती),
+                              सार्वजनिक claude-data/claude/pub.json → फोन अगली बार (≤30 मिनट / ऐप खोलते ही) नई चाबी से भेजेगा
   send <दिन> <audit.json> [--key PEM]  (Claude) ऑडिट ताले में → claude-data/claude/out/<दिन>.json + index.json → push
 audit.json: {"verdict":"एक लाइन", "rows":[["कुल बिक्री","₹10,325"],…], "issues":[{"t":"…","amt":"1,150","lvl":"पक्का|शक|नोट","why":"…"}],
              "ask":["कमल भाई से सवाल…"], "note":"…"}
-निजी चाबी: /home/claude/vbe-block-timer/keys/sabji-claude.pem (निजी repo vikram7charan-del/vbe-block-timer)।"""
+निजी चाबी सिर्फ़ चल रहे सत्र में (/tmp/sabji-claude/key.pem) — GitHub पर कभी नहीं; नई चैट = newkey।"""
 import base64, json, os, subprocess, sys, time, urllib.request
 
 PROJ = "sabji-express-9a8f0"
 API = "AIzaSyBBaZF1E58Ybxemy5HPj8T3L0gnyg9eOPI"
 REPO = "/home/claude/sabji-express-app"
-PEM = "/home/claude/vbe-block-timer/keys/sabji-claude.pem"
+PEM = "/tmp/sabji-claude/key.pem"
 OUT = "/tmp/sabji-in"
 
 
@@ -57,10 +59,23 @@ def git(*a, cwd=REPO):
 
 def worktree():
     wt = "/tmp/sabji-claude-data"
-    git("fetch", "-q", "origin", "claude-data")
+    git("fetch", "-q", "origin", "+claude-data:refs/remotes/origin/claude-data")
     if not os.path.exists(wt): git("worktree", "add", "-f", wt, "origin/claude-data")
     else: git("checkout", "-q", "--detach", "origin/claude-data", cwd=wt); git("reset", "-q", "--hard", "origin/claude-data", cwd=wt)
     return wt
+
+
+def newkey(pem):
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+    k = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    os.makedirs(os.path.dirname(pem), exist_ok=True)
+    open(pem, "wb").write(k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())); os.chmod(pem, 0o600)
+    pub = base64.b64encode(k.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)).decode()
+    wt = worktree(); kid = "k" + str(int(time.time()))
+    json.dump({"kid": kid, "pub": pub, "ts": int(time.time() * 1000)}, open(f"{wt}/claude/pub.json", "w"))
+    git("add", "-A", cwd=wt); git("commit", "-qm", "Claude की नई सार्वजनिक चाबी", cwd=wt); git("push", "-q", "origin", "HEAD:claude-data", cwd=wt)
+    print("✓ नई चाबी", kid, "— फोन ऐप खोलते ही / 30 मिनट में इसी से भेजेगा")
 
 
 def inbox(pem):
@@ -70,8 +85,10 @@ def inbox(pem):
     k, wt = keys(pem), worktree()
     os.makedirs(OUT, exist_ok=True); last = (0, None)
     for f in sorted(os.listdir(f"{wt}/claude/in")):
+        if not f.endswith(".json"): continue
         o = json.load(open(f"{wt}/claude/in/{f}"))
-        K = k.decrypt(base64.b64decode(o["wk"]), padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None))
+        try: K = k.decrypt(base64.b64decode(o["wk"]), padding.OAEP(mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None))
+        except Exception: print(f[:-5], "— पुरानी चाबी का (नहीं खुला; फोन नई चाबी से फिर भेजेगा)"); continue
         t = AESGCM(K).decrypt(base64.b64decode(o["iv"]), base64.b64decode(o["ct"]), None).decode()
         open(f"{OUT}/{f[:-5]}.md", "w").write(t)
         if o.get("ts", 0) > last[0]: last = (o["ts"], K)
@@ -95,5 +112,6 @@ def send(day, path):
 if __name__ == "__main__":
     a = sys.argv[1:]; pem = a[a.index("--key") + 1] if "--key" in a else PEM
     if a[0] == "fetch": fetch(a[1])
+    elif a[0] == "newkey": newkey(pem)
     elif a[0] == "inbox": inbox(pem)
     elif a[0] == "send": send(a[1], a[2])
