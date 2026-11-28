@@ -52,10 +52,12 @@ service cloud.firestore {
       allow delete: if false;
     }
     // 28-11: गल्ले की एंट्री (log), हटाए सामान (cartrm.log), गल्ला-गिनती (close.hist) — कर्मचारी सिर्फ़ जोड़ सकते हैं, पुरानी लाइन मिटा/बदल नहीं सकते
+    //        मालिक की मंज़ूरी (cartrm.dec / okTs) — सिर्फ़ मालिक लिखें, कर्मचारी अपनी मंज़ूरी खुद न दे सकें
     function keepList(f) { return !(f in resource.data) || (f in request.resource.data && request.resource.data[f] is list && request.resource.data[f].hasAll(resource.data[f])); }
     match /days/{date}/meta/{doc}    {
-      allow read, create: if active();
-      allow update: if isOwner() || (active() && keepList('log') && keepList('hist'));
+      allow read: if active();
+      allow create: if isOwner() || (active() && !request.resource.data.keys().hasAny(['dec', 'okTs']));
+      allow update: if isOwner() || (active() && keepList('log') && keepList('hist') && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['dec', 'okTs']));
       allow delete: if isOwner();
     }
     match /days/{date}/kharch/{id}   { allow read, create: if active(); allow update, delete: if isOwner(); }

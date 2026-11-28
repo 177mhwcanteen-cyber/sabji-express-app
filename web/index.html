@@ -1551,7 +1551,7 @@ $("#p-day").addEventListener("click",async e=>{
     const float=fl===""?c.float:parseFloat(fl)||0,counted=ct===""?null:parseFloat(ct)||0;
     if(!biller()){openBiller();return}
     /* हर गिनती hist में जुड़ती है — पहले वाली गिनती कभी नहीं मिटती (SF.gcSave) */
-    try{if(window.SF&&SF.gcSave)await SF.gcSave(float,counted);else{const expected=r2(float+c.cashSale+c.jamaCash+c.gIn-c.khCash-c.gOut);const doc={float,counted,expected,diff:counted==null?null:r2(counted-expected),ts:Date.now(),by:S.uid||"",byName:biller()};if(!S.demo)await S.db.doc("days/"+S.billsDate+"/meta/close").set(doc);S.close=doc}renderDay();toast("गल्ला मिलान सेव हुआ")}catch(err){toast("सेव नहीं हुआ")}return}
+    try{if(window.SF&&SF.gcSave)await SF.gcSave(float,counted);else{const expected=r2(float+c.cashSale+c.jamaCash+c.gIn-c.khCash-c.gOut);const doc={float,counted,expected,diff:counted==null?null:r2(counted-expected),ts:Date.now(),by:S.uid||"",byName:biller()};if(!S.demo)await S.db.doc("days/"+S.billsDate+"/meta/close").set(doc,{merge:true});S.close=doc}renderDay();toast("गल्ला मिलान सेव हुआ")}catch(err){toast("सेव नहीं हुआ")}return}
   const ac=e.target.closest("[data-applycost]");if(ac){const r=stockRows().find(x=>x.it.id===ac.dataset.applycost);if(!r)return;const old=+r.it.cost||0;await saveItem(r.it.id,{cost:r.buyRate});logPrice(r.it.id,"cost",old,r.buyRate);renderDay();return}
 });
 
