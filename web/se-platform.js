@@ -243,23 +243,42 @@ function wrapLines(ctx,text,maxW){const words=String(text).split(" ");const out=
 /* कागज़ जैसी रसीद की तस्वीर — प्रिंट, PDF और WhatsApp तीनों में यही */
 /* 🧾 छोटी पर्ची (विक्रम जी 27-11, docs/PARCHI-PROMPT): नाम · बिल नं+समय · सामान · कुल · बड़ा QR (रकम भरी) · धन्यवाद — बस */
 SE.slimCanvas=function(b,o,widthPx){
-  const W=widthPx||SE.printer.width,P=Math.round(W*0.025),F='"Mukta","Noto Sans Devanagari","Noto Sans",sans-serif',FB='"Baloo 2","Mukta","Noto Sans Devanagari",sans-serif';
-  const k=W/384,fs=n=>Math.round(n*k);const c=document.createElement("canvas");c.width=W;c.height=4000;const x=c.getContext("2d");
-  x.fillStyle="#fff";x.fillRect(0,0,W,c.height);x.fillStyle="#000";x.textBaseline="top";let y=fs(4);
-  const T=(t,sz,al,bold,fam)=>{x.font=`${bold?"800 ":"600 "}${sz}px ${fam||F}`;for(const ln of wrapLines(x,t,W-2*P)){const w=x.measureText(ln).width;x.fillText(ln,al==="c"?(W-w)/2:al==="r"?W-P-w:P,y);y+=Math.round(sz*1.25)}};
-  const DASH=()=>{y+=fs(2);for(let i=P;i<W-P;i+=fs(9))x.fillRect(i,y,fs(5),Math.max(2,fs(2)));y+=fs(6)};
-  T(o.shop||"सब्ज़ी एक्सप्रेस",fs(32),"c",true,FB);
-  T("बिल "+b.no+" · "+(o.date||""),fs(17),"c",true);DASH();
-  const sz=fs(19);(b.lines||[]).forEach(l=>{const am="₹"+r2(l.amt);x.font=`800 ${sz}px ${F}`;const aw=x.measureText(am).width;
-    const left=(l.name||"")+" "+o.fq(l.qty,l.unit).replace(" कि.ग्रा","kg").replace(" किलो","kg")+(l.free?" (मुफ्त)":" × "+l.rate);
-    x.font=`600 ${sz}px ${F}`;const L=wrapLines(x,left,W-2*P-aw-fs(8));L.forEach((ln,i)=>{x.font=`600 ${sz}px ${F}`;x.fillText(ln,P,y);if(i===0){x.font=`800 ${sz}px ${F}`;x.fillText(am,W-P-aw,y)}y+=Math.round(sz*1.22)})});
+  /* 28-11 (विक्रम जी): अंग्रेज़ी, सब बीच में (SBI रोल के किनारों पर नीला लोगो — दोनों ओर ~7% खाली), बड़े अक्षर, QR छोटा और बीच में */
+  const W=widthPx||SE.printer.width,k=W/384,fs=n=>Math.round(n*k),P=Math.round(W*0.075),CW=W-2*P;
+  const F='"Mukta","Noto Sans","Noto Sans Devanagari",sans-serif',FB='"Baloo 2","Mukta","Noto Sans",sans-serif';
+  const c=document.createElement("canvas");c.width=W;c.height=4000;const x=c.getContext("2d");
+  x.fillStyle="#fff";x.fillRect(0,0,W,c.height);x.fillStyle="#000";x.textBaseline="top";let y=fs(6);
+  const font=(sz,w)=>{x.font=`${w||600} ${sz}px ${F}`};
+  const C=(t,sz,w,fam)=>{x.font=`${w||600} ${sz}px ${fam||F}`;for(const ln of wrapLines(x,t,CW)){const tw=x.measureText(ln).width;x.fillText(ln,(W-tw)/2,y);y+=Math.round(sz*1.22)}};
+  const LR=(l,r,sz,w)=>{font(sz,w);const rw=x.measureText(r).width;x.fillText(l,P,y);x.fillText(r,W-P-rw,y);y+=Math.round(sz*1.3)};
+  const fit=(t,max)=>{if(x.measureText(t).width<=max)return t;while(t.length>1&&x.measureText(t+"…").width>max)t=t.slice(0,-1);return t+"…"};
+  const DASH=()=>{y+=fs(3);for(let i=P;i<W-P;i+=fs(9))x.fillRect(i,y,fs(5),Math.max(2,fs(2)));y+=fs(8)};
+  const LINE=()=>{y+=fs(2);x.fillRect(P,y,CW,Math.max(2,fs(3)));y+=fs(8)};
+  C("SABJI EXPRESS",fs(36),800,FB);y-=fs(4);
+  C("Fresh Vegetables & Fruits",fs(15),600);y+=fs(4);
+  LINE();
+  const dt=String(o.date||"");LR("Bill: "+b.no,dt.replace(/(\d\d-\d\d-)\d\d(\d\d)/,"$1$2"),fs(17),700);
   DASH();
-  {x.font=`800 ${fs(34)}px ${FB}`;const t="कुल ₹"+r2(b.total),w=x.measureText(t).width;x.fillText(t,(W-w)/2,y);y+=fs(42)}
-  const p=b.pay;if(p&&o.paid!==false){const parts=[p.upi?"UPI ₹"+p.upi:"",p.cash?"नकद ₹"+p.cash:"",p.udhar?"📒 उधार ₹"+p.udhar:""].filter(Boolean);if(parts.length)T((p.udhar&&!p.upi&&!p.cash?"":"✅ ")+parts.join(" · "),fs(17),"c",true)}
-  if(o.qr){y+=fs(4);T(o.qrLabel||"📱 स्कैन करके भुगतान करें",fs(19),"c",true);y+=fs(12);/* QR के चारों ओर सफ़ेद जगह = कैमरा जल्दी पकड़े */
-    const s=Math.round(W*0.8);x.imageSmoothingEnabled=false;x.drawImage(o.qr,Math.round((W-s)/2),y,s,s);y+=s+fs(12);
-    if(o.upi)T("UPI: "+o.upi,fs(14),"c")}
-  T("🙏 धन्यवाद",fs(18),"c",true);y+=fs(14);
+  /* सामान: नाम (अंग्रेज़ी) | मात्रा × भाव | रकम */
+  const en=l=>{try{const it=l.id&&typeof item==="function"?item(l.id):null;return (window.SN&&SN.en&&(SN.en(it||l.name)))||l.name||""}catch(e){return l.name||""}};
+  const unit=u=>u==="kg"?"kg":u==="g"?"g":u==="pc"||u==="nag"?"pc":u==="dozen"?"dz":(u||"");
+  const sz=fs(20),c2=P+Math.round(CW*0.50),c3=W-P;
+  font(fs(14),800);x.fillText("ITEM",P,y);{const t="QTY × RATE";x.fillText(t,c2-x.measureText(t).width/2,y)}{const t="AMT";x.fillText(t,c3-x.measureText(t).width,y)}y+=fs(20);
+  (b.lines||[]).forEach(l=>{const am="₹"+r2(l.amt),q=(+l.qty%1?(+l.qty).toFixed(2).replace(/0$/,""):l.qty)+unit(l.unit)+(l.free?" free":" × "+r2(l.rate));
+    font(sz,800);const aw=x.measureText(am).width;x.fillText(am,c3-aw,y);
+    font(fs(17),600);const qw=x.measureText(q).width;x.fillText(q,c2-qw/2,y+fs(2));
+    font(sz,700);x.fillText(fit(en(l),c2-qw/2-P-fs(8)),P,y);y+=Math.round(sz*1.35)});
+  DASH();
+  {font(fs(16),700);x.fillText((b.lines||[]).length+" item"+((b.lines||[]).length>1?"s":""),P,y+fs(12));
+   x.font=`800 ${fs(36)}px ${FB}`;const t="TOTAL ₹"+r2(b.total),tw=x.measureText(t).width;x.fillText(t,W-P-tw,y);y+=fs(44)}
+  const p=b.pay;if(p&&o.paid!==false){const parts=[p.upi?"UPI ₹"+p.upi:"",p.cash?"Cash ₹"+p.cash:"",p.udhar?"Credit ₹"+p.udhar:""].filter(Boolean);if(parts.length)C((p.udhar&&!p.upi&&!p.cash?"":"✔ PAID · ")+parts.join(" · "),fs(17),800)}
+  if(o.qr){LINE();C(o.qrLabel||"SCAN & PAY",fs(20),800);y+=fs(8);
+    const s=Math.round(W*0.56);x.imageSmoothingEnabled=false;x.drawImage(o.qr,Math.round((W-s)/2),y,s,s);y+=s+fs(8);
+    if(o.upi)C("UPI: "+o.upi,fs(14),600)}
+  else LINE();
+  y+=fs(2);C("Thank you! Visit again",fs(17),700);
+  if(o.phone)C("Order: "+o.phone,fs(14),600);
+  y+=fs(10);
   const out=document.createElement("canvas");out.width=W;out.height=Math.ceil(y);out.getContext("2d").drawImage(c,0,0);return out;
 };
 SE.receiptCanvas=function(b,o,widthPx){

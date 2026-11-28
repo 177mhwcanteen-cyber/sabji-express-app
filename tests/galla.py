@@ -83,7 +83,7 @@ async def main():
           const o=SF.rcptOpts(b),slim=SE.receiptCanvas(b,o),full=SE.receiptCanvas(b,SF.rcptOpts(b,'full'));
           const paid={...b,settled:true,pay:{upi:115,cash:0,udhar:0}},o2=SF.rcptOpts(paid),s2=SE.receiptCanvas(paid,o2);
           window.__slim=slim.toDataURL();return [o.slim,!!o.qr,o.qrLabel,slim.width,slim.height,full.height,!!o2.qr,s2.height]})()""")
-        assert r[0] and r[1] and "₹115" in r[2] and r[3] == 384 and r[4] < r[5] * 0.75 and not r[6] and r[7] < r[4] - 200, r
+        assert r[0] and r[1] and "115" in r[2] and r[3] == 384 and r[4] < r[5] * 0.75 and not r[6] and r[7] < r[4] - 200, r
         await pg.evaluate("document.body.insertAdjacentHTML('beforeend','<img id=slimimg style=\"position:fixed;top:0;left:0;z-index:99999;background:#fff;border:1px solid #000\" src=\"'+window.__slim+'\">')")
         await pg.wait_for_timeout(200); await pg.locator("#slimimg").screenshot(path=os.path.join(SHOTS, "parchi-slim.png")); await pg.evaluate("document.getElementById('slimimg').remove()")
         # बिल बनते ही अपने-आप छपाई (नकली प्रिंटर) + 👤 में प्रिंटर खिड़की

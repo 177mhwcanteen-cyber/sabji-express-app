@@ -1034,7 +1034,7 @@ SF.slimOn=()=>{try{return localStorage.getItem("se_slim")!=="0"}catch(e){return 
 SF.autoPrn=()=>{try{return localStorage.getItem("se_autoprn")!=="0"}catch(e){return true}};
 SF.slimOpts=function(b){const q=SF.qrFor(b);const due=q&&q.amt>0&&(b.settled===false||!b.pay||(b.partyId&&q.amt>0));
   return {slim:true,shop:"सब्ज़ी एक्सप्रेस",date:fdate(b.date||today())+" "+ftime(b.ts||Date.now()),fq,paid:!!b.pay,
-    qr:due?SF.qrCanvas(q.amt,b.no,Math.round(SE.printer.width*0.8)):null,qrLabel:due?(b.settled===false||!b.pay?"📱 स्कैन करें — ₹"+q.amt:"📒 खाते में बाकी ₹"+q.amt+" — स्कैन करें"):"",upi:upiId()}};
+    qr:due?SF.qrCanvas(q.amt,b.no,Math.round(SE.printer.width*0.8)):null,qrLabel:due?(b.settled===false||!b.pay?"SCAN & PAY  ₹"+q.amt:"BALANCE ₹"+q.amt+" · SCAN & PAY"):"",upi:upiId(),phone:SF.orderPh?SF.fmtPh(SF.orderPh()):""}};
 SF.rcptOpts=function(b,withQr){
   if(b&&b.mode!=="inst"&&SF.slimOn()&&withQr!=="full")return SF.slimOpts(b);
   const due=b.pay?(b.pay.udhar||0):b.total;
