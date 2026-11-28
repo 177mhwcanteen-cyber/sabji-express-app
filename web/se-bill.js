@@ -18,7 +18,11 @@ async function patchBill(b,ch){
   const o=outboxGet();const i=o.findIndex(x=>x.bill.no===b.no);
   if(i>-1&&!(o[i].done&&o[i].done.b)){Object.assign(o[i].bill,ch);outboxSet(o);return}
   if(S.demo||!S.db)return;
-  await S.db.doc("days/"+b.date+"/bills/"+b.no).update(ch);
+  /* 28-11: कमज़ोर नेट में सर्वर का जवाब न आए तो सेटल-खिड़की अटकी रहती थी (साथी दोबारा दबाता) — 5 सेकंड बाद आगे; लिखाई Firestore की कतार में रहती है।
+     सर्वर ने साफ़ मना किया (अनुमति आदि) तो गलती पहले की तरह ऊपर जाती है। */
+  const w=S.db.doc("days/"+b.date+"/bills/"+b.no).update(ch);let late=false;
+  w.catch(e=>{if(late)toast("⚠ बिल "+b.no+" का बदलाव सर्वर ने नहीं लिया: "+(e.code||""))});
+  const r=await Promise.race([w.then(()=>"ok"),new Promise(res=>setTimeout(()=>res("slow"),5000))]);if(r==="slow")late=true;
 }
 const sumLines=L=>r2(L.reduce((a,l)=>a+num(l.amt),0));
 const lineTxt=l=>l.name+" "+fq(l.qty,l.unit);
@@ -78,7 +82,8 @@ SB.settleSheet=function(b,offline){
         if(st.pay==="split"&&!(SB.udAmt(b,st)>0)){toast("नकद पूरा मिल गया — 💵 नकद चुनें");return}
         if(c.noPh&&SB.ph10(st.ph).length!==10){toast("📱 "+party.name+" का 10 अंक का मोबाइल नंबर डालें");const f=$("#sbUph");if(f)f.focus();return}
         if((c.over||c.stale)&&String(st.why).trim().length<3){toast("⚠ उधार क्यों दिया — वजह लिखें");const f=$("#sbUwhy");if(f)f.focus();return}}
-      await doSettle(b,st)}
+      /* 28-11: दो बार दबाने पर दो बार सेटल (पुराने बिल का नकद गल्ले में दो बार) — अब एक बार */
+      if(st.busy)return;st.busy=true;try{await doSettle(b,st)}finally{st.busy=false}}
   };
 };
 /* ================= 📒 उधार का पक्का रास्ता ================= */
@@ -148,11 +153,12 @@ async function doSettle(b,st){
   try{
     await patchBill(b,ch);
     if(pay.udhar>0&&party){const ent={ts:b.ts,date:b.date,partyId:party.id,partyName:party.name,type:"udhar",amt:pay.udhar,billNo:b.no,by:S.uid||"",byName:biller()};
-      if(S.demo)S.ledger.push({id:b.no,...ent});else{const o=outboxGet();const inBox=o.some(x=>x.bill.no===b.no&&!(x.done&&x.done.l));if(!inBox)await S.db.collection("ledger").doc(b.no).set(ent);if(!S.ledger.find(x=>x.id===b.no))S.ledger.push({id:b.no,...ent})}}
+      if(S.demo)S.ledger.push({id:b.no,...ent});else{const o=outboxGet();const inBox=o.some(x=>x.bill.no===b.no&&!(x.done&&x.done.l));if(!inBox){const w=S.db.collection("ledger").doc(b.no).set(ent);w.catch(()=>{});await Promise.race([w,new Promise(r=>setTimeout(r,5000))]);if(window.SX&&SX.hisabRefresh)setTimeout(()=>SX.hisabRefresh(party.id),1200)}if(!S.ledger.find(x=>x.id===b.no))S.ledger.push({id:b.no,...ent})}}
     if(pay.udhar>0)SB._lastUd=b;
     /* पुराने दिन का बिल आज सेटल: नकद आज के गल्ले में आया → आज की "बाहर से आया" एंट्री (वरना आज गल्ला ज़्यादा दिखे) */
-    if(b.date!==today()){SB.old=(SB.old||[]).filter(x=>x.no!==b.no);if(pay.cash>0&&window.SF&&SF.glWrite&&S.billsDate===today()){const ts=Date.now();
-      try{await SF.glWrite(((S.gl&&S.gl.log)||[]).concat([{id:"g"+ts.toString(36),ts,kind:"in",why:"पुराने बिल का पैसा",amt:pay.cash,note:"बिल "+b.no+" ("+fdate(b.date)+")",by:S.uid||"",byName:biller(),auto:1}]))}catch(x){}}}
+    /* 28-11: पहले सिर्फ़ तब जुड़ता था जब "दिन का हिसाब" में आज की तारीख खुली हो — अब हमेशा आज के गल्ले में (arrayUnion, दूसरे फोन की एंट्री नहीं मिटती) */
+    if(b.date!==today()){SB.old=(SB.old||[]).filter(x=>x.no!==b.no);if(pay.cash>0&&window.SF&&SF.glAdd){const ts=Date.now();
+      try{await SF.glAdd({id:"g"+ts.toString(36),ts,kind:"in",why:"पुराने बिल का पैसा",amt:pay.cash,note:"बिल "+b.no+" ("+fdate(b.date)+")",by:S.uid||"",byName:biller(),auto:1},today())}catch(x){}}}
     SB.afterSettle(b);
   }catch(err){toast("सेटल नहीं हुआ: "+(err.code||err.message||""))}
 }
@@ -242,7 +248,8 @@ async function saveEdit(b,E){
 /* ================= जगह-जगह जुड़ाव ================= */
 /* ⏳ पिछले 3 दिन के "भुगतान बाकी" बिल (27-11) — अगले दिन भी साथी को दिखें, मालिक को लाल चेतावनी; आज सेटल करें तो नकद आज के गल्ले में */
 SB.old=[];
-SB.loadOld=async function(){if(S.demo||!S.db)return;const L=[];for(let i=1;i<=3;i++){const d=dayPlus(today(),-i);
+/* 28-11: पहले सिर्फ़ पिछले 3 दिन — 4 दिन पुराना बिना-भुगतान बिल हर याद से गायब हो जाता (पैसा कभी नहीं आता)। अब मालिक 15 दिन, साथी 7 दिन */
+SB.loadOld=async function(){if(S.demo||!S.db)return;const L=[];for(let i=1;i<=(S.isOwner?15:7);i++){const d=dayPlus(today(),-i);
   try{const q=await S.db.collection("days/"+d+"/bills").where("settled","==",false).get();q.docs.forEach(x=>{const b=x.data();if(!b.cancelled&&(S.isOwner||b.by===S.uid))L.push(b)})}catch(e){}}
   const ch=L.length!==(SB.old||[]).length;SB.old=L.sort((a,b)=>a.ts-b.ts);try{if(ch&&typeof renderPane==="function"&&!document.querySelector("#sheet .scrim")&&!document.querySelector("#sheet .qpop"))renderPane(true)}catch(e){}};
 SB.oldHTML=function(){const L=(SB.old||[]).filter(b=>!hid(b));if(!L.length)return "";
@@ -252,13 +259,14 @@ SB.pendingHTML=function(){
   const U=unpaid();if(!U.length)return SB.oldHTML();
   return `<div class="sb-pend"><b>⏳ ${U.length} बिल का भुगतान बाकी</b><div>${U.slice(0,6).map(b=>`<button data-sbopen="${esc(b.no)}">${esc(b.partyName&&b.partyName!=="VIP ग्राहक"?b.partyName:b.no)} · ${rs(b.total)}</button>`).join("")}</div></div>`+SB.oldHTML();
 };
-SB.receiptActionsHTML=function(b){
+SB._ract=function(b){
   if(b.cancelled)return "";
   if(b.mode==="inst")return `<div data-icb="${esc(b.no)}">${SB.instContactsHTML(b)}</div>`;
   if(b.settled!==false&&num(b.pay&&b.pay.udhar)>0)return SB.udSendHTML(b)+((b.edits&&b.edits.length&&S.isOwner)?`<div class="sb-ract"><p class="note" style="margin:0">✏️ सेव के बाद ${b.edits.length} बार बदला</p></div>`:"");
   if(b.settled===false)return `<div class="sb-ract"><span class="pill blue">⏳ भुगतान बाकी</span><div class="sb-row"><button class="big" data-sbopen="${esc(b.no)}">💰 सेटल करें</button><button class="big ghost" data-sbeditno="${esc(b.no)}">✏️ बिल बदलें</button></div></div>`;
   return (b.edits&&b.edits.length&&S.isOwner)?`<div class="sb-ract"><p class="note" style="margin:0">✏️ सेव के बाद ${b.edits.length} बार बदला: ${b.edits.map(x=>esc(x.byName)+" "+ftime(x.ts)+" · "+esc(x.diff)+" ("+rs(x.totalBefore)+" → "+rs(x.totalAfter)+")").join(" | ")}</p></div>`:"";
 };
+SB.receiptActionsHTML=function(b){const h=SB._ract(b);return (b&&!b.cancelled&&window.SF&&SF.billPhHTML?SF.billPhHTML(b):"")+h};
 SB.editsHTML=function(){
   if(!S.isOwner)return "";const L=(S.dayBills||[]).filter(b=>b.edits&&b.edits.length);const U=unpaid();
   if(!L.length&&!U.length)return SB.oldHTML();

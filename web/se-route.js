@@ -778,6 +778,8 @@ SR.rateSheet=function(it){
   const I=$("#rnIn");
   $("#sheet").oninput=()=>{const n=num(I.value),m=$("#rnM");if(m&&n>0)m.innerHTML=`खरीद ${rs(cost)} → बिक्री ${rs(n)} · मुनाफ़ा <b style="color:${n>cost?"var(--leaf)":"var(--chili)"}">${Math.round((n-cost)/cost*100)}%</b>`};
   const save=async()=>{const n=r2(num(I.value));if(!(n>0)){toast("नया भाव लिखें");return}if(n===old){closeSheet();return}
+    /* 28-11: साथी कोई भी भाव लगा सकता था (खरीद से भी कम) — अब 30% से ज़्यादा कम या खरीद भाव से नीचे सिर्फ़ विक्रम जी (साथी को खरीद भाव नहीं दिखता) */
+    if(!S.isOwner&&!S.demo&&((old>0&&n<old*0.7)||(cost>0&&n<cost))){toast("🔒 इतना कम भाव सिर्फ़ विक्रम जी लगा सकते हैं — उनसे पूछें");return}
     try{if(!S.demo){await S.db.collection("items").doc(it.id).update({sale:n,rateTs:Date.now(),rateBy:S.uid||"",rateByName:biller(),ratePrev:old});
         await S.db.collection("priceLog").doc("r"+Date.now().toString(36)).set({itemId:it.id,name:it.name,field:"sale",old,new:n,ts:Date.now(),by:S.uid||"",byName:biller()})}
       it.sale=n;closeSheet();refreshAfterCart();toast("✏️ "+it.name+": "+rs(old)+" → "+rs(n))}
@@ -1358,7 +1360,7 @@ SR.delParty=async function(p,why,extra){
   try{const seen=JSON.parse(localStorage.getItem("se_pdel")||"{}");seen[p.id]=d.deletedTs;localStorage.setItem("se_pdel",JSON.stringify(seen))}catch(e){}
 };
 SR.delListHTML=function(){const L=(S.partiesDel||[]).slice().sort((a,b)=>num(b.deletedTs)-num(a.deletedTs));if(!L.length)return "";
-  return `<details class="pdel"><summary>🗑️ हटाए गए खाते (${L.length})</summary>${L.map(p=>`<div class="pdel-r"><div><b>${esc(p.name)}</b><span>मालिक ने हटाया · ${p.deletedTs?fdate(new Date(p.deletedTs).toISOString().slice(0,10))+" "+ftime(p.deletedTs):""}${p.movedTo?" · 🏢 संस्था में भेजा: "+esc(p.movedTo):""}${S.isOwner&&p.deleteWhy?" · "+esc(p.deleteWhy):""}${S.isOwner&&num(p.oldBal)?" · बाकी था "+rs(p.oldBal):""}${S.isOwner&&p.deletedDevTxt?" · 📱 "+esc(p.deletedDevTxt):""}</span></div>${S.isOwner?`<button class="lnk" data-pundel="${esc(p.id)}">↩ वापस लाएँ</button>`:""}</div>`).join("")}</details>`};
+  return `<details class="pdel"><summary>🗑️ हटाए गए खाते (${L.length})</summary>${L.map(p=>`<div class="pdel-r"><div><b>${esc(p.name)}</b><span>मालिक ने हटाया · ${p.deletedTs?fdate(today(new Date(p.deletedTs)))/* 28-11: UTC से रात 12–5:30 की तारीख एक दिन पीछे दिखती थी */+" "+ftime(p.deletedTs):""}${p.movedTo?" · 🏢 संस्था में भेजा: "+esc(p.movedTo):""}${S.isOwner&&p.deleteWhy?" · "+esc(p.deleteWhy):""}${S.isOwner&&num(p.oldBal)?" · बाकी था "+rs(p.oldBal):""}${S.isOwner&&p.deletedDevTxt?" · 📱 "+esc(p.deletedDevTxt):""}</span></div>${S.isOwner?`<button class="lnk" data-pundel="${esc(p.id)}">↩ वापस लाएँ</button>`:""}</div>`).join("")}</details>`};
 /* मालिक की ID से किसी दूसरे फ़ोन पर खाता हटे → इस फ़ोन पर तुरंत 🚨 सूचना (पहरेदार में दर्ज) */
 SR.watchDel=function(L){if(!S.isOwner)return;let seen={};try{seen=JSON.parse(localStorage.getItem("se_pdel")||"null")}catch(e){}
   const first=!seen;seen=seen||{};let ch=false;

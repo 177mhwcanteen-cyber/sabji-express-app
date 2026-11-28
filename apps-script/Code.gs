@@ -14,6 +14,7 @@
  */
 const PROJECT_ID = 'sabji-express-9a8f0'; // Firebase प्रोजेक्ट ID, जैसे sabji-express-1a2b3
 const DAYS_BACK = 3;
+const API_KEY = 'AIzaSyBBaZF1E58Ybxemy5HPj8T3L0gnyg9eOPI'; // इसी प्रोजेक्ट की वेब-चाबी (config.js वाली) — गुप्त नहीं
 
 function setup() {
   ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
@@ -151,7 +152,8 @@ function doPost(e) {
   try {
     const b = JSON.parse(e.postData.contents);
     // 1) फोटो भेजने वाला सच में हमारे ऐप का चालू कर्मचारी/मालिक है?
-    const lk = UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(b.apiKey),
+    // 28-11: चाबी ऐप से नहीं लेते — कोई अपने Firebase की चाबी + टिकट भेजकर पहरा पार न कर सके
+    const lk = UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + encodeURIComponent(API_KEY),
       { method: 'post', contentType: 'application/json', payload: JSON.stringify({ idToken: b.idToken }), muteHttpExceptions: true });
     if (lk.getResponseCode() !== 200) return out_({ ok: false, error: 'login' });
     const u = (JSON.parse(lk.getContentText()).users || [])[0];

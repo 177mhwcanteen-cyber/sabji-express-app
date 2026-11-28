@@ -107,11 +107,15 @@ SX.wasteHTML=function(){if(!S.isOwner)return "";const W=SX.waste;let body="";
   return `<div class="card2 sxc"><div class="rr-h"><h3 style="margin:0">🗑️ खराबी रिपोर्ट (30 दिन)</h3><button class="lnk" data-sxo="waste">${open.waste?"बंद करें":"खोलें ›"}</button></div>${body}</div>`};
 
 /* ======================= 5) ग्राहक का हिसाब-लिंक ======================= */
-SX.hisabLink=async function(pid){const p=(S.parties||[]).find(x=>x.id===pid);if(!p){toast("खाता नहीं मिला");return}if(p.hide){toast("🔒 छिपे खाते का लिंक नहीं बनता");return}
-  let tok=p.pubToken;if(!tok){tok=rnd(16);try{if(!S.demo)await S.db.collection("parties").doc(pid).update({pubToken:tok})}catch(e){toast("लिंक नहीं बना (सर्वर नियम नए चिपकाएँ): "+(e.code||""));return}p.pubToken=tok}
+SX.hisabDoc=function(p){const pid=p.id;
   const E=(S.ledger||[]).filter(l=>l.partyId===pid).sort((a,b)=>a.ts-b.ts).slice(-200).map(l=>({d:l.date||"",t:l.type,a:num(l.amt),b:l.billNo||"",m:l.mode||"",o:l.opening?1:0}));
   const b=typeof balRaw==="function"?balRaw(pid):bal(pid);
-  const doc={type:"hisab",name:p.name||"",bal:r2(b),entries:E,upi:upiId(),payee:"Sabji Express",ts:Date.now(),by:biller()||""};
+  return {type:"hisab",name:p.name||"",bal:r2(b),entries:E,upi:upiId(),payee:"Sabji Express",ts:Date.now(),by:biller()||""}};
+/* 28-11: ग्राहक का हिसाब-लिंक (h.html) पहले बनाते समय की "फोटो" था — बाद का जमा/उधार उसमें कभी नहीं दिखता था। अब हर जमा/उधार के बाद अपने-आप ताज़ा */
+SX.hisabRefresh=async function(pid){try{const p=(S.parties||[]).find(x=>x.id===pid);if(!p||!p.pubToken||p.hide||S.demo||!S.db)return;await S.db.collection("pub").doc(p.pubToken).set(SX.hisabDoc(p))}catch(e){}};
+SX.hisabLink=async function(pid){const p=(S.parties||[]).find(x=>x.id===pid);if(!p){toast("खाता नहीं मिला");return}if(p.hide){toast("🔒 छिपे खाते का लिंक नहीं बनता");return}
+  let tok=p.pubToken;if(!tok){tok=rnd(16);try{if(!S.demo)await S.db.collection("parties").doc(pid).update({pubToken:tok})}catch(e){toast("लिंक नहीं बना (सर्वर नियम नए चिपकाएँ): "+(e.code||""));return}p.pubToken=tok}
+  const doc=SX.hisabDoc(p),b=doc.bal;
   try{if(!S.demo)await S.db.collection("pub").doc(tok).set(doc)}catch(e){toast("लिंक नहीं बना (सर्वर नियम नए चिपकाएँ): "+(e.code||""));return}
   const url=pubBase()+"h.html?t="+tok;
   const txt=`🙏 नमस्ते ${p.name} जी,\nसब्ज़ी एक्सप्रेस में आपका हिसाब: *₹${r2(b)} बाकी*\nपूरा तारीख-वार हिसाब और UPI से चुकाने का बटन इस लिंक पर 👇\n${url}\nधन्यवाद 🥬`;
@@ -132,8 +136,11 @@ SX.ordersSheet=function(){const L=SX.orders;$("#sheet").innerHTML=`<div class="s
     <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxono="${esc(o.id)}" style="color:var(--chili)">✕ रद्द</button><span></span></div></div>`).join(""):'<div class="empty">अभी कोई ऑर्डर नहीं</div>'}
   <div class="row2" style="margin-top:6px"><button class="big ghost" data-sxolink>🔗 ऑर्डर-लिंक भेजें</button><button class="big ghost" data-sxqr>📲 घर-घर का QR</button></div></div></div>`};
 SX.orderBill=async function(id){const o=SX.orders.find(x=>x.id===id);if(!o)return;(SX._oall||(SX._oall={}))[id]=o;closeSheet();S.tab="bill";showTab();
+  /* 28-11: पहले ऑर्डर का सामान उसी चालू बिल में मिल जाता था जिसमें दूसरा ग्राहक था — अब बिल खाली न हो तो नया टैब */
+  if((S.cart||[]).length||S.mode!=="walk"||(S.cust&&S.cust.phone&&S.cust.phone!==o.phone))newTab();
   if(String(o.phone||"").length===10){S.mode="walk";S.cust={phone:o.phone,name:o.name||""}}
-  (o.items||[]).forEach(x=>{const it=item(x.id);if(it&&num(x.q)>0)try{quickAdd(it,num(x.q))}catch(e){}});
+  const miss=[];(o.items||[]).forEach(x=>{const it=item(x.id);if(it&&num(x.q)>0&&priceOf(it)>0){try{quickAdd(it,num(x.q))}catch(e){}}else miss.push((x.n||x.id)+" "+fq(num(x.q),x.u||"kg"))});
+  if(miss.length)setTimeout(()=>toast("⚠ ऑर्डर के ये सामान बिल में नहीं जुड़े (लिस्ट में नहीं/भाव नहीं): "+miss.join(", ")),2600);
   try{if(!S.demo)await S.db.collection("orders").doc(id).update({status:"billing",byName:biller()||"",bts:Date.now()})}catch(e){}SX.pubOt(id,"pack");
   S.sxOrder={id,phone:o.phone,ts:Date.now()};try{refreshAfterCart()}catch(e){}toast("📥 ऑर्डर का सामान बिल में — तौलकर मात्रा ठीक करें, फिर सेव करें")};
 SX.orderSet=async function(id,status,extra){try{if(!S.demo)await S.db.collection("orders").doc(id).update({status,dts:Date.now(),byName:biller()||"",...(extra||{})})}catch(e){toast("नहीं हुआ: "+(e.code||""))}
@@ -195,12 +202,16 @@ SX.shareBlob=async function(blob,name,ext,mime,text){
 
 /* ======================= 14) बैकअप ======================= */
 const clean=o=>JSON.parse(JSON.stringify(o,(k,v)=>k==="pin"||k==="pinHash"?undefined:v));
-SX.autoBackup=async function(){if(!S.isOwner||S.demo||!S.db)return;const y=dayAdd(today(),-1);if(LS.get("sx_bk")===y)return;
-  try{const ref=S.db.doc("ownerCfg/bk_"+y);const ex=await ref.get();if(ex.exists){LS.set("sx_bk",y);return}
-    const [bills,kh,st,cl,pu]=await Promise.all([S.db.collection("days/"+y+"/bills").get(),S.db.collection("days/"+y+"/kharch").get(),S.db.doc("days/"+y+"/meta/stock").get(),S.db.doc("days/"+y+"/meta/close").get(),S.db.collection("purchases").where("date","==",y).get()]);
-    const doc=clean({date:y,ts:Date.now(),bills:bills.docs.map(d=>d.data()),kharch:kh.docs.map(d=>({id:d.id,...d.data()})),stock:st.exists?st.data():null,close:cl.exists?cl.data():null,purchases:pu.docs.map(d=>({id:d.id,...d.data()})),ledger:(S.ledger||[]).filter(l=>l.date===y)});
+/* 28-11: पहले सिर्फ़ "कल" का बैकअप बनता था — मालिक 2-3 दिन ऐप न खोलें तो बीच के दिन छूट जाते; 1 MB से बड़ा दिन चुपचाप छूटता पर "हो गया" लिख जाता।
+   अब पिछले 7 दिन में जो भी छूटा हो, बनता है; गल्ला + हटाए सामान भी साथ; बहुत बड़ा हो तो "tooBig" निशान (मालिक को पता चले) */
+SX.autoBackup=async function(){if(!S.isOwner||S.demo||!S.db)return;const y0=dayAdd(today(),-1);if(LS.get("sx_bk")===y0)return;let all=true;
+  for(let k=7;k>=1;k--){const y=dayAdd(today(),-k);
+  try{const ref=S.db.doc("ownerCfg/bk_"+y);const ex=await ref.get();if(ex.exists)continue;
+    const [bills,kh,st,cl,pu,gl,cr]=await Promise.all([S.db.collection("days/"+y+"/bills").get(),S.db.collection("days/"+y+"/kharch").get(),S.db.doc("days/"+y+"/meta/stock").get(),S.db.doc("days/"+y+"/meta/close").get(),S.db.collection("purchases").where("date","==",y).get(),S.db.doc("days/"+y+"/meta/galla").get(),S.db.doc("days/"+y+"/meta/cartrm").get()]);
+    const doc=clean({date:y,ts:Date.now(),bills:bills.docs.map(d=>d.data()),kharch:kh.docs.map(d=>({id:d.id,...d.data()})),stock:st.exists?st.data():null,close:cl.exists?cl.data():null,purchases:pu.docs.map(d=>({id:d.id,...d.data()})),ledger:(S.ledger||[]).filter(l=>l.date===y),galla:gl.exists?gl.data():null,cartrm:cr.exists?cr.data():null});
     let js=JSON.stringify(doc);if(js.length>900000){doc.bills=doc.bills.map(b=>({...b,edits:undefined}));js=JSON.stringify(doc)}
-    if(js.length<1000000)await ref.set(JSON.parse(js));LS.set("sx_bk",y)}catch(e){}};
+    if(js.length<1000000)await ref.set(JSON.parse(js));else await ref.set({date:y,ts:Date.now(),tooBig:true,n:bills.docs.length,kb:Math.round(js.length/1024)})}catch(e){all=false}}
+  if(all)LS.set("sx_bk",y0)};
 SX.backupFile=async function(){if(!S.isOwner)return;toast("📦 बैकअप फ़ाइल बन रही है… (30 दिन)");const out={app:"सब्ज़ी एक्सप्रेस",made:new Date().toISOString(),days:{}};
   try{const g=async c=>(await S.db.collection(c).get()).docs.map(d=>({id:d.id,...d.data()}));
     [out.items,out.parties,out.ledger,out.suppliers,out.supPay]=await Promise.all(["items","parties","ledger","suppliers","supPay"].map(g));

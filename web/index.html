@@ -600,6 +600,7 @@ html .cartbtn:active{transform:scale(.985)}
 .snav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:8px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
 .snav button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:5px 10px;font-size:12.5px;font-weight:700;white-space:nowrap}
 .toast{pointer-events:none}
+/* 28-11: 📷 Firestore फोटो की परत · छोटे फोन (≤400px) पर बिल-सूची की फ़िल्टर पट्टी चिपकी न रहे (ऊपर के आँकड़े ढक जाते थे) और तारीखें नीचे की लाइन में */.fsph{position:fixed;inset:0;z-index:95;background:rgba(0,0,0,.86);display:grid;place-items:center;padding:10px}.fsph-in{display:grid;gap:6px;justify-items:center;color:#fff;max-width:100%;max-height:100%}.fsph-in img{max-width:100%;max-height:86vh;border-radius:10px;background:#fff}.fsph-in small{color:#ddd;text-align:center}@media (max-width:400px){.bfbar{position:static}.bf-r{flex-wrap:wrap}.bf-d input{max-width:120px}#ctray .cth span{white-space:normal}}
 </style>
 
 <header class="px">
@@ -719,6 +720,7 @@ function renderBillTabs(){
 $("#btabs").onclick=e=>{
   const x=e.target.closest("[data-btx]");if(x){const i=+x.dataset.btx;const t=i===S.ai?{cart:S.cart}:S.bt[i];
     if(t.cart&&t.cart.length&&x.dataset.sure!=="1"){x.dataset.sure="1";x.textContent="?";toast("इस बिल में सामान है — बंद करने के लिए ✕ दोबारा दबाएँ");return}
+    (t.cart||[]).forEach(l=>rmLog({...l},"पूरा बिल बंद"));
     syncTab();S.bt.splice(i,1);if(!S.bt.length)S.bt=[blankTab()];loadTab(i<S.ai?S.ai-1:Math.min(S.ai===i?i:S.ai,S.bt.length-1));refreshAfterCart();return}
   if(e.target.closest("[data-btnew]")){newTab();return}
   const b=e.target.closest("[data-bt]");if(b&&+b.dataset.bt!==S.ai)switchTab(+b.dataset.bt);
@@ -841,7 +843,7 @@ $("#q").addEventListener("keydown",e=>{if(e.key!=="Enter"||e.defaultPrevented)re
 function quickAdd(it,q){if(it&&it.id==="xyz"&&window.SR)return SR.xyzSheet(q);
   const p=priceOf(it);if(!(p>0))return;
   const ex=S.cart.find(l=>l.id===it.id&&!l.changed&&!l.free);
-  if(ex){ex.qty=Math.round((ex.qty+q)*1000)/1000;ex.amt=r2(ex.qty*ex.rate)}
+  if(ex){ex.qty=Math.round((ex.qty+q)*1000)/1000;ex.amt=r2(ex.amt+q*ex.rate);delete ex.fix}
   else S.cart.push({key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:q,rate:p,board:p,cost:(window.SF?SF.costOf(it):(+it.cost||0)),changed:false,free:false,amt:r2(q*p)});
   clearSearch();refreshAfterCart();beep(true);toast("✓ "+it.name+" "+fq(q,it.unit)+" · "+rs(r2(q*p)));
 }
@@ -870,8 +872,8 @@ function openQty(it,lineIdx,focus){if(it&&it.id==="xyz"&&window.SR)return SR.xyz
   const sh=$("#sheet"),qi=$("#qIn"),ai=$("#aIn"),btn=sh.querySelector("[data-add]");
   const upd=()=>{const amt=r2(st.qty*rate);btn.disabled=!(st.qty>0);btn.textContent=st.qty>0?`${ln?"बदलें":"जोड़ें"} · ${fqg(st.qty,it.unit)} = ${rs(st.fixAmt||amt)}`:(kg?"किलो या रुपये लिखें":"गिनती लिखें")};
   const add=()=>{if(!(st.qty>0))return;const q=Math.round(st.qty*1000)/1000;
-    const line={key:ln?ln.key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:q,rate:r2(rate),board:r2(board),cost:(window.SF?SF.costOf(it):(+it.cost||0)),changed:r2(rate)!==r2(board),free:false,amt:kg&&st.fixAmt>0?st.fixAmt:r2(q*rate)};
-    if(ln)S.cart[lineIdx]=line;else{const ex=S.cart.findIndex(l=>l.id===it.id&&!l.changed&&!l.free);if(ex>-1){S.cart[ex].qty=Math.round((S.cart[ex].qty+q)*1000)/1000;S.cart[ex].amt=r2(S.cart[ex].amt+line.amt)}else S.cart.push(line)}
+    const line={key:ln?ln.key:Math.random().toString(36).slice(2),id:it.id,name:it.name,emoji:it.emoji,unit:it.unit,qty:q,rate:r2(rate),board:r2(board),cost:(window.SF?SF.costOf(it):(+it.cost||0)),changed:r2(rate)!==r2(board),free:false,amt:kg&&st.fixAmt>0?st.fixAmt:r2(q*rate),...(kg&&st.fixAmt>0?{fix:1}:{})};
+    if(ln)S.cart[lineIdx]=line;else{const ex=S.cart.findIndex(l=>l.id===it.id&&!l.changed&&!l.free);if(ex>-1){S.cart[ex].qty=Math.round((S.cart[ex].qty+q)*1000)/1000;S.cart[ex].amt=r2(S.cart[ex].amt+line.amt);if(!line.fix)delete S.cart[ex].fix}else S.cart.push(line)}
     closeSheet();clearSearch();refreshAfterCart();beep(true);toast("✓ "+it.name+" "+fqg(q,it.unit)+" · "+rs(line.amt));
     if(lineIdx!=null&&S.chk&&S.cart.length)drawCheckout();};
   if(ln&&focus!=="amt")st.fixAmt=kg&&Math.abs(ln.amt-r2(ln.qty*ln.rate))>0.001?ln.amt:0;
@@ -886,7 +888,7 @@ function openQty(it,lineIdx,focus){if(it&&it.id==="xyz"&&window.SR)return SR.xyz
     if(e.target.closest("[data-close]")){closeSheet();return}
     const qa=e.target.closest("[data-qa]");if(qa&&rate>0){const v=+qa.dataset.qa;st.fixAmt=v;st.qty=Math.round(v/rate*1000)/1000;qi.value=+st.qty.toFixed(3);ai.value=v;upd();add();return}
     const c=e.target.closest("[data-q]");if(c){st.fixAmt=0;st.qty=+c.dataset.q;qi.value=st.qty;ai.value=r2(st.qty*rate);upd();add();return}
-    if(e.target.closest("[data-rm]")){S.cart.splice(lineIdx,1);closeSheet();refreshAfterCart();return}
+    if(e.target.closest("[data-rm]")){rmLog({...S.cart[lineIdx]},"मात्रा-खिड़की");S.cart.splice(lineIdx,1);closeSheet();refreshAfterCart();return}
     if(e.target.closest("[data-add]"))add();
   };
 }
@@ -918,15 +920,19 @@ function ctray(show){let t=$("#ctray");
     <button type="button" class="ctx" data-ctdel="${i}" aria-label="${esc(l.name)} हटाएँ">✕</button></div>`}).join("")}</div>`;
   if(hl){const r=t.querySelector(".ctr.hl");if(r&&r.scrollIntoView)try{r.scrollIntoView({block:"nearest"})}catch(e){}}
 }
-function rmLog(l){try{if(!l)return;S.cartRmLocal=(S.cartRmLocal||0)+1;if(S.isOwner||S.demo||!S.db)return;
-  const F=firebase.firestore.FieldValue;S.db.doc("days/"+today()+"/meta/cartrm").set({log:F.arrayUnion({id:l.id||"",n:l.name||"",q:+l.qty||0,u:l.unit||"",a:r2(+l.amt||0),by:biller()||"",uid:S.uid||"",ts:Date.now()})},{merge:true}).catch(()=>{})}catch(e){}}
-function cartRmHTML(){if(!S.isOwner||S.demo||!S.db)return "";const d=today();
-  if(S._crmD!==d){S._crmD=d;S.cartRm=[];S.db.doc("days/"+d+"/meta/cartrm").get().then(x=>{S.cartRm=(x.exists&&x.data().log)||[];if(S.cartRm.length&&S.tab==="report")renderReport()}).catch(()=>{})}
-  const L=S.cartRm||[];if(!L.length)return "";const ok=+lsGet("se_crmok_"+d)||0;const nw=L.filter(x=>x.ts>ok);if(!nw.length)return "";
-  return `<div class="card2" style="border:2px solid #f97316"><h3 style="color:#c2410c">✕ आज ${nw.length} सामान बिल बनने से पहले हटाए गए</h3><p class="note" style="margin:0 0 6px">साथी ने जोड़कर हटाया — ज़्यादातर गलती से जुड़ा होता है; बार-बार हो तो पूछें।</p>
-  ${nw.slice(-12).reverse().map(x=>`<div class="stkmeta"><span>${esc(x.n)} · ${esc(fqg(x.q,x.u))}<br><small class="note">${ftime(x.ts)} · ${esc(x.by||"")}</small></span><b>${rs(x.a)}</b></div>`).join("")}
+/* 28-11 (50 कमियाँ #1-2): पूरा बिल-टैब ✕✕ से बंद करना और मात्रा-खिड़की का "बिल से हटाएँ" भी यहीं दर्ज (पहले सिर्फ़ ट्रे का ✕) — w = कैसे हटाया */
+function rmLog(l,w){try{if(!l)return;S.cartRmLocal=(S.cartRmLocal||0)+1;if(S.isOwner||S.demo||!S.db)return;
+  const F=firebase.firestore.FieldValue;S.db.doc("days/"+today()+"/meta/cartrm").set({log:F.arrayUnion({id:l.id||"",n:l.name||"",q:+l.qty||0,u:l.unit||"",a:r2(+l.amt||0),by:biller()||"",uid:S.uid||"",ts:Date.now(),...(w?{w}:{})})},{merge:true}).catch(()=>{})}catch(e){}}
+/* 28-11: पहले दिन में एक ही बार पढ़ता था (बाद के हटाए दिखते नहीं थे) और "देख लिया" सिर्फ़ इसी फोन में — अब हर मिनट ताज़ा, आज + कल, ✓ सर्वर पर (okTs) */
+function cartRmHTML(){if(!S.isOwner||S.demo||!S.db)return "";const d=today(),y=dayPlus(d,-1);
+  if(S._crmD!==d||!S._crmT||Date.now()-S._crmT>60000){S._crmD=d;S._crmT=Date.now();
+    Promise.all([d,y].map(k=>S.db.doc("days/"+k+"/meta/cartrm").get().then(x=>{const v=(x.exists&&x.data())||{};const ok=Math.max(+v.okTs||0,+lsGet("se_crmok_"+k)||0);return (v.log||[]).filter(e=>e&&e.ts>ok).map(e=>({...e,_d:k}))}).catch(()=>[])))
+      .then(R=>{const n=R.flat(),sig=a=>a.map(x=>x.ts+"|"+x.n).join(",");const ch=sig(n)!==sig(S.cartRm||[]);S.cartRm=n;if(ch&&S.tab==="report")renderReport()})}
+  const nw=(S.cartRm||[]).slice().sort((a,b)=>a.ts-b.ts);if(!nw.length)return "";const tot=r2(nw.reduce((a,x)=>a+(+x.a||0),0)),whole=nw.filter(x=>x.w==="पूरा बिल बंद").length;
+  return `<div class="card2" style="border:2px solid #f97316"><h3 style="color:#c2410c">✕ ${nw.length} सामान बिल बनने से पहले हटाए गए · ${rs(tot)}</h3><p class="note" style="margin:0 0 6px">साथी ने जोड़कर हटाया — ज़्यादातर गलती से जुड़ा होता है; बार-बार हो तो पूछें।${whole?` <b style="color:#c2410c">${whole} सामान पूरा बिल ✕ से बंद करके हटे — माल गया हो तो पैसा कहाँ?</b>`:""}</p>
+  ${nw.slice(-15).reverse().map(x=>`<div class="stkmeta"><span>${esc(x.n)} · ${esc(fqg(x.q,x.u))}${x.w?` · <b style="color:#c2410c">${esc(x.w)}</b>`:""}<br><small class="note">${x._d!==d?"कल ":""}${ftime(x.ts)} · ${esc(x.by||"")}</small></span><b>${rs(x.a)}</b></div>`).join("")}
   <button class="lnk" data-crmok>✓ देख लिया</button></div>`}
-document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("[data-crmok]")){lsSet("se_crmok_"+today(),String(Date.now()));try{renderReport()}catch(x){}return}
+document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("[data-crmok]")){const now=Date.now();[today(),dayPlus(today(),-1)].forEach(k=>{lsSet("se_crmok_"+k,String(now));if(!S.demo&&S.db)S.db.doc("days/"+k+"/meta/cartrm").set({okTs:now},{merge:true}).catch(()=>{})});S.cartRm=[];try{renderReport()}catch(x){}return}
   const t=e.target.closest&&e.target.closest("#ctray");if(!t)return;
   if(e.target.closest("[data-ctmin]")){t.classList.toggle("min");lsSet("se_ctmin",t.classList.contains("min")?"1":"0");renderCart();return}
   if(e.target.closest("[data-ctnew]")){newTab();return}
@@ -1027,7 +1033,7 @@ async function saveBill(){
   const item={bill,done:{}};let offline=false;
   try{if(navigator.onLine===false)throw {code:"offline"};await commitBill(item)}
   catch(err){
-    if(err&&(err.code==="invalid_argument"||err.code==="permission-denied")){S.saving=false;drawCheckout();toast("बिल सेव करने की अनुमति नहीं है — विक्रम जी से खाता चालू करवाएँ");return}
+    if(err&&(err.code==="invalid-argument"||err.code==="invalid_argument"||err.code==="permission-denied")){S.saving=false;drawCheckout();toast("बिल सेव करने की अनुमति नहीं है — विक्रम जी से खाता चालू करवाएँ");return}
     offline=true;bill.pending=true;item.localStock=true;
     for(const [id,d] of trackedPairs(lines,-1)){const cur=+(S.pstock[id]?.qty)||0;S.pstock[id]={...(S.pstock[id]||{}),qty:r2(cur+d)}}
     const o=outbox();o.push(item);saveOutbox(o);
@@ -1159,7 +1165,7 @@ function openParty(pid){
       if(!biller()){openBiller(()=>openParty(pid));return}
       const now=Date.now(),id="j"+now.toString(36)+Math.random().toString(36).slice(2,4);
       const ent={...(window.SR&&SR.locNow&&SR.locNow()?{loc:SR.locNow()}:{}),ts:now,date:today(),partyId:pid,partyName:p.name,type:"jama",amt:r2(amt),mode:st.mode,by:S.uid||"",byName:biller()};
-      try{if(S.demo)S.ledger.push({id,...ent});else await S.db.collection("ledger").doc(id).set(ent);toast(rs(amt)+" जमा हुए");closeSheet();renderPane();if(window.SR)setTimeout(()=>SR.jamaDone(p,r2(amt),st.mode),250)}catch(err){toast("जमा नहीं हुआ, दोबारा कोशिश करें")}
+      try{if(S.demo)S.ledger.push({id,...ent});else await S.db.collection("ledger").doc(id).set(ent);toast(rs(amt)+" जमा हुए");if(window.SX&&SX.hisabRefresh)setTimeout(()=>SX.hisabRefresh(pid),800);closeSheet();renderPane();if(window.SR)setTimeout(()=>SR.jamaDone(p,r2(amt),st.mode),250)}catch(err){toast("जमा नहीं हुआ, दोबारा कोशिश करें")}
     }
   };
 }
@@ -1187,7 +1193,8 @@ async function adjStock(pairs,why){
   pairs=pairs.filter(p=>p[1]);
   for(const [id,d] of pairs){
     const cur=+(S.pstock[id]?.qty)||0;S.pstock[id]={...(S.pstock[id]||{}),qty:r2(cur+d),ts:Date.now()};
-    if(!S.demo){try{await S.db.collection("pstock").doc(id).set({qty:SE.inc(r2(d)),ts:Date.now(),by:S.uid||"",byName:biller(),last:why||""},{merge:true});S.db.collection("stockLog").doc("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,5)).set({itemId:id,d:r2(d),why:why||"",ts:Date.now(),date:today(),by:S.uid||"",byName:biller()}).catch(()=>{})}catch(e){toast("स्टॉक अपडेट नहीं हुआ")}}
+    /* 28-11: कमज़ोर नेट में सर्वर का जवाब आने तक बिल "सेव हो रहा है" पर अटका रहता था — अब 4 सेकंड बाद आगे (Firestore लिखाई फोन में कतार में रखकर खुद भेजता है) */
+    if(!S.demo){try{const w=S.db.collection("pstock").doc(id).set({qty:SE.inc(r2(d)),ts:Date.now(),by:S.uid||"",byName:biller(),last:why||""},{merge:true});w.catch(()=>toast("स्टॉक अपडेट नहीं हुआ"));await Promise.race([w.catch(()=>{}),new Promise(r=>setTimeout(r,4000))]);S.db.collection("stockLog").doc("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,5)).set({itemId:id,d:r2(d),why:why||"",ts:Date.now(),date:today(),by:S.uid||"",byName:biller()}).catch(()=>{})}catch(e){toast("स्टॉक अपडेट नहीं हुआ")}}
   }
 }
 function trackedPairs(lines,sign){return lines.filter(l=>item(l.id)?.track).map(l=>[l.id,sign*l.qty])}
@@ -1321,10 +1328,13 @@ function saveOutbox(o){lsSet("se_outbox",JSON.stringify(o))}
 function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej({code:"timeout"}),ms))])}
 async function commitBill(item){
   const bill=item.bill,date=bill.date,f=item.done||(item.done={});
+  /* 28-11: बिना नेट बने बिल (फोन-निशान 1-9 बेतरतीब) — दो फोन का एक ही नंबर निकला तो set() पहले वाला बिल मिटा देता था → पहले सर्वर पर जाँचो, टकराए तो सर्वर से नया नंबर */
+  if(!f.b&&!f.k&&window.SF&&SF.decodeBill&&SF.serverBillNo){const dc=SF.decodeBill(bill.no);if(dc&&dc.dev>0){const g=await withTimeout(S.db.collection("days/"+date+"/bills").doc(bill.no).get(),9000);
+    if(g.exists){const x=g.data()||{};if(x.ts!==bill.ts||x.by!==bill.by){const was=bill.no;bill.no=await SF.serverBillNo(date);bill.noWas=was}}}f.k=1}
   if(!f.b){await withTimeout(S.db.collection("days/"+date+"/bills").doc(bill.no).set({...bill,pending:false}),9000);f.b=1}
-  if(!f.l&&bill.pay.udhar>0){await withTimeout(S.db.collection("ledger").doc(bill.no).set({ts:bill.ts,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:bill.pay.udhar,billNo:bill.no,by:bill.by,byName:bill.byName}),9000)}f.l=1;
+  if(!f.l&&bill.pay.udhar>0){await withTimeout(S.db.collection("ledger").doc(bill.no).set({ts:bill.ts,date,partyId:bill.partyId,partyName:bill.partyName,type:"udhar",amt:bill.pay.udhar,billNo:bill.no,by:bill.by,byName:bill.byName}),9000);if(window.SX&&SX.hisabRefresh)setTimeout(()=>SX.hisabRefresh(bill.partyId),1500)}f.l=1;
   if(!f.c){const lastCart=bill.lines.filter(l=>!l.free).map(l=>({id:l.id,qty:l.qty})),lastItems=bill.lines.map(l=>l.name).slice(0,5).join(", ");
-    try{if((bill.custPhone||"").length===10){const ref=S.db.collection("customers").doc(bill.custPhone);const g=await ref.get();const o=g.exists?g.data():{};await ref.set({...(bill.loc?{lastLoc:bill.loc}:{}),name:bill.custName||o.name||"",phone:bill.custPhone,visits:(o.visits||0)+1,spent:r2((o.spent||0)+bill.total),firstTs:o.firstTs||bill.ts,lastTs:bill.ts,lastItems,lastCart})}
+    try{if((bill.custPhone||"").length===10){const ref=S.db.collection("customers").doc(bill.custPhone);const g=await ref.get();const o=g.exists?g.data():{};await ref.set({...(bill.loc?{lastLoc:bill.loc}:{}),name:bill.custName||o.name||"",phone:bill.custPhone,visits:(o.visits||0)+1,spent:r2((o.spent||0)+bill.total),firstTs:o.firstTs||bill.ts,lastTs:bill.ts,lastItems,lastCart},{merge:true})/* 28-11: merge — पहले हर बिल पर बाकी खाने (lastLoc आदि) मिट जाते थे */}
       else if(bill.mode==="udhar"&&bill.partyId)await S.db.collection("parties").doc(bill.partyId).update({lastCart,lastTs:bill.ts})}catch(e){}f.c=1}
   if(!f.s){if(!item.localStock)await adjStock(trackedPairs(bill.lines,-1),"बिल "+bill.no);else{for(const [id,d] of trackedPairs(bill.lines,-1)){try{await S.db.collection("pstock").doc(id).set({qty:SE.inc(r2(d)),ts:Date.now(),byName:bill.byName,last:"बिल "+bill.no},{merge:true})}catch(e){}}}f.s=1}
 }
@@ -1333,7 +1343,7 @@ async function flushOutbox(){
   if(flushing||S.demo||!S.db)return;let o=outbox();if(!o.length){netbar();return}
   if(navigator.onLine===false){netbar();return}
   flushing=true;netbar("sync");let sent=0;
-  for(const item of [...o]){try{await commitBill(item);o=outbox().filter(x=>x.bill.no!==item.bill.no);saveOutbox(o);sent++}catch(e){const cur=outbox();const i=cur.findIndex(x=>x.bill.no===item.bill.no);if(i>-1){cur[i].done=item.done;saveOutbox(cur)}break}}
+  for(const item of [...o]){try{await commitBill(item);o=outbox().filter(x=>x.bill.no!==item.bill.no&&x.bill.no!==item.bill.noWas);saveOutbox(o);sent++;if(item.bill.noWas)toast("⚠ बिल "+item.bill.noWas+" का नंबर दूसरे फोन से टकराया — नया नंबर "+item.bill.no+" (दोनों बिल सुरक्षित)")}catch(e){const cur=outbox();const i=cur.findIndex(x=>x.bill.no===item.bill.no||x.bill.no===item.bill.noWas);if(i>-1){cur[i]=item;saveOutbox(cur)}break}}
   flushing=false;netbar();if(sent){toast("✅ "+sent+" बिल सर्वर पर भेज दिए");beat()}
 }
 function netbar(mode){
@@ -1353,7 +1363,7 @@ async function saveCustPhone(b,ph){
   b.custPhone=ph;if(S.demo||!S.db)return;
   try{await S.db.doc("days/"+b.date+"/bills/"+b.no).update({custPhone:ph})}catch(e){}
   if(b.mode==="udhar"&&b.partyId){const p=S.parties.find(x=>x.id===b.partyId);if(p&&!p.phone){try{await S.db.collection("parties").doc(p.id).update({phone:ph})}catch(e){}}return}
-  try{const ref=S.db.collection("customers").doc(ph);const g=await ref.get();const o=g.exists?g.data():{};await ref.set({...(b.loc?{lastLoc:b.loc}:{}),name:b.custName||o.name||"",phone:ph,visits:(o.visits||0)+(g.exists?0:1),spent:r2((o.spent||0)+(g.exists?0:b.total)),firstTs:o.firstTs||b.ts,lastTs:b.ts,lastItems:o.lastItems||b.lines.map(l=>l.name).slice(0,5).join(", "),lastCart:o.lastCart||b.lines.map(l=>({id:l.id,qty:l.qty}))})}catch(e){}
+  try{const ref=S.db.collection("customers").doc(ph);const g=await ref.get();const o=g.exists?g.data():{};await ref.set({...(b.loc?{lastLoc:b.loc}:{}),name:b.custName||o.name||"",phone:ph,visits:(o.visits||0)+(g.exists?0:1),spent:r2((o.spent||0)+(g.exists?0:b.total)),firstTs:o.firstTs||b.ts,lastTs:b.ts,lastItems:o.lastItems||b.lines.map(l=>l.name).slice(0,5).join(", "),lastCart:o.lastCart||b.lines.map(l=>({id:l.id,qty:l.qty}))},{merge:true})}catch(e){}
 }
 
 /* ---------- guard: tamper alarm (owner-private fingerprints) ---------- */
@@ -1421,10 +1431,14 @@ function stockRows(){
   });
 }
 function cashCalc(d){
+  /* 28-11: बाद के दिन सेटल हुए बिल का नकद उसी (बाद वाले) दिन के गल्ले में "पुराने बिल का पैसा" से आता है — बिल वाले दिन में दोबारा नहीं (पहले पुराना दिन पीछे से "ज़्यादा होना चाहिए" दिखता था) */
+  const late=b=>b.settleTs&&b.date===d&&today(new Date(b.settleTs))!==d;
   const sale=liveBills().filter(b=>b.mode!=="inst");
-  const cashSale=r2(sale.reduce((a,b)=>a+(b.pay.cash||0),0));
+  const cashSale=r2(sale.filter(b=>!late(b)).reduce((a,b)=>a+(b.pay.cash||0),0));
   const jamaCash=r2(S.ledger.filter(l=>l.date===d&&l.type==="jama"&&l.mode!=="upi").reduce((a,l)=>a+l.amt,0));
-  const khCash=r2(S.kharch.filter(k=>k.mode!=="upi").reduce((a,k)=>a+(+k.amt||0),0)+(window.SF?SF.gallaPaid():0));
+  /* 28-11: दुकानदार को "गल्ले से" दिया बाकी का भुगतान (supPay) भी गल्ले से घटे — पहले नहीं घटता था, गल्ला झूठा "कम" दिखता */
+  const spGalla=r2((S.supPay||[]).filter(x=>x.mode==="galla"&&x.date===d).reduce((a,x)=>a+(+x.amt||0),0));
+  const khCash=r2(S.kharch.filter(k=>k.mode!=="upi").reduce((a,k)=>a+(+k.amt||0),0)+(window.SF?SF.gallaPaid():0)+spGalla);
   const khAll=r2(S.kharch.reduce((a,k)=>a+(+k.amt||0),0));
   const cl=S.close||{};const pc=S.prevClose&&S.prevClose.d===dayPlus(d,-1)&&S.prevClose.counted!=null&&S.prevClose.counted!==""?+S.prevClose.counted:null;
   const float=cl.float!=null&&cl.float!==""?+cl.float:(pc!=null?pc:(+S.settings.float||0));
@@ -1787,6 +1801,12 @@ function subBills(){
     S.db.doc(d+"/meta/close").onSnapshot(s=>{S.close=s.exists?s.data():null;if(S.tab!=="day")renderPane()},()=>{}),
     S.db.doc(d+"/meta/galla").onSnapshot(s=>{S.gl=s.exists?s.data():null;renderPane(S.tab!=="day")},()=>{})];
 }
+/* 🌅 28-11 (177 MH का 23-11 वाला सुधार): ऐप रात भर खुला रहे या सुबह पीछे से खुले — "आज" वाली स्क्रीन (बिल, खर्चा, गल्ला, गिनती) अपने-आप नई तारीख पर।
+   पहले तारीख नहीं बदलती थी → नए बिल दिखते नहीं, खर्चा/गल्ला कल की तारीख में चढ़ता। जो पुरानी तारीख खुद चुनकर देख रहा है, उसे नहीं छेड़ते। */
+let _dayNow=today();
+function dayRoll(){const t=today();if(t===_dayNow)return;const was=_dayNow;_dayNow=t;if(!S.db&&!S.demo)return;if(S.billsDate!==was)return;
+  S.billsDate=t;S.repDate=t;try{subBills()}catch(e){}try{renderTabs();renderPane(true)}catch(e){}}
+setInterval(dayRoll,60000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)dayRoll()});
 function loadDemo(){
   S.demo=true;S.isOwner=true;
   S.items=DEMO_ITEMS.map(([id,name,emoji,cat,unit,sale,cost,hue,barcode],i)=>({id,name,emoji,cat,unit,sale,cost,hue,alias:ALIAS[id]||"",barcode:barcode||"",track:!!barcode,order:i,active:true}));
@@ -1810,7 +1830,10 @@ async function boot(){
   if(S.isOwner)db.collection("staff").onSnapshot(s=>{S.staffDocs=s.docs.map(d=>({id:d.id,...d.data()}));if(S.tab==="set"&&!$("#p-set").contains(document.activeElement))renderSettings()},()=>{});
   setTimeout(()=>SE.checkUpdate(toast),4000);if(SE.autoUpdateLoop)SE.autoUpdateLoop(toast);
   const sortItems=a=>a.sort((x,y)=>(x.order??999)-(y.order??999)||x.name.localeCompare(y.name,"hi"));
-  db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(window.SX&&SX.ratesSoon)SX.ratesSoon();if(window.SR)SR.addVirtual();if(S.isOwner&&window.SF&&S.items.some(i=>!i.plu))SF.ensurePLU();S.cart.forEach(l=>{const it=item(l.id);if(it&&!l.changed&&!l.free){l.board=priceOf(it);l.rate=l.board;l.cost=+it.cost||0;l.amt=r2(l.qty*l.rate)}});renderPane();renderCart()},()=>toast("सब्ज़ी लिस्ट लोड नहीं हुई"));
+  db.collection("items").onSnapshot(s=>{S.items=sortItems(s.docs.map(d=>({id:d.id,...d.data()})));if(window.SX&&SX.ratesSoon)SX.ratesSoon();if(window.SR)SR.addVirtual();if(S.isOwner&&window.SF&&S.items.some(i=>!i.plu))SF.ensurePLU();/* 28-11: चालू बिल में भाव बदले तो — "₹20 का" (fix) वाली लाइन की रकम वही रहे, वज़न नए भाव से; खरीद भाव उसी तरीके से (SF.costOf) जैसे जोड़ते समय; बदला तो बिलर को बताओ */
+    const chg=[];S.cart.forEach(l=>{const it=item(l.id);if(!it||l.changed||l.free)return;const nb=priceOf(it);if(!(nb>0))return;if(nb!==l.rate)chg.push(it.name+" ₹"+l.rate+"→₹"+nb);
+      if(l.fix&&nb!==l.rate)l.qty=Math.round(l.amt/nb*1000)/1000;else if(!l.fix)l.amt=r2(l.qty*nb);l.board=nb;l.rate=nb;l.cost=window.SF?SF.costOf(it):(+it.cost||0)});
+    if(chg.length)toast("✏️ चालू बिल में भाव बदला: "+chg.slice(0,3).join(", "));renderPane();renderCart()},()=>toast("सब्ज़ी लिस्ट लोड नहीं हुई"));
   db.doc("settings/main").onSnapshot(s=>{S.settings=s.exists?s.data():{};checkLock();if(S.tab!=="set")renderPane()});
   if(S.isOwner)db.collection("presence").onSnapshot(s=>{S.presence=s.docs.map(d=>d.data());if(S.tab==="bills")renderBills()},()=>{});
   setTimeout(()=>{flushOutbox();beat();netbar()},1500);

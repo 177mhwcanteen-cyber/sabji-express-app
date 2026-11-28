@@ -39,7 +39,7 @@ SF.onDate=function(d){
     if(SF._unN)try{SF._unN()}catch(e){}SF._nt=undefined;
     if(d===today())SF._unN=S.db.doc("days/"+d+"/meta/stock").onSnapshot(x=>{const v=x.exists?x.data():null;const nt=v&&v.nightTs;if(SF._nt!==undefined&&nt&&nt!==SF._nt&&v.by!==S.uid)setTimeout(()=>{const D=nightDiffs(),tot=r2(D.filter(y=>y.r.short>0).reduce((a,y)=>a+y.val,0));toast("🌙 "+(v.nightBy||"कर्मचारी")+" ने रात का स्टॉक लिखा"+(D.length?" · "+D.length+" में फर्क"+(tot>0?" · लगभग "+rs(tot):"")+" — दिन का हिसाब देखें":" · हिसाब मिल गया 👍"))},900);SF._nt=nt||null},()=>{})}
   S.prevStock={};SF.loadCopy(d);SF.loadGpay(d);SF.watchClose(d);SF.loadNobuy(d);
-  S.db.doc("days/"+dayAdd(d,-1)+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};if(S.tab==="day")renderDay()}).catch(()=>{});
+  SF._pvOk=false;S.db.doc("days/"+dayAdd(d,-1)+"/meta/stock").get().then(x=>{S.prevStock=(x.exists&&x.data().items)||{};SF._pvOk=true;if(S.tab==="day")renderDay()}).catch(()=>{});
 };
 const livePurch=()=>S.purch.filter(p=>!p.cancelled);
 /* किसी सब्ज़ी का आज का खरीद (मात्रा, रकम) */
@@ -64,20 +64,30 @@ function shrinkPhoto(file,max=1600,q=.72){return new Promise((res,rej)=>{const i
 const b64=blob=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=rej;r.readAsDataURL(blob)});
 let flushing=false;
 SF.pendingPhotos=async()=>{try{return (await IDB.all()).length}catch(e){return 0}};
+/* 28-11 (50 कमियाँ): config.js में photoUrl खाली था → खरीद/बिल की हर फोटो साथी के फोन में ही अटकी रहती थी, विक्रम जी तक कभी नहीं पहुँची।
+   अब: Apps Script का URL (config या सेटिंग settings/main.scriptUrl) हो तो Drive; न हो तो फोटो छोटी करके सीधे Firestore (days/<तारीख>/meta/ph_*) — मालिक ऐप में ही देखें */
+SF.scriptUrl=()=>CFG.photoUrl||(S.settings&&S.settings.scriptUrl)||"";
+async function photoToFs(ph){let bl=await shrinkPhoto(ph.blob,1100,.55),d=await b64(bl);
+  if(d.length>380000){bl=await shrinkPhoto(ph.blob,850,.45);d=await b64(bl)}
+  const k=String(ph.k||Date.now()).replace(/[^A-Za-z0-9_-]/g,"_"),path="days/"+ph.date+"/meta/ph_"+k;
+  await S.db.doc(path).set({img:"data:image/jpeg;base64,"+d,pid:ph.pid||"",kind:ph.kind||"buy",no:ph.no||"",name:ph.name||"",ts:Date.now(),by:ph.by||biller()||""});
+  return {fs:path}}
 SF.flushPhotos=async function(){
-  if(flushing||S.demo||!S.db||!CFG.photoUrl||navigator.onLine===false)return;
+  if(flushing||S.demo||!S.db||navigator.onLine===false)return;
   flushing=true;
   try{
     const list=await IDB.all();
     for(const ph of list){
       try{
-        const tok=await firebase.auth().currentUser.getIdToken();
-        const r=await fetch(CFG.photoUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-          body:JSON.stringify({idToken:tok,apiKey:CFG.firebase.apiKey,pid:ph.pid,date:ph.date,name:ph.name,mime:"image/jpeg",b64:await b64(ph.blob)})});
-        const j=await r.json();if(!j.ok)throw new Error(j.error||"upload");
+        const url=SF.scriptUrl();let got;
+        if(url){const tok=await firebase.auth().currentUser.getIdToken();
+          const r=await fetch(url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+            body:JSON.stringify({idToken:tok,apiKey:CFG.firebase.apiKey,pid:ph.pid,date:ph.date,name:ph.name,mime:"image/jpeg",b64:await b64(ph.blob)})});
+          const j=await r.json();if(!j.ok)throw new Error(j.error||"upload");got={id:j.id,url:j.url}}
+        else got=await photoToFs(ph);
         const F=firebase.firestore.FieldValue;
-        if(ph.kind==="bill")await S.db.doc("days/"+ph.date+"/meta/billPhotos").set({[ph.no]:F.arrayUnion({id:j.id,url:j.url,ts:Date.now(),by:ph.by||""})},{merge:true});
-        else await S.db.doc("purchases/"+ph.pid).update({photos:F.arrayUnion({id:j.id,url:j.url,ts:Date.now()}),photoPending:F.increment(-1)});
+        if(ph.kind==="bill")await S.db.doc("days/"+ph.date+"/meta/billPhotos").set({[ph.no]:F.arrayUnion({...got,ts:Date.now(),by:ph.by||""})},{merge:true});
+        else await S.db.doc("purchases/"+ph.pid).update({photos:F.arrayUnion({...got,ts:Date.now()}),photoPending:F.increment(-1)});
         await IDB.del(ph.k);
       }catch(e){break}
     }
@@ -85,6 +95,18 @@ SF.flushPhotos=async function(){
   flushing=false;
 };
 
+/* 📷 Firestore में रखी फोटो देखें (बड़ी, अलग परत — रसीद/खिड़की बंद नहीं होती) */
+SF.showFsPhoto=async function(path){if(!path||S.demo||!S.db)return;let ov=document.getElementById("fsph");if(!ov){ov=document.createElement("div");ov.id="fsph";ov.className="fsph";document.body.appendChild(ov)}
+  ov.innerHTML='<div class="fsph-in"><b>📷 फोटो आ रही है…</b></div>';ov.hidden=false;ov.onclick=()=>{ov.hidden=true;ov.innerHTML=""};
+  try{const x=await S.db.doc(path).get();const v=x.exists?x.data():null;if(!v||!v.img)throw 0;ov.innerHTML=`<div class="fsph-in"><img src="${esc(v.img)}" alt="बिल की फोटो"><small>${esc(v.name||"")} · ${esc(v.by||"")} · ${ftime(v.ts||0)} — कहीं भी दबाएँ = बंद</small></div>`}
+  catch(e){ov.innerHTML='<div class="fsph-in"><b>फोटो नहीं मिली</b></div>'}};
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[data-fsph]");if(!b)return;e.preventDefault();SF.showFsPhoto(b.dataset.fsph)});
+/* 28-11: बिक्री-बिल के साथ ली फोटो (meta/billPhotos) पहले कहीं दिखती ही नहीं थी — अब रसीद में "📷 फोटो" बटन */
+SF.billPhHTML=function(b){if(!b||!b.no||S.demo||!S.db)return "";const key=(b.date||today())+"|"+b.no;
+  setTimeout(()=>{const el=document.querySelector(`[data-bph="${CSS.escape(key)}"]`);if(!el||el.dataset.done)return;el.dataset.done="1";
+    S.db.doc("days/"+(b.date||today())+"/meta/billPhotos").get().then(x=>{const L=((x.exists&&x.data())||{})[b.no]||[];if(!L.length)return;
+      el.innerHTML=L.map((f,i)=>f.url?`<a class="chip" target="_blank" rel="noopener" href="${esc(f.url)}">📷 फोटो ${i+1}</a>`:`<button class="chip" data-fsph="${esc(f.fs||"")}">📷 फोटो ${i+1}</button>`).join("")}).catch(()=>{})},60);
+  return `<div class="seg" data-bph="${esc(key)}" style="margin:6px 0 0"></div>`};
 /* =============== 🛒 खरीद स्क्रीन =============== */
 let P=null;
 /* पिछली बार इसी फोन से जिस दुकान से खरीदा — वही पहले से भरी मिले */
@@ -118,9 +140,9 @@ function supItHTML(){const s=curSup();if(!s||!(s.items||[]).length)return "";
 function supRefresh(){const b=$("#supIt");if(b){const h=supItHTML();b.innerHTML=h;b.hidden=!h}const g=$("#pgrid");if(g)g.innerHTML=pGridHTML()}
 SF.supRate=supRate;SF.curSup=curSup;
 SF.hiRateHTML=function(){if(!S.isOwner)return "";const from=dayAdd(today(),-7);const seen=new Set();
-  const L=S.purchHist.concat(S.purch).filter(p=>{if(seen.has(p.id))return false;seen.add(p.id);return !p.cancelled&&!p.hiOk&&(p.hiRate||[]).length&&p.date>=from}).sort((a,b)=>b.ts-a.ts);
+  const L=S.purchHist.concat(S.purch).filter(p=>{if(seen.has(p.id))return false;seen.add(p.id);return !p.cancelled&&!p.hiOk&&((p.hiRate||[]).length||p.dupOf)&&p.date>=from}).sort((a,b)=>b.ts-a.ts);
   if(!L.length)return "";
-  return `<div class="card2" style="border:2px solid var(--chili);margin-bottom:10px"><h3 style="margin:0 0 6px;color:var(--chili)">🔺 दुकान के आम भाव से महँगी खरीद (15%+)</h3><div class="list">${L.map(p=>`<div class="li"><div class="mid"><b>${esc(p.supName||"दुकान")} · ${fdate(p.date).slice(0,5)} · ${esc(p.byName||"")}</b><span>${p.hiRate.map(h=>`${esc(h.name)} ₹${h.rate} (आम ₹${h.usual}, +${h.pct}%)`).join(" · ")}</span></div><button class="lnk" data-hiok="${esc(p.id)}">ठीक है</button></div>`).join("")}</div></div>`};
+  return `<div class="card2" style="border:2px solid var(--chili);margin-bottom:10px"><h3 style="margin:0 0 6px;color:var(--chili)">🔺 दुकान के आम भाव से महँगी खरीद (15%+)</h3><div class="list">${L.map(p=>`<div class="li"><div class="mid"><b>${esc(p.supName||"दुकान")} · ${fdate(p.date).slice(0,5)} · ${esc(p.byName||"")}</b><span>${p.dupOf?"⚠ यही खरीद (दुकान + रकम) उसी दिन दोबारा चढ़ी — दोगुनी तो नहीं? ":""}${(p.hiRate||[]).map(h=>`${esc(h.name)} ₹${h.rate} (${h.mkt?"बाज़ार/दूसरी दुकान":"आम"} ₹${h.usual}, +${h.pct}%)`).join(" · ")}</span></div><button class="lnk" data-hiok="${esc(p.id)}">ठीक है</button></div>`).join("")}</div></div>`};
 document.addEventListener("click",e=>{const b=e.target.closest("[data-hiok]");if(!b||!S.isOwner)return;const id=b.dataset.hiok;
   [S.purch,S.purchHist].forEach(A=>A.forEach(p=>{if(p.id===id)p.hiOk=true}));if(!S.demo&&S.db)S.db.collection("purchases").doc(id).update({hiOk:true}).catch(()=>{});if(typeof renderReport==="function")renderReport()});
 function pPick(){const qq=(P.q||"").trim().toLowerCase().replace(/\s*\d+([.,]\d+)?\s*(kg|किलो)?$/i,"").trim();
@@ -269,6 +291,10 @@ async function savePurchase(){
   if(S.saving)return;S.saving=true;
   const shop=String(P.shop||"").trim()||"मंडी",ph=String(P.phone||"").replace(/\D/g,"").slice(-10);
   let sup=shopKnown(shop,ph);
+  /* 28-11: वही खरीद दोबारा (उसी दुकान, उसी दिन, वही रकम) — पहले चुपचाप दोगुनी चढ़ जाती (माल + पैसा दोनों दोगुने) → अब पूछो */
+  {const pd0=P.day==="yday"?dayAdd(today(),-1):today(),n0=pNet();const dup=sup&&S.purchHist.concat(S.purch).find(p=>!p.cancelled&&p.supId===sup.id&&p.date===pd0&&Math.abs(num(p.total)-n0)<1);
+    if(dup&&P._dupOk!==dup.id){P._dupOk=dup.id;S.saving=false;toast("⚠ "+shop+" की "+rs(n0)+" की खरीद आज पहले भी चढ़ी है ("+ftime(dup.ts)+", "+(dup.byName||"")+") — सच में दूसरी है तो सेव फिर दबाएँ");return}
+    if(dup)P._dupOf=dup.id}
   if(!sup){const sid="s"+uid(),d={name:shop,phone:ph.length===10?ph:"",ts:Date.now(),lastTs:Date.now(),by:S.uid||"",byName:biller()};
     if(!S.demo)S.db.collection("suppliers").doc(sid).set(d).catch(()=>{});sup={id:sid,...d};S.suppliers.unshift(sup)}
   const net=pNet(),disc=r2(gross-net),f=gross>0?net/gross:1;
@@ -278,8 +304,10 @@ async function savePurchase(){
     return {id:l.id||"",name:it?it.name:String(l.name).trim(),unit:it?it.unit:(l.unit||"pc"),qty:r2(num(l.qty)*1000)/1000,rate:r2(num(l.rate)),amt:disc>0?r2(amt*f):amt,billAmt:amt,prev:lr?lr.rate:0}});
   const pdate=P.day==="yday"?dayAdd(today(),-1):today();
   /* दुकान के आम भाव से 15% से ज़्यादा महँगा — सिर्फ़ मालिक को सूचना (कर्मचारी को कुछ नहीं दिखता) */
-  const hiRate=lines.map(l=>{if(!l.id)return null;const u=supRate(l.id,sup);return u&&u.rate>0&&l.rate>u.rate*1.15?{name:l.name,rate:l.rate,usual:u.rate,pct:Math.round((l.rate/u.rate-1)*100)}:null}).filter(Boolean);
-  const doc={date:pdate,ts,...(P.day==="yday"?{late:true}:{}),...((window.SR&&SR.locNow&&SR.locNow())?{loc:SR.locNow()}:{}),by:S.uid||"",byName:biller(),supId:sup.id,supName:shop,supPhone:ph.length===10?ph:(ph||""),lines,gross,disc,total:net,pay:P.pay,paid:r2(paid),due:r2(net-paid),note:String(P.note||"").trim(),photos:[],photoPending:draftPhotos.length,cancelled:false,...(hiRate.length?{hiRate}:{})};
+  /* 28-11: नई/कभी-कभार वाली दुकान का पिछला भाव नहीं होता → पहले कभी पकड़ में नहीं आती थी; अब उस हालत में बाज़ार (किसी भी दुकान) के पिछले भाव से तुलना (mkt) */
+  const hiRate=lines.map(l=>{if(!l.id)return null;const u=supRate(l.id,sup);if(u&&u.rate>0)return l.rate>u.rate*1.15?{name:l.name,rate:l.rate,usual:u.rate,pct:Math.round((l.rate/u.rate-1)*100)}:null;
+    const m=lastRate(l.id);return m&&m.rate>0&&m.ts&&l.rate>m.rate*1.15?{name:l.name,rate:l.rate,usual:m.rate,pct:Math.round((l.rate/m.rate-1)*100),mkt:1}:null}).filter(Boolean);
+  const doc={date:pdate,ts,...(P.day==="yday"?{late:true}:{}),...((window.SR&&SR.locNow&&SR.locNow())?{loc:SR.locNow()}:{}),by:S.uid||"",byName:biller(),supId:sup.id,supName:shop,supPhone:ph.length===10?ph:(ph||""),lines,gross,disc,total:net,pay:P.pay,paid:r2(paid),due:r2(net-paid),note:String(P.note||"").trim(),photos:[],photoPending:draftPhotos.length,cancelled:false,...(hiRate.length?{hiRate}:{}),...(P._dupOf?{dupOf:P._dupOf}:{})};
   try{
     if(S.demo){S.purch.push({id,...doc});}
     else{
@@ -306,7 +334,7 @@ function viewPurchase(p){
   <div class="pp-stamp${p.pay==="udhar"&&num(p.due)>0?" red":""}">${PAY[p.pay]||""}${p.pay==="udhar"?" · दिया ₹"+p.paid+" · बाकी ₹"+p.due:""}</div>${p.note?`<p class="note">📝 ${esc(p.note)}</p>`:""}</div>
   ${window.SP?SP.purchaseInfoHTML(p):""}
   <h4 style="margin:10px 0 6px">बिल की फोटो</h4>
-  ${(p.photos||[]).length?(p.photos||[]).map((f,i)=>`<a class="big ghost" style="margin-bottom:6px" target="_blank" rel="noopener" href="${esc(f.url)}">📷 फोटो ${i+1} देखें (Google Drive)</a>`).join(""):`<p class="note">${num(p.photoPending)>0?"📷 फोटो अभी उस फोन से Drive पर जानी बाकी है":"इस खरीद की फोटो नहीं ली गई"}</p>`}
+  ${(p.photos||[]).length?(p.photos||[]).map((f,i)=>f.url?`<a class="big ghost" style="margin-bottom:6px" target="_blank" rel="noopener" href="${esc(f.url)}">📷 फोटो ${i+1} देखें (Google Drive)</a>`:`<button class="big ghost" style="margin-bottom:6px" data-fsph="${esc(f.fs||"")}">📷 फोटो ${i+1} देखें</button>`).join(""):`<p class="note">${num(p.photoPending)>0?"📷 फोटो अभी उस फोन से सर्वर पर जानी बाकी है (उस फोन में ऐप खोलें, नेट चालू रखें)":"इस खरीद की फोटो नहीं ली गई"}</p>`}
   ${p.by===S.uid&&!p.cancelled&&!S.demo?`<button class="big ghost" data-paddphoto style="margin-top:8px">📷 और फोटो जोड़ें</button>`:""}
   </div></div>`;
   $("#sheet").onclick=e=>{if(e.target.matches("[data-close]")){closeSheet();return}
@@ -406,7 +434,9 @@ SF.dayStockHTML=function(){
   <div class="card2"><h3>🛒 मंडी की खरीद</h3><p class="note" style="margin:0">सुबह न जुड़ पाई तो दोपहर, शाम या रात को "खरीद" में डाल दें। आधी रात के बाद हो तो वहाँ "कल" चुनें।</p>
     <button class="big ghost" data-gokharid>🛒 खरीद डालें</button></div>
   <div class="card2"><h3>🖼️ आज का भाव-पोस्टर</h3><p class="note" style="margin:0">सब्ज़ियों की फोटो और आज के भाव वाली सुंदर तस्वीर — WhatsApp ग्रुप या स्टेटस पर डालें।</p><button class="big ghost" data-sxposter>🖼️ पोस्टर बनाएँ और भेजें</button></div>`;
-  return `<div data-ds="sar">${P2.html}${SF.xyzWarnHTML()}${window.SR&&SR.miniMapHTML?SR.miniMapHTML():""}</div>
+  /* 28-11: कल रात का स्टॉक नहीं भरा तो "कल रात" 0 मान लिया जाता था — आज की कमी/ज़्यादा चुपचाप गलत; अब साफ़ चेतावनी */
+  const pvMiss=SF._pvOk&&!Object.values(S.prevStock||{}).some(o=>o&&o.close!==undefined&&o.close!=="")&&rows.some(r=>r.buyQ>0||r.saleQ>0);
+  return `${pvMiss?`<div class="warn" data-ds="maal">⚠ ${fdate(dayAdd(S.billsDate,-1))} की रात का स्टॉक ऐप में नहीं है — "कल रात" हर सब्ज़ी में 0 माना है, इसलिए आज की कमी/बचत का हिसाब अधूरा है। (उस दिन गाड़ी नहीं चली हो तो ठीक है)</div>`:""}<div data-ds="sar">${P2.html}${SF.xyzWarnHTML()}${window.SR&&SR.miniMapHTML?SR.miniMapHTML():""}</div>
   <div data-ds="paisa">${SF.gpayCardHTML()}</div>
   <div data-ds="ai">${SF.copyCardHTML()+SF.auditCardHTML()}</div>
   <div data-ds="maal">${window.SX?SX.mandiHTML()+(SX.seasonHTML?SX.seasonHTML():'')+SX.priceHTML():""}${SF.liveStockHTML()+SF.nightReviewHTML()}
@@ -444,7 +474,8 @@ function dayMoney(rows){
     <div class="stkmeta"><span>− आज रात बचा माल</span><b>${rs(closeVal)}</b></div>
     <div class="amtline" style="margin:0"><span>= ग्राहकों को बिका माल (लागत)</span><b>${rs(cogs)}</b></div>
     <div class="stkmeta"><span>ग्राहकों से बिक्री</span><b>${rs(sales)}</b></div>
-    <div class="amtline" style="margin:0;background:${profit>=0?"var(--leaf-bg,#e7f5ec)":"var(--chili-bg)"}"><span>असली मुनाफ़ा</span><b style="color:${profit>=0?"var(--leaf)":"var(--chili)"}">${rs(profit)}</b></div>
+    <div class="amtline" style="margin:0;background:${profit>=0?"var(--leaf-bg,#e7f5ec)":"var(--chili-bg)"}"><span>मुनाफ़ा (खर्चे से पहले)</span><b style="color:${profit>=0?"var(--leaf)":"var(--chili)"}">${rs(profit)}</b></div>
+    ${(()=>{const kh=r2((S.kharch||[]).reduce((a,k)=>a+num(k.amt),0));return kh>0?`<div class="stkmeta"><span>− आज का खर्चा (डीज़ल, पॉलीथीन…)</span><b>${rs(kh)}</b></div><div class="amtline" style="margin:0"><span>असली मुनाफ़ा (खर्चे के बाद)</span><b style="color:${profit-kh>=0?"var(--leaf)":"var(--chili)"}">${rs(r2(profit-kh))}</b></div>`:""})()}
     <div class="stkmeta"><span>मैनेजर के भाव पर बिक्री होनी चाहिए थी</span><b>${rs(expSale)}</b></div>
     ${Math.abs(gap)>=20?`<div class="${gap>0?"warn":"note"}" style="margin:0">${gap>0?`⚠ ${rs(gap)} की बिक्री कम आई — कम भाव, मुफ्त, खराब या माल कम`:`बोर्ड भाव से ${rs(-gap)} ज़्यादा बिका`}</div>`:'<span class="pill green">✓ बिक्री भाव के हिसाब से ठीक</span>'}
   </div>`;
@@ -984,6 +1015,10 @@ SF.decodeBill=function(no){const m=/^SE-([0-9A-Z]{6})$/.exec(String(no||""));if(
   return {date,serial,dev}};
 SF.billLabel=no=>{const d=SF.decodeBill(no);return d?`${fdate(d.date)} का बिल #${d.serial}${d.dev?" · बिना नेट बना":""}`:""};
 function devSlot(){let v=LS.get("se_dev");if(!v){v=String(1+Math.floor(Math.random()*9));LS.set("se_dev",v)}return +v}
+/* 28-11: बिना-नेट बिल का नंबर टकराए तो उसी तारीख के सर्वर-क्रम से नया (फोन-निशान 0 = पक्का अनोखा) — index.html commitBill */
+SF.serverBillNo=async function(date){const ref=S.db.doc("days/"+date+"/meta/counter");
+  const n=await Promise.race([S.db.runTransaction(async t=>{const g=await t.get(ref);const n=(g.exists?(+g.data().n||0):0)+1;t.set(ref,{n,ts:Date.now()},{merge:true});return n}),new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000))]);
+  return SF.encodeBill(date,Math.min(n,999),0)};
 SF.reserveBillNo=async function(){
   const d=today(),k="se_cnt_"+d,loc=+LS.get(k)||0;
   if(!S.demo&&S.db&&navigator.onLine!==false){
@@ -1199,7 +1234,7 @@ SF.purchA4HTML=function(){
   const tot=r2(list.reduce((a,p)=>a+num(p.total),0));
   const by={};list.forEach(p=>{by[p.pay]=r2((by[p.pay]||0)+num(p.paid));});
   return `<h2>मंडी खरीद (${list.length} बिल · ${rs(tot)})</h2><table><tr><th>नं</th><th>दुकान</th><th>किसने</th><th>सामान</th><th class="r">रकम</th><th>भुगतान</th><th>फोटो</th></tr>
-  ${list.map((p,i)=>`<tr><td>${pNo(p,i+1)}</td><td>${esc(p.supName||"")}</td><td>${esc(p.byName||"")}</td><td>${(p.lines||[]).map(l=>`${esc(l.name)} ${fq(l.qty,l.unit)}×${rs(l.rate)}${l.prev&&l.rate>l.prev*1.03?" 🔺":""}`).join(", ")}</td><td class="r">${rs(p.total)}</td><td>${PAY[p.pay]||""}${num(p.due)>0?" · बाकी "+rs(p.due):""}</td><td>${(p.photos||[]).length?(p.photos||[]).map((f,j)=>`<a href="${esc(f.url)}">${j+1}</a>`).join(" "):"—"}</td></tr>`).join("")}</table>
+  ${list.map((p,i)=>`<tr><td>${pNo(p,i+1)}</td><td>${esc(p.supName||"")}</td><td>${esc(p.byName||"")}</td><td>${(p.lines||[]).map(l=>`${esc(l.name)} ${fq(l.qty,l.unit)}×${rs(l.rate)}${l.prev&&l.rate>l.prev*1.03?" 🔺":""}`).join(", ")}</td><td class="r">${rs(p.total)}</td><td>${PAY[p.pay]||""}${num(p.due)>0?" · बाकी "+rs(p.due):""}</td><td>${(p.photos||[]).length?(p.photos||[]).map((f,j)=>f.url?`<a href="${esc(f.url)}">${j+1}</a>`:"📷"+(j+1)).join(" "):"—"}</td></tr>`).join("")}</table>
   <p>भुगतान: ${Object.entries(by).map(([k,v])=>`${PAY[k]||k} ${rs(v)}`).join(" · ")}</p>`;
 };
 /* =============== 💹 हर बिल का मुनाफ़ा (सिर्फ़ मालिक, सूची में — बिल पर नहीं छपता) =============== */
@@ -1343,7 +1378,7 @@ SF.parseGpay=function(text){
   const R=csvRows(text);if(!R.length)return [];const H=R[0].map(h=>h.trim().toLowerCase());
   const ix=k=>H.findIndex(h=>h.includes(k));const iN=ix("payer"),iT=ix("creation"),iX=ix("transaction id"),iA=H.findIndex(h=>h==="amount"),iS=ix("status"),iO=ix("notes"),iY=H.findIndex(h=>h==="type"),iV=ix("paid via");
   if(iT<0||iA<0)return [];
-  return R.slice(1).map(r=>{const tm=(r[iT]||"").trim(),note=(r[iO]||"").trim(),m=noKey(note).match(/BILLNO(SE[A-Z0-9]{6})/);
+  return R.slice(1).map(r=>{const tm=(r[iT]||"").trim(),note=(r[iO]||"").trim(),m=noKey(note).match(/BILL(?:NO)?(SE[A-Z0-9]{6})/);/* 28-11: नोट अब "Sabji Express Bill SE-…" (No नहीं) — पहले यह पकड़ में ही नहीं आता था */
     return {name:(r[iN]||"").trim(),ts:new Date(tm.replace(" ","T")+"+05:30").getTime(),date:tm.slice(0,10),txn:(r[iX]||"").trim(),amt:num(r[iA]),ok:iS<0||/success/i.test(r[iS]||""),note,via:((iV>-1?r[iV]:"")+" "+(iY>-1?r[iY]:"")).trim(),bill:m?m[1]:""}})
     .filter(p=>p.ok&&p.amt>0&&p.ts>0);
 };
@@ -1357,7 +1392,9 @@ SF.gpMatch=function(pays,bills){
   pass(0.01,"रकम+समय");pass(1.01,"लगभग");
   return {rows:out,free:out.filter(o=>!o.b),miss:B.filter(b=>!used.has(b.no)),upiApp:r2(B.reduce((a,b)=>a+num(b.pay.upi),0)),gp:r2(pays.reduce((a,p)=>a+p.amt,0))};
 };
-SF.gpNow=function(){if(!SF.gp||!(SF.gp.pays||[]).length)return null;return SF.gpMatch(SF.gp.pays,S.dayBills)};
+/* 28-11: उधार का "UPI से जमा" भी मिलान में — पहले सिर्फ़ बिल गिने जाते थे, झूठा UPI-जमा कभी पकड़ में नहीं आता */
+SF.jamaUpi=d=>(S.ledger||[]).filter(l=>l.type==="jama"&&l.mode==="upi"&&l.date===d).map(l=>({no:"जमा·"+(l.partyName||"").slice(0,14),jama:1,ts:l.ts,byName:l.byName||"",mode:"jama",pay:{upi:num(l.amt)},cancelled:false}));
+SF.gpNow=function(){if(!SF.gp||!(SF.gp.pays||[]).length)return null;return SF.gpMatch(SF.gp.pays,(S.dayBills||[]).concat(SF.jamaUpi(S.billsDate)))};
 const gpNear=o=>o.how==="लगभग"||o.how==="नोट (रकम अलग)";
 SF.gpTag=function(b){if(!S.isOwner)return "";const M=SF.gpNow();if(!M)return "";const o=M.rows.find(x=>x.b&&x.b.no===b.no);
   if(o)return `<small class="gp-tag">📱 ${esc(o.p.name)}${gpNear(o)?" · ₹"+o.p.amt:""}</small>`;
@@ -1392,10 +1429,10 @@ SF.importGpay=async function(text){
     const seen=new Set(old.map(p=>p.txn));const pays=[...old,...by[d].filter(p=>!seen.has(p.txn))].sort((a,b)=>b.ts-a.ts);
     let bills=d===S.billsDate?S.dayBills:null;
     if(!bills&&!S.demo&&S.db){try{const q=await S.db.collection("days/"+d+"/bills").get();bills=q.docs.map(x=>x.data())}catch(e){bills=[]}}
-    const M=SF.gpMatch(pays,bills||[]);
+    const M=SF.gpMatch(pays,(bills||[]).concat(SF.jamaUpi(d)));
     const doc={date:d,pays,ts:Date.now(),by:S.uid||"",n:pays.length};
     if(!S.demo&&S.db){try{await S.db.doc("ownerCfg/gpay_"+d).set(doc)}catch(e){toast("सेव नहीं हुआ: "+(e.code||""));return}}
-    for(const o of M.rows){if(!o.b||(o.b.upiPayer&&o.b.upiPayer.txn===o.p.txn))continue;const up={name:o.p.name,txn:o.p.txn,amt:o.p.amt,ts:o.p.ts,how:o.how};o.b.upiPayer=up;named++;
+    for(const o of M.rows){if(!o.b||o.b.jama||(o.b.upiPayer&&o.b.upiPayer.txn===o.p.txn))continue;const up={name:o.p.name,txn:o.p.txn,amt:o.p.amt,ts:o.p.ts,how:o.how};o.b.upiPayer=up;named++;
       if(!S.demo&&S.db)try{await S.db.doc("days/"+d+"/bills/"+o.b.no).update({upiPayer:up})}catch(e){}}
     if(d===S.billsDate)SF.gp=doc;
   }
@@ -1431,12 +1468,16 @@ SF.glCardHTML=function(){const F=SF.glF,own=S.isOwner,L=SF.glLog().filter(g=>own
   ${L.length?`<div style="margin-top:6px">${L.slice().reverse().map(g=>`<div class="stkmeta"><span>${g.kind==="in"?"📥":"📤"} ${esc(g.why)}${g.note?" · "+esc(g.note):""}<br><small class="note">${ftime(g.ts)} · ${esc(g.byName||"")}${g.ok?" · ✓ देख लिया":""}</small></span><b>${rs(g.amt)}${own&&!g.ok?` <button class="lnk" data-glok="${esc(g.id)}">✓ देख लिया</button>`:""}</b></div>`).join("")}</div>`:""}
   </div>`};
 SF.glWrite=async function(log){const d=S.billsDate;if(S.demo){S.gl={log};return}await S.db.doc("days/"+d+"/meta/galla").set({log,ts:Date.now()},{merge:true});S.gl={...(S.gl||{}),log}};
+/* 28-11: नई एंट्री arrayUnion से — पहले पूरी सूची दोबारा लिखी जाती थी, दो फोन एक साथ लिखें तो एक की एंट्री मिट जाती थी */
+SF.glAdd=async function(g,date){const d=date||S.billsDate;if(S.demo||!S.db){if(d===S.billsDate)S.gl={...(S.gl||{}),log:((S.gl&&S.gl.log)||[]).concat([g])};return}
+  await S.db.doc("days/"+d+"/meta/galla").set({log:firebase.firestore.FieldValue.arrayUnion(g),ts:Date.now()},{merge:true});
+  if(d===S.billsDate)S.gl={...(S.gl||{}),log:((S.gl&&S.gl.log)||[]).filter(x=>x.id!==g.id).concat([g])}};
 SF.glSave=async function(){const F=SF.glF,amt=r2(num(($("#glAmt")||{}).value)),note=String(($("#glNote")||{}).value||"").trim();
   if(!F.why){toast("पहले चुनें — पैसा किसको दिया / कहाँ से आया");return false}
   if(!(amt>0)){toast("रकम लिखें");return false}
   if(SF.glNeedNote(F.why)&&note.length<2){toast("लिखें — किससे / किस लिए");return false}
   const ts=Date.now(),g={id:"g"+ts.toString(36),ts,kind:F.kind,why:F.why,amt,note,by:S.uid||"",byName:biller(),...(S.isOwner?{ok:{ts}}:{})};
-  try{await SF.glWrite(((S.gl&&S.gl.log)||[]).concat([g]));SF.glF={kind:F.kind,why:""};toast((g.kind==="in"?"📥 ":"📤 ")+rs(amt)+" की एंट्री सेव हुई");renderDay();return true}catch(e){toast("एंट्री सेव नहीं हुई: "+(e.code||""));return false}};
+  try{await SF.glAdd(g,S.isOwner?S.billsDate:today());SF.glF={kind:F.kind,why:""};toast((g.kind==="in"?"📥 ":"📤 ")+rs(amt)+" की एंट्री सेव हुई");renderDay();return true}catch(e){toast("एंट्री सेव नहीं हुई: "+(e.code||""));return false}};
 document.addEventListener("click",e=>{const t=e.target;if(!t.closest)return;
   const k=t.closest("[data-glk]");if(k){SF.glF={kind:k.dataset.glk,why:""};renderDay();return}
   const w=t.closest("[data-glw]");if(w){const a=($("#glAmt")||{}).value,n=($("#glNote")||{}).value;SF.glF.why=w.dataset.glw;renderDay();if($("#glAmt")){$("#glAmt").value=a||"";$("#glNote").value=n||""}return}
@@ -1495,9 +1536,10 @@ SF.pendBills=()=>(S.dayBills||[]).filter(b=>b.settled===false&&!b.cancelled&&b.m
 SF.gcSave=async function(float,counted){const d=S.billsDate,c=cashCalc(d),fl=float==null?c.float:float;
   const expected=r2(fl+c.cashSale+c.jamaCash+c.gIn-c.khCash-c.gOut),ts=Date.now();
   const hist=((S.close&&S.close.hist)||SF.gcHist()).slice();
-  if(counted!=null)hist.push({ts,counted,expected,diff:r2(counted-expected),by:S.uid||"",byName:biller(),pend:SF.pendBills().length});
-  const doc={float:fl,counted,expected,diff:counted==null?null:r2(counted-expected),ts,by:S.uid||"",byName:biller(),hist:hist.slice(-48)};
-  if(!S.demo)await S.db.doc("days/"+d+"/meta/close").set(doc);S.close=doc;try{localStorage.setItem("se_gc_"+d,String(ts))}catch(e){}return doc};
+  const h=counted!=null?{ts,counted,expected,diff:r2(counted-expected),by:S.uid||"",byName:biller(),pend:SF.pendBills().length}:null;if(h)hist.push(h);
+  const doc={float:fl,counted,expected,diff:counted==null?null:r2(counted-expected),ts,by:S.uid||"",byName:biller(),hist};
+  /* 28-11: पहले पूरा doc (hist समेत) दोबारा लिखा जाता था — फोन में पुरानी गिनतियाँ अभी लोड न हुई हों तो सर्वर की पिछली गिनतियाँ मिट जातीं। अब नई गिनती arrayUnion से जुड़ती है */
+  if(!S.demo){const F=firebase.firestore.FieldValue,{hist:_h,...top}=doc;await S.db.doc("days/"+d+"/meta/close").set({...top,...(h?{hist:F.arrayUnion(h)}:{})},{merge:true})}S.close=doc;try{localStorage.setItem("se_gc_"+d,String(ts))}catch(e){}return doc};
 SF.gcPendHTML=function(){const P=SF.pendBills();if(!P.length)return "";
   return `<div class="ud-w" style="margin:4px 0 8px">⏳ ${P.length} बिल का भुगतान अभी बाकी है${S.isOwner?" ("+rs(P.reduce((a,b)=>a+num(b.total),0))+")":""} — पहले इन्हें सेटल करें, फिर गल्ला गिनें:
     <div class="seg" style="margin-top:4px">${P.slice(0,6).map(b=>`<button class="chip" data-sbopen="${esc(b.no)}">${esc(b.partyName||"ग्राहक")} · ${ftime(b.ts)}</button>`).join("")}</div></div>`};
